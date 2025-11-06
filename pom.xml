@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    DevOps 管理平台 - 父级POM配置文件
+    作用：定义整个微服务项目的公共配置、依赖管理和模块结构
+    包含5个核心模块：网关、管理服务、安全服务、Cloudflare日志生产者和消费者
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- Maven 模型版本 -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 项目坐标信息 -->
+    <groupId>com.backend</groupId>          <!-- 组织标识：com.admin -->
+    <artifactId>devop</artifactId><!-- 项目标识：admin-platform -->
+    <version>1.0.0</version>              <!-- 版本号：1.0.0 -->
+    <packaging>pom</packaging>            <!-- 打包类型：pom（多模块项目） -->
+    <name>Devop Backend</name>    <!-- 项目名称 -->
+    <description>Parent project for Devop Backend</description><!-- 项目描述 -->
+
+    <!-- 项目模块定义 -->
+    <modules>
+        <module>utils-core</module>                 <!-- 工具模块 -->
+        <module>utils-webflux</module>              <!-- 工具模块，针对webflux -->
+        <module>gateway</module>                    <!-- 网关模块：负责请求路由和过滤 -->
+        <module>cloudflare-logs-producer</module>    <!-- Cloudflare日志生成者 -->
+        <module>cloudflare-logs-consumer</module>   <!-- Cloudflare日志消费者：处理日志数据 -->
+<!--        <module>manage</module>                     &lt;!&ndash; 管理服务模块：核心业务逻辑处理 &ndash;&gt;-->
+<!--        <module>security</module>                   &lt;!&ndash; 安全服务模块：认证和授权管理 &ndash;&gt;-->
+<!--        <module>cloudflare-logs-consumer</module>   &lt;!&ndash; Cloudflare日志消费者：处理日志数据 &ndash;&gt;-->
+    </modules>
+
+    <!-- 全局属性配置 -->
+    <properties>
+        <java.version>21</java.version>                           <!-- Java版本：17 -->
+        <spring-boot.version>3.2.5</spring-boot.version>           <!-- Spring Boot版本：3.2.5 -->
+        <spring-cloud.version>2023.0.1</spring-cloud.version>      <!-- Spring Cloud版本：2023.0.1 -->
+        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version><!-- Spring Cloud Alibaba版本 -->
+        <!-- 统一使用 UTF-8 编码进行编译 -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>      <!-- 源代码编码：UTF-8 -->
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding><!-- 报告输出编码：UTF-8 -->
+    </properties>
+
+    <!-- 依赖管理：统一管理所有子模块的依赖版本 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot 依赖管理 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring Cloud 依赖管理 -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring Cloud Alibaba 依赖管理 -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 构建配置 -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Maven 编译器插件配置 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>           <!-- 源代码版本：Java 21 -->
+                        <target>${java.version}</target>           <!-- 目标字节码版本：Java 21 -->
+                        <encoding>${project.build.sourceEncoding}</encoding><!-- 编码格式：UTF-8 -->
+                    </configuration>
+                </plugin>
+
+                <!-- Spring Boot Maven 插件 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <!-- 版本由Spring Boot依赖管理自动控制 -->
+                    <!--                    <version>${spring-boot.version}</version>-->
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

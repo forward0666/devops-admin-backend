@@ -1,0 +1,3 @@
+com\backend\bigdata\CloudflareLogsProducerApplication.class
+com\backend\bigdata\controller\CloudflareLogController.class
+com\backend\bigdata\service\CloudFlareLogsSendToKafkaService.class

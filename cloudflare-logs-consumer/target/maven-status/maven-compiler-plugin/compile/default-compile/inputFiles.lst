@@ -1,0 +1,14 @@
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\config\KafkaBatchConsumerConfig.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\handler\MapToJsonStringTypeHandler.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\service\impl\CloudflareLogServiceImpl.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForGoGameApp.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\handler\ListToStringArrayTypeHandler.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForU8App.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForUU8App.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForCreditApp.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForDevopApp.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForKKApp.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\consumer\CloudflareLogsBatchConsumer.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\mapper\CloudflareLogsMapper.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\CloudflareLogsConsumerApplication.java
+D:\projects\devop\backend\cloudflare-logs-consumer\src\main\java\com\backend\bigdata\service\CloudflareLogService.java

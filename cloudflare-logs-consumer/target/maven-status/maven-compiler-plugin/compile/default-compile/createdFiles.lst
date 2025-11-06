@@ -1,0 +1,14 @@
+com\backend\bigdata\config\KafkaBatchConsumerConfig.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForUU8App.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForU8App.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForGoGameApp.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForCreditApp.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForKKApp.class
+com\backend\bigdata\handler\MapToJsonStringTypeHandler.class
+com\backend\bigdata\service\CloudflareLogService.class
+com\backend\bigdata\service\impl\CloudflareLogServiceImpl.class
+com\backend\bigdata\mapper\CloudflareLogsMapper.class
+com\backend\bigdata\CloudflareLogsConsumerApplication.class
+com\backend\bigdata\consumer\CloudflareLogsBatchConsumer.class
+com\backend\bigdata\consumer\KafkaConsumerHttpRequestsForDevopApp.class
+com\backend\bigdata\handler\ListToStringArrayTypeHandler.class
