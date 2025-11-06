@@ -8,7 +8,12 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
+/**
+ * BigData应用认证过滤器
+ * 支持线程池异步验证 & 方法级阻塞
+ */
 @Slf4j
 @RefreshScope
 @Component("BigDataAuth")
@@ -17,8 +22,11 @@ public class BigDataAuth extends AbstractAuthFilter<BaseAuthConfig> {
     @Value("${secure.header.bigdata.secret:default-secret}")
     private String secret;
 
-    public BigDataAuth() {
-        super(BaseAuthConfig.class);
+    /**
+     * 构造器注入线程池
+     */
+    public BigDataAuth(ExecutorService executorService) {
+        super(BaseAuthConfig.class, executorService);
     }
 
     @Override
@@ -26,13 +34,13 @@ public class BigDataAuth extends AbstractAuthFilter<BaseAuthConfig> {
         return secret;
     }
 
+    /**
+     * 方法级拦截逻辑
+     * 仅允许 POST 请求，其它方法阻塞
+     */
     @Override
     protected boolean authorizedRequest(String method) {
-        // 允许的方法列表
-        // Set<String> allowedMethods = Set.of("POST", "PUT");
         Set<String> allowedMethods = Set.of("POST");
-        // 如果请求方法不在允许列表中，就阻塞
         return !allowedMethods.contains(method.toUpperCase());
     }
-
 }

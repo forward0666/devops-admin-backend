@@ -1,4 +1,6 @@
 network\HttpResponseUtils.class
+config\ThreadPoolConfig.class
+network\ThreadPoolUtils.class
 security\AuthValidationUtils.class
 network\ClientIpUtils.class
 webflux\ExchangeUtils.class

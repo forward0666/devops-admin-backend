@@ -1,10 +1,15 @@
 package com.backend.gateway;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.ApplicationContext;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * 网关服务主应用类
@@ -26,7 +31,11 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 4. 初始化网关路由和过滤器配置
  * 5. 启动Netty服务器监听HTTP请求
  */
-@SpringBootApplication
+@Slf4j
+@SpringBootApplication(scanBasePackages = {
+        "com.backend.gateway", // 主工程包
+        "config",
+})
 @EnableDiscoveryClient
 @RefreshScope
 @EnableFeignClients
@@ -43,7 +52,26 @@ public class GatewayApplication {
      * 4. 开始接收和处理HTTP请求
      */
     public static void main(String[] args) {
-        SpringApplication.run(GatewayApplication.class, args);
+
+//        SpringApplication.run(GatewayApplication.class, args);
+        ApplicationContext ctx = SpringApplication.run(GatewayApplication.class, args);
+        // 启动后执行额外逻辑（如异步任务、Kafka 检查、线程池预热等）
+        initAfterStartup(ctx);
+    }
+
+    private static void initAfterStartup(ApplicationContext ctx) {
+        log.info("✅ GatewayApplication started successfully!");
+
+        ExecutorService executor = ctx.getBean(ExecutorService.class);
+        log.info("🧵 ThreadPool initialized: {}", executor);
+
+        // ✅ 线程池预热（提前创建核心线程）
+        if (executor instanceof ThreadPoolExecutor) {
+            ((ThreadPoolExecutor) executor).prestartAllCoreThreads();
+            log.info("🔥 ThreadPool pre-started {} core threads",
+                    ((ThreadPoolExecutor) executor).getPoolSize());
+        }
+
     }
 
 }
