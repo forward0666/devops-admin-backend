@@ -4,6 +4,7 @@ import com.backend.gateway.config.BaseAuthConfig;
 import com.backend.gateway.filter.AbstractAuthFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
@@ -25,8 +26,8 @@ public class BigDataAuth extends AbstractAuthFilter<BaseAuthConfig> {
     /**
      * 构造器注入线程池
      */
-    public BigDataAuth(ExecutorService executorService) {
-        super(BaseAuthConfig.class, executorService);
+    public BigDataAuth(ExecutorService executorService, CacheManager cacheManager) {
+        super(BaseAuthConfig.class, executorService, cacheManager);
     }
 
     @Override

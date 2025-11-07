@@ -1,6 +1,12 @@
+monitor\ThreadPoolMonitor.class
 network\HttpResponseUtils.class
 config\ThreadPoolConfig.class
 network\ThreadPoolUtils.class
 security\AuthValidationUtils.class
+monitor\JvmStartupInfoPrinter.class
+monitor\RuntimeMemoryMonitor.class
+monitor\JvmRuntimeMonitor.class
 network\ClientIpUtils.class
 webflux\ExchangeUtils.class
+config\CacheConfig.class
+monitor\HeapMemoryMonitor.class

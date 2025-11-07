@@ -8,6 +8,7 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ExecutorService;
+import org.springframework.cache.CacheManager;
 
 /**
  * 全局认证过滤器
@@ -24,8 +25,8 @@ public class GlobalAuth extends AbstractAuthFilter<BaseAuthConfig> {
     /**
      * 使用构造器注入线程池
      */
-    public GlobalAuth(ExecutorService executorService) {
-        super(BaseAuthConfig.class, executorService);
+    public GlobalAuth(ExecutorService executorService, CacheManager cacheManager) {
+        super(BaseAuthConfig.class, executorService, cacheManager);
     }
 
     @Override
