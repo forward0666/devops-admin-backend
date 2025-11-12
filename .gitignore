@@ -3,3 +3,4 @@
 /cloudflare-logs-producer/target/
 /utils-core/target/
 /utils-webflux/target/
+/.idea/

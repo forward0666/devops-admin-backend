@@ -1,5 +1,0 @@
-com\backend\gateway\filter\AbstractAuthFilter.class
-com\backend\gateway\filter\impl\BigDataAuth.class
-com\backend\gateway\GatewayApplication.class
-com\backend\gateway\filter\impl\GlobalAuth.class
-com\backend\gateway\config\BaseAuthConfig.class
