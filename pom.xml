@@ -72,36 +72,36 @@
     </dependencyManagement>
 
     <!-- 构建配置 -->
-<!--    <build>-->
-<!--        <pluginManagement>-->
-<!--            <plugins>-->
-<!--                &lt;!&ndash; Maven 编译器插件配置 &ndash;&gt;-->
-<!--                <plugin>-->
-<!--                    <groupId>org.apache.maven.plugins</groupId>-->
-<!--                    <artifactId>maven-compiler-plugin</artifactId>-->
-<!--                    <version>3.11.0</version>-->
-<!--                    <configuration>-->
-<!--                        <source>${java.version}</source>           &lt;!&ndash; 源代码版本：Java 21 &ndash;&gt;-->
-<!--                        <target>${java.version}</target>           &lt;!&ndash; 目标字节码版本：Java 21 &ndash;&gt;-->
-<!--                        <encoding>${project.build.sourceEncoding}</encoding>&lt;!&ndash; 编码格式：UTF-8 &ndash;&gt;-->
-<!--                    </configuration>-->
-<!--                </plugin>-->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Maven 编译器插件配置 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>           <!-- 源代码版本：Java 21 -->
+                        <target>${java.version}</target>           <!-- 目标字节码版本：Java 21 -->
+                        <encoding>${project.build.sourceEncoding}</encoding><!-- 编码格式：UTF-8 -->
+                    </configuration>
+                </plugin>
 
-<!--                &lt;!&ndash; Spring Boot Maven 插件 &ndash;&gt;-->
-<!--                <plugin>-->
-<!--                    <groupId>org.springframework.boot</groupId>-->
-<!--                    <artifactId>spring-boot-maven-plugin</artifactId>-->
-<!--                    &lt;!&ndash; 版本由Spring Boot依赖管理自动控制 &ndash;&gt;-->
-<!--&lt;!&ndash;                     <version>${spring-boot.version}</version>&ndash;&gt;-->
-<!--                    <executions>-->
-<!--                        <execution>-->
-<!--                            <goals>-->
-<!--                                <goal>repackage</goal>-->
-<!--                            </goals>-->
-<!--                        </execution>-->
-<!--                    </executions>-->
-<!--                </plugin>-->
-<!--            </plugins>-->
-<!--        </pluginManagement>-->
-<!--    </build>-->
+                <!-- Spring Boot Maven 插件 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <!-- 版本由Spring Boot依赖管理自动控制 -->
+<!--                     <version>${spring-boot.version}</version>-->
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>
