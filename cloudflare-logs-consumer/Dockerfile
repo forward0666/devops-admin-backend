@@ -1,10 +1,10 @@
-FROM alibabadragonwell/dragonwell:21.0.8.0.8.9
+FROM amazoncorretto:21.0.9-alpine3.22
 WORKDIR /app
-RUN adduser -D -h /app/appuser appuser
+RUN adduser --disabled-password --gecos "" appuser
 ARG JAR_FILE=cloudflare-logs-consumer/target/cloudflare-logs-consumer-1.0.0.jar
 COPY ${JAR_FILE} app.jar
 RUN sh -c 'touch app.jar'
-ENV TZ=Asia/Shanghai
+ENV TZ=Asia/Shanghai JAVA_OPTS="-Dspring.config.location=classpath:/application.properties"
 RUN chown -R appuser:appuser /app
 USER appuser
 ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar" ]
