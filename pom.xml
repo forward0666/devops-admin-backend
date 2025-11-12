@@ -92,7 +92,14 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <!-- 版本由Spring Boot依赖管理自动控制 -->
-                    <!--                    <version>${spring-boot.version}</version>-->
+<!--                     <version>${spring-boot.version}</version>-->
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
             </plugins>
         </pluginManagement>
