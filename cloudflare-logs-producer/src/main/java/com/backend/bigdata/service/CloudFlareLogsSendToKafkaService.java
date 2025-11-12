@@ -53,7 +53,7 @@ public class CloudFlareLogsSendToKafkaService {
                         log.error("[traceId={}] ❌ Kafka send failed: {}", traceId, ex.getMessage(), ex);
                     } else {
                         if (firstSuccess != null && firstSuccess.compareAndSet(false, true)) {
-                            log.info("[traceId={}] ✅ Kafka messages sent finished: {}", traceId, topic);
+//                            log.info("[traceId={}] ✅ Kafka messages sent finished: {}", traceId, topic);
                         }
                     }
                 } finally {

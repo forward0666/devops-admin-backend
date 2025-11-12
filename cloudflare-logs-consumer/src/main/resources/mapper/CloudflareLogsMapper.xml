@@ -718,4 +718,15 @@
         </foreach>
     </insert>
 
+<!--    <select id="enableTTL" resultType="java.lang.String">-->
+<!--        ALTER TABLE cloudflare_logs.http_devop_app_local-->
+<!--            MODIFY TTL EdgeEndTimestamp + INTERVAL 7 DAY-->
+<!--    </select>-->
+<!--清理数据-->
+<!--    ALTER TABLE cloudflare_logs.http_devop_app_local-->
+<!--    MODIFY TTL EdgeEndTimestamp + INTERVAL 7 DAY;-->
+<!--    delete from cloudflare_logs.http_devop_app_local where EdgeEndTimestamp < '2025-01-11 00:00:00'-->
+
+
+
 </mapper>

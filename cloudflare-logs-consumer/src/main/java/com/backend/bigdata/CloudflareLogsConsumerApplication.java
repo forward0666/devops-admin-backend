@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -56,6 +57,7 @@ import java.util.concurrent.ThreadPoolExecutor;
         })
 @EnableDiscoveryClient
 @RefreshScope
+@EnableScheduling
 @MapperScan({"com.backend.bigdata.mapper"})
 public class CloudflareLogsConsumerApplication {
 

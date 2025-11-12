@@ -136,8 +136,8 @@ public class CloudflareLogController {
                             log.warn("[traceId={}] ⚠️ Invalid JSON skipped: {}", traceId, e.getMessage());
                         }
                     }
-                    log.info("[traceId={}] 🧵 [{}] finished sending {} messages → topic '{}'",
-                            traceId, Thread.currentThread().getName(), batchSent, topic);
+//                    log.info("[traceId={}] 🧵 [{}] finished sending {} messages → topic '{}'",
+//                            traceId, Thread.currentThread().getName(), batchSent, topic);
                     MDC.remove("traceId");
                 }, executorService);
                 futures.add(future);

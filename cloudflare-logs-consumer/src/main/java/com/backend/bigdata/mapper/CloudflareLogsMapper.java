@@ -46,4 +46,5 @@ public interface CloudflareLogsMapper {
      * @param batch 批量日志数据列表，每个元素为字段名到值的映射
      */
     void batchInsertCloudflareHttpLogsForDevopApp(List<Map<String, Object>> batch);
+
 }
