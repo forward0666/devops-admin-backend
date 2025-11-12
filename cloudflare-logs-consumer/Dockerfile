@@ -9,4 +9,4 @@ ENV TZ=Asia/Shanghai
 RUN chown -R appuser:appuser /app
 USER appuser
 ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar" ]
-EXPOSE 8081 11111
+EXPOSE 8085 11111
