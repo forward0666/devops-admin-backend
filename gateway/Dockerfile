@@ -1,6 +1,5 @@
 FROM alibabadragonwell/dragonwell:21.0.8.0.8.9
 WORKDIR /app
-# Alpine 下创建用户
 RUN adduser -D -h /app/appuser appuser
 ARG JAR_FILE=gateway/target/gateway-1.0.0.jar
 COPY ${JAR_FILE} app.jar
