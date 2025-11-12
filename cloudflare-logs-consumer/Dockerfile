@@ -1,4 +1,4 @@
-FROM amazoncorretto:17.0.9-alpine3.18
+FROM alibabadragonwell/dragonwell:21-alpine3.18
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
 ARG JAR_FILE=cloudflare-logs-consumer/target/cloudflare-logs-consumer-1.0.0.jar
