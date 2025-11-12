@@ -4,6 +4,7 @@ import com.backend.bigdata.consumer.CloudflareLogsBatchConsumer;
 import com.backend.bigdata.mapper.CloudflareLogsMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -41,9 +42,7 @@ public class KafkaConsumerHttpRequestsForUU8App {
             groupId = "cloudflare_logs_http_requests",
             containerFactory = "kafkaBatchListenerContainerFactory"
     )
-    public void consume(List<String> messages) {
-        // ✅ 为每批 Kafka 消息生成全链路 traceId
-        String traceId = java.util.UUID.randomUUID().toString();
-        batchConsumer.consume(messages, traceId);
+    public void consume(List<ConsumerRecord<String, String>> records) {
+        batchConsumer.consumeRecords(records);
     }
 }

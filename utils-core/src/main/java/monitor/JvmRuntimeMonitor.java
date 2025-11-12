@@ -11,7 +11,7 @@ import java.lang.management.ThreadMXBean;
 import java.util.List;
 
 @Slf4j
-@Component
+//@Component
 @EnableScheduling
 public class JvmRuntimeMonitor {
 

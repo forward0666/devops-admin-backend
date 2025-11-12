@@ -38,8 +38,8 @@ public class ThreadPoolUtils {
 
         if (maxBatchSize > 0) batchSize = Math.min(batchSize, maxBatchSize);
 
-        log.info("🧮 Dynamic batchSize={} (total={}, cpuCores={}, active={}, available={}, max={})",
-                batchSize, totalTasks, cpuCores, activeThreads, availableThreads, maxThreads);
+//        log.info("🧮 Dynamic batchSize={} (total={}, cpuCores={}, active={}, available={}, max={})",
+//                batchSize, totalTasks, cpuCores, activeThreads, availableThreads, maxThreads);
 
         return batchSize;
     }
@@ -55,12 +55,12 @@ public class ThreadPoolUtils {
      */
     public static void logThreadPoolStatus(ThreadPoolExecutor executor, String poolName) {
         if (executor == null) return;
-        log.info("📊 [{}] Pool status: active={}, queue={}, completed={}, largest={}, max={}",
-                poolName,
-                executor.getActiveCount(),
-                executor.getQueue().size(),
-                executor.getCompletedTaskCount(),
-                executor.getLargestPoolSize(),
-                executor.getMaximumPoolSize());
+//        log.info("📊 [{}] Pool status: active={}, queue={}, completed={}, largest={}, max={}",
+//                poolName,
+//                executor.getActiveCount(),
+//                executor.getQueue().size(),
+//                executor.getCompletedTaskCount(),
+//                executor.getLargestPoolSize(),
+//                executor.getMaximumPoolSize());
     }
 }

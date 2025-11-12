@@ -1,4 +1,4 @@
-package webflux;
+package network;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

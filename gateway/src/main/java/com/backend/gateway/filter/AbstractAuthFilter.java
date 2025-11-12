@@ -61,7 +61,7 @@ public abstract class AbstractAuthFilter<T extends BaseAuthConfig> extends Abstr
                     Boolean cached = cache != null ? cache.get(cacheKey, Boolean.class) : null;
 
                     if (cached != null) {
-                        log.info("[traceId={}] 🔹 Cache hit | key={} | result={}", traceId, cacheKey, cached);
+                        log.info("[traceId={}] 🔹 Cache hit | result={}| key={} ", traceId, cached, cacheKey);
                         return cached;
                     }
 

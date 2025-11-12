@@ -10,7 +10,7 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 
 @Slf4j
-@Component
+//@Component
 @EnableScheduling
 public class HeapMemoryMonitor {
 

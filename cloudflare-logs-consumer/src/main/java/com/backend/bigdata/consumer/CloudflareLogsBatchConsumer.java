@@ -1,26 +1,23 @@
 package com.backend.bigdata.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import exception.ExceptionUtils;
 import lombok.extern.slf4j.Slf4j;
 import network.CloudflareLogUtils;
 import network.ThreadPoolUtils;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
 import org.slf4j.MDC;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
 
 /**
- * Cloudflare 日志批量消费者（支持 traceId）
- * 中文注释：
- * - 使用与 Producer 统一的线程池
- * - 动态计算 batchSize
- * - 自动解析 JSON 并展平字段
- * - 支持高并发批量入库
- * - 全链路 traceId（可追踪每条日志）
+ * Cloudflare 日志批量消费者（只打印业务日志）
  */
 @Slf4j
 public class CloudflareLogsBatchConsumer {
@@ -30,13 +27,6 @@ public class CloudflareLogsBatchConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String topic;
 
-    /**
-     * 构造函数
-     *
-     * @param executorService       公共线程池
-     * @param batchInsertFunction   批量写入数据库的回调函数
-     * @param topic                 Kafka topic 或业务标识
-     */
     public CloudflareLogsBatchConsumer(ExecutorService executorService,
                                        Consumer<List<Map<String, Object>>> batchInsertFunction,
                                        String topic) {
@@ -45,75 +35,87 @@ public class CloudflareLogsBatchConsumer {
         this.topic = topic;
     }
 
-    /**
-     * 消费 Kafka 消息（带 traceId）
-     *
-     * @param messages 消息列表
-     * @param traceId  全链路 traceId
-     */
+    public void consumeRecords(List<ConsumerRecord<String, String>> records) {
+        if (records == null || records.isEmpty()) return;
 
-    public void consume(List<String> messages, String traceId) {
-        if (messages == null || messages.isEmpty()) return;
+        // 提取消息和 traceId
+        List<String> messages = new ArrayList<>();
+        Map<String, String> traceIds = new HashMap<>();
+        for (ConsumerRecord<String, String> record : records) {
+            messages.add(record.value());
+            Header header = record.headers().lastHeader("traceId");
+            String traceId = header != null ? new String(header.value(), StandardCharsets.UTF_8) : "UNKNOWN";
+            traceIds.put(record.value(), traceId);
+        }
 
-        // ✅ 动态计算批次大小
+        // 动态 batchSize
         int batchSize = ThreadPoolUtils.calculateSmartBatchSize(executorService, messages.size(), 10, 200);
-        log.info("🛠 [{}] traceId={} | Calculated dynamic batchSize={} (totalMessages={})",
-                topic, traceId, batchSize, messages.size());
 
-        // 拆分批次
+        // 使用第一条消息 traceId 作为整个 Kafka 批次 traceId
+        String batchTraceId = messages.isEmpty() ? "UNKNOWN" : traceIds.getOrDefault(messages.get(0), "UNKNOWN");
+
+        // ✅ Kafka 批次开始日志
+        log.info("[traceId={}] 🧵✅ [{}] Starting processing Kafka batch | totalMessages={} | calculatedBatchSize={}",
+                batchTraceId, topic, messages.size(), batchSize);
+
+        // 拆分 batch
         List<List<String>> batches = new ArrayList<>();
         for (int i = 0; i < messages.size(); i += batchSize) {
             batches.add(messages.subList(i, Math.min(i + batchSize, messages.size())));
         }
 
-        // 并发提交任务
+        // 多线程并发处理 batch
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (List<String> batch : batches) {
-            executorService.submit(() -> {
-                MDC.put("traceId", traceId); // 设置线程 MDC
-                log.info("🧵 [{}] Thread {} started processing {} messages | traceId={}",
-                        topic, Thread.currentThread().getName(), batch.size(), traceId);
-                try {
-                    processBatch(batch, traceId);
-                } finally {
-                    log.info("🧵 [{}] Thread {} finished processing {} messages | traceId={}",
-                            topic, Thread.currentThread().getName(), batch.size(), traceId);
-                    MDC.remove("traceId"); // 清理 MDC
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                for (String msg : batch) {
+                    String traceId = traceIds.getOrDefault(msg, "UNKNOWN");
+                    MDC.put("traceId", traceId);
+                    try {
+                        processMessage(msg, batchTraceId);
+                    } finally {
+                        MDC.remove("traceId");
+                    }
                 }
-            });
+            }, executorService);
+            futures.add(future);
         }
 
+        // 等待所有 batch 完成
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        // ✅ Kafka 批次完成日志（只打印一次）
+        log.info("[traceId={}] ✅ [{}] Finished processing entire Kafka batch | totalMessages={}",
+                batchTraceId, topic, messages.size());
+
         // 打印线程池状态
-        if (executorService instanceof ThreadPoolExecutor tpe) {
-            ThreadPoolUtils.logThreadPoolStatus(tpe, topic);
+        if (executorService instanceof ThreadPoolExecutor threadPoolExecutor) {
+            ThreadPoolUtils.logThreadPoolStatus(threadPoolExecutor, topic);
         }
     }
 
     /**
-     * 批次处理逻辑：JSON解析 + 字段展平 + 批量写入
+     * 单条消息处理逻辑
      */
-    private void processBatch(List<String> messages, String traceId) {
-        List<Map<String, Object>> batch = new ArrayList<>();
-        for (String message : messages) {
-            try {
-                if (message != null && message.trim().startsWith("{") && message.trim().endsWith("}")) {
-                    Map<String, Object> original = objectMapper.readValue(message, Map.class);
-                    Map<String, Object> flattened = CloudflareLogUtils.flattenAndBuildParams(original);
-                    batch.add(flattened);
-                } else {
-                    log.warn("⚠️ [{}] traceId={} | Skip malformed message: {}", topic, traceId, message);
-                }
-            } catch (Exception e) {
-                log.warn("⚠️ [{}] traceId={} | Skip bad message: {}", topic, traceId, e.getMessage());
-            }
-        }
+    private void processMessage(String message, String batchTraceId) {
+        if (message == null || message.trim().isEmpty()) return;
 
-        if (!batch.isEmpty()) {
-            try {
-                batchInsertFunction.accept(batch);
-                log.info("✅ [{}] traceId={} | Inserted {} records successfully", topic, traceId, batch.size());
-            } catch (Exception e) {
-                log.error("❌ [{}] traceId={} | Batch insert failed: {}", topic, traceId, e.getMessage(), e);
+        try {
+            if (message.trim().startsWith("{") && message.trim().endsWith("}")) {
+                Map<String, Object> original = objectMapper.readValue(message, Map.class);
+                Map<String, Object> flattened = CloudflareLogUtils.flattenAndBuildParams(original);
+                try {
+                    batchInsertFunction.accept(Collections.singletonList(flattened));
+                } catch (Exception e) {
+                    // 只打印简短 SQL 插入失败信息，不打印堆栈
+//                    log.error("[traceId={}] SQL insert failed", batchTraceId);
+                    ExceptionUtils.logSimple(batchTraceId, "SQL insert failed");
+
+                }
             }
+        } catch (Exception e) {
+            // 解析失败也只打印简单日志
+            ExceptionUtils.logSimple(batchTraceId, "Failed to parse message");
         }
     }
 }
