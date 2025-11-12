@@ -2,6 +2,9 @@ package network;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import reactor.core.publisher.Mono;
+import webflux.ResponseWriterUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -86,4 +89,19 @@ public class HttpResponseUtils {
     public static ResponseEntity<Map<String, Object>> serviceUnavailable(String msg) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, msg, null));
     }
+    /** 直接将 ResponseEntity 写入响应流 */
+    public static Mono<Void> write(ServerHttpResponse response, ResponseEntity<?> entity) {
+        return ResponseWriterUtils.writeJson(response, entity);
+    }
+
+    /** 快捷方法：直接输出错误 JSON */
+    public static Mono<Void> writeError(ServerHttpResponse response, String msg) {
+        return ResponseWriterUtils.writeJson(response, internalError(msg));
+    }
+
+    /** 快捷方法：直接输出成功 JSON */
+    public static Mono<Void> writeOk(ServerHttpResponse response, Map<String, Object> data) {
+        return ResponseWriterUtils.writeJson(response, ok(data));
+    }
+
 }

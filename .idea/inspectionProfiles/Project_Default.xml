@@ -5,6 +5,7 @@
       <option name="customHeaders">
         <set>
           <option value="X-Authorization-Status" />
+          <option value="CF-Request-ID" />
         </set>
       </option>
     </inspection_tool>

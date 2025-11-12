@@ -9,7 +9,7 @@ import java.lang.management.*;
 import java.util.List;
 
 @Slf4j
-@Component
+//@Component
 @EnableScheduling
 public class JvmRuntimeMonitor {
 
