@@ -1,4 +1,3 @@
-
 FROM amazoncorretto:21.0.9-alpine3.22
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
