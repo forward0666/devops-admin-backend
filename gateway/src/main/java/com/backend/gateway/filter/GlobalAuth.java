@@ -1,4 +1,4 @@
-package com.backend.gateway.filter.impl;
+package com.backend.gateway.filter;
 
 import com.backend.gateway.config.BaseAuthConfig;
 import com.backend.gateway.filter.AbstractAuthFilter;

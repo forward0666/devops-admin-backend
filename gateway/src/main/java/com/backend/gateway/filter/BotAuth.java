@@ -1,4 +1,4 @@
-package com.backend.gateway.filter.impl;
+package com.backend.gateway.filter;
 
 import com.backend.gateway.config.BaseAuthConfig;
 import com.backend.gateway.filter.AbstractAuthFilter;
@@ -12,21 +12,21 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
- * BigData应用认证过滤器
+ * Bot应用认证过滤器
  * 支持线程池异步验证 & 方法级阻塞
  */
 @Slf4j
 @RefreshScope
-@Component("BigDataAuth")
-public class BigDataAuth extends AbstractAuthFilter<BaseAuthConfig> {
+@Component("BotAuth")
+public class BotAuth extends AbstractAuthFilter<BaseAuthConfig> {
 
-    @Value("${secure.header.bigdata.secret:default-secret}")
+    @Value("${secure.header.bot.secret:default-secret}")
     private String secret;
 
     /**
      * 构造器注入线程池
      */
-    public BigDataAuth(ExecutorService executorService, CacheManager cacheManager) {
+    public BotAuth(ExecutorService executorService, CacheManager cacheManager) {
         super(BaseAuthConfig.class, executorService, cacheManager);
     }
 

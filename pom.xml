@@ -25,6 +25,7 @@
         <module>gateway</module>                    <!-- 网关模块：负责请求路由和过滤 -->
         <module>cloudflare-logs-producer</module>    <!-- Cloudflare日志生成者 -->
         <module>cloudflare-logs-consumer</module>   <!-- Cloudflare日志消费者：处理日志数据 -->
+        <module>telegram-bot-manager</module>
 <!--        <module>manage</module>                     &lt;!&ndash; 管理服务模块：核心业务逻辑处理 &ndash;&gt;-->
 <!--        <module>security</module>                   &lt;!&ndash; 安全服务模块：认证和授权管理 &ndash;&gt;-->
 <!--        <module>cloudflare-logs-consumer</module>   &lt;!&ndash; Cloudflare日志消费者：处理日志数据 &ndash;&gt;-->
@@ -84,6 +85,9 @@
                         <source>${java.version}</source>           <!-- 源代码版本：Java 21 -->
                         <target>${java.version}</target>           <!-- 目标字节码版本：Java 21 -->
                         <encoding>${project.build.sourceEncoding}</encoding><!-- 编码格式：UTF-8 -->
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
                     </configuration>
                 </plugin>
 
