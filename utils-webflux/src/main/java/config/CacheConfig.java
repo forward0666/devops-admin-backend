@@ -8,14 +8,16 @@ import org.springframework.context.annotation.Configuration;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Configuration
 public class CacheConfig {
 
     @Bean
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
-
+        log.info("✅ CaffeineCacheManager bean created: {}", cacheManager);
         // 获取堆内存信息
         MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
         long maxHeap = memoryMXBean.getHeapMemoryUsage().getMax(); // 最大堆内存 bytes

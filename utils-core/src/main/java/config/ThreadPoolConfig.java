@@ -33,16 +33,6 @@ public class ThreadPoolConfig {
                 .setDaemon(false)
                 .build();
 
-        // 构建线程池
-//        return new ThreadPoolExecutor(
-//                core,
-//                max,
-//                60L,
-//                TimeUnit.SECONDS,
-//                new LinkedBlockingQueue<>(1000),
-//                threadFactory,
-//                new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略：主线程执行
-//        );
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 core,
                 max,
