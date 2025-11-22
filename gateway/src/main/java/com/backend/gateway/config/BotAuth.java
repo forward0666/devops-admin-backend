@@ -1,7 +1,6 @@
-package com.backend.gateway.filter;
+package com.backend.gateway.config;
 
-import com.backend.gateway.config.BaseAuthConfig;
-import com.backend.gateway.filter.AbstractAuthFilter;
+import com.backend.gateway.filter.AuthFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
@@ -18,7 +17,7 @@ import java.util.concurrent.ExecutorService;
 @Slf4j
 @RefreshScope
 @Component("BotAuth")
-public class BotAuth extends AbstractAuthFilter<BaseAuthConfig> {
+public class BotAuth extends AuthFilter<BaseAuthConfig> {
 
     @Value("${secure.header.bot.secret:default-secret}")
     private String secret;

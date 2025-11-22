@@ -1,7 +1,6 @@
-package com.backend.gateway.filter;
+package com.backend.gateway.config;
 
-import com.backend.gateway.config.BaseAuthConfig;
-import com.backend.gateway.filter.AbstractAuthFilter;
+import com.backend.gateway.filter.AuthFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -17,7 +16,7 @@ import org.springframework.cache.CacheManager;
 @Slf4j
 @RefreshScope
 @Component("GlobalAuth")
-public class GlobalAuth extends AbstractAuthFilter<BaseAuthConfig> {
+public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
 
     @Value("${secure.header.global.secret:default-secret}")
     private String secret;

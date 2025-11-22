@@ -20,12 +20,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 @Slf4j
-public abstract class AbstractAuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterFactory<T> {
+public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterFactory<T> {
 
     private final ExecutorService executorService;
     private final CacheManager cacheManager;
 
-    public AbstractAuthFilter(Class<T> configClass, ExecutorService executorService, CacheManager cacheManager) {
+    public AuthFilter(Class<T> configClass, ExecutorService executorService, CacheManager cacheManager) {
         super(configClass);
         this.executorService = TraceIdUtils.mdcExecutor(executorService);
         this.cacheManager = cacheManager;
