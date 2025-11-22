@@ -10,13 +10,10 @@ import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Cloudflare日志发送到Kafka服务
- * 适用于 Spring Kafka 2.8+（KafkaTemplate.send 返回 CompletableFuture）
- */
 @Slf4j
 @Service
 public class CloudFlareLogsSendToKafkaService {
@@ -24,40 +21,41 @@ public class CloudFlareLogsSendToKafkaService {
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
 
-    /**
-     * 发送消息到 Kafka
-     *
-     * @param topic        Kafka topic
-     * @param message      消息内容
-     * @param firstSuccess 原子标志，第一次成功时打印完成日志
-     */
     public void sendMessage(String topic, String message, AtomicBoolean firstSuccess) {
-        // ✅ 从 MDC 获取 traceId
+
+        // 当前线程 MDC 的 traceId
         String traceId = MDC.get("traceId");
 
+        // ⚠️ 完整复制 MDC 副本，给异步线程继承
+        Map<String, String> contextMap = MDC.getCopyOfContextMap();
+
         try {
-            // ✅ 构建 ProducerRecord，并把 traceId 写入 header
             ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
+
+            // traceId 写入 Kafka header
             if (traceId != null) {
-                record.headers().add(new RecordHeader("traceId", traceId.getBytes(StandardCharsets.UTF_8)));
+                record.headers().add(
+                        new RecordHeader("traceId", traceId.getBytes(StandardCharsets.UTF_8))
+                );
             }
 
-            // ✅ 发送消息，返回 CompletableFuture
+            // 发送 Kafka 异步
             CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(record);
 
-            // ✅ 异步回调
             future.whenComplete((result, ex) -> {
-                if (traceId != null) MDC.put("traceId", traceId);
+
+                // 回调线程恢复 MDC
+                if (contextMap != null) MDC.setContextMap(contextMap);
+
                 try {
                     if (ex != null) {
                         log.error("[traceId={}] ❌ Kafka send failed: {}", traceId, ex.getMessage(), ex);
-                    } else {
-                        if (firstSuccess != null && firstSuccess.compareAndSet(false, true)) {
-//                            log.info("[traceId={}] ✅ Kafka messages sent finished: {}", traceId, topic);
-                        }
+                    } else if (firstSuccess != null && firstSuccess.compareAndSet(false, true)) {
+                        // 你之前注释掉的日志
+                        // log.info("[traceId={}] ✅ Kafka messages sent finished: {}", traceId, topic);
                     }
                 } finally {
-                    if (traceId != null) MDC.remove("traceId");
+                    MDC.clear();
                 }
             });
 

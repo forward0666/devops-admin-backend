@@ -3,8 +3,6 @@ package com.backend.bigdata.controller;
 import com.backend.bigdata.service.CloudFlareLogsSendToKafkaService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import network.ClientHeaderUtils;
-import network.TraceIdUtils;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,24 +47,12 @@ public class CloudflareLogController {
     public Map<String, Object> receiveLogs(
             @PathVariable("project") String project,
             @RequestBody byte[] compressedBody,
-            @RequestHeader(value = "Content-Encoding", required = false, defaultValue = "identity") String encoding,
-            @RequestHeader(value = "CF-RAY", required = false) String cfRay,
-            @RequestHeader(value = "X-Trace-Id", required = false) String xTraceId) {
+            @RequestHeader(value = "Content-Encoding", required = false, defaultValue = "identity") String encoding) {
 
-        // ✅ 从 header 获取 traceId，优先 CF-RAY -> X-Trace-Id -> UUID
-        String traceId = cfRay != null && !cfRay.isBlank() ? cfRay
-                : xTraceId != null && !xTraceId.isBlank() ? xTraceId
-                : UUID.randomUUID().toString();
-
-        // ✅ 设置 MDC
-        MDC.put("traceId", traceId);
-
-        // ✅ 打印接收到的 traceId
-        log.info("[traceId={}] 🔹 Received traceId from request headers: CF-RAY='{}', X-Trace-Id='{}', final traceId='{}'",
-                traceId, cfRay, xTraceId, traceId);
+        String traceId = MDC.get("traceId");
 
         try {
-            // 🧩 校验项目白名单
+            // 校验项目
             boolean isAllowed = Arrays.stream(allowedProjects.split(","))
                     .anyMatch(p -> p.trim().equals(project));
             if (!isAllowed) {
@@ -77,7 +63,7 @@ public class CloudflareLogController {
             log.info("[traceId={}] 📩 Received body ({} bytes) | project={} | encoding={}",
                     traceId, compressedBody.length, project, encoding);
 
-            // 🗜️ 解压内容
+            // 解压
             String decompressed;
             if ("gzip".equalsIgnoreCase(encoding)) {
                 if (!isGzipFormat(compressedBody)) {
@@ -90,11 +76,12 @@ public class CloudflareLogController {
                 decompressed = new String(compressedBody, StandardCharsets.UTF_8);
             }
 
-            // 🪣 按行拆分 JSON logs
+            // 按行拆分 log
             List<String> lines = Arrays.stream(decompressed.split("\n"))
                     .filter(line -> !line.isBlank())
                     .toList();
             int totalLines = lines.size();
+
             log.info("[traceId={}] 🧾 Parsed {} JSON lines from project '{}'", traceId, totalLines, project);
 
             if (totalLines == 0) {
@@ -106,50 +93,49 @@ public class CloudflareLogController {
             AtomicInteger successCount = new AtomicInteger(0);
             AtomicInteger failedCount = new AtomicInteger(0);
 
-            // 🧮 动态计算 batchSize
+            // 动态 batchSize
             int batchSize = calculateSmartBatchSize(executorService, totalLines, 10, 200);
             log.info("[traceId={}] 🛠 Calculated dynamic batchSize={}", traceId, batchSize);
 
-            // 🧩 构建批次列表
+            // 分批
             List<List<String>> batches = new ArrayList<>();
             for (int i = 0; i < totalLines; i += batchSize) {
                 batches.add(lines.subList(i, Math.min(i + batchSize, totalLines)));
             }
 
-            log.info("[traceId={}] 🚀 Starting concurrent Kafka send with {} batches", traceId, batches.size());
+            log.info("[traceId={}] 🚀 Starting concurrent Kafka send with {} batches",
+                    traceId, batches.size());
 
-            // 🚀 并发发送到 Kafka
+            // 并发发 Kafka
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             for (List<String> batch : batches) {
                 CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                    // ✅ 每个线程都设置 MDC traceId
                     MDC.put("traceId", traceId);
-                    int batchSent = 0;
-                    for (String line : batch) {
-                        try {
-                            objectMapper.readTree(line); // 校验 JSON
-                            cloudFlareLogsSendToKafkaService.sendMessage(topic, line, firstSuccess);
-                            successCount.incrementAndGet();
-                            batchSent++;
-                        } catch (Exception e) {
-                            failedCount.incrementAndGet();
-                            log.warn("[traceId={}] ⚠️ Invalid JSON skipped: {}", traceId, e.getMessage());
+                    try {
+                        for (String line : batch) {
+                            try {
+                                objectMapper.readTree(line); // JSON 校验
+                                cloudFlareLogsSendToKafkaService.sendMessage(topic, line, firstSuccess);
+                                successCount.incrementAndGet();
+                            } catch (Exception e) {
+                                failedCount.incrementAndGet();
+                                log.warn("[traceId={}] ⚠️ Invalid JSON skipped: {}", traceId, e.getMessage());
+                            }
                         }
+                    } finally {
+                        MDC.remove("traceId");
                     }
-//                    log.info("[traceId={}] 🧵 [{}] finished sending {} messages → topic '{}'",
-//                            traceId, Thread.currentThread().getName(), batchSent, topic);
-                    MDC.remove("traceId");
                 }, executorService);
+
                 futures.add(future);
             }
 
-            // ⏳ 等待所有线程完成
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
             log.info("[traceId={}] ✅ Kafka send finished | totalLines={} | success={} | failed={}",
                     traceId, totalLines, successCount.get(), failedCount.get());
 
-            // ✅ 返回响应
+            // 返回结果（traceId 已自动带入日志）
             Map<String, Object> response = new HashMap<>();
             response.put("topic", topic);
             response.put("traceId", traceId);
@@ -162,8 +148,6 @@ public class CloudflareLogController {
         } catch (Exception e) {
             log.error("[traceId={}] ❌ Kafka send failed | error={}", traceId, e.getMessage(), e);
             return internalError("Kafka send failed").getBody();
-        } finally {
-            MDC.remove("traceId"); // ✅ 清理 MDC
         }
     }
 }

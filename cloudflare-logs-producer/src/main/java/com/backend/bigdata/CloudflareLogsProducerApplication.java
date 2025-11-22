@@ -22,7 +22,8 @@ import java.util.concurrent.ThreadPoolExecutor;
                 "com.backend.bigdata", // 主工程包
                 "shutdown",
                 "config",
-                "monitor"
+                "monitor",
+                "filter"
         },
         exclude = {
                 org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,

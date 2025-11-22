@@ -36,7 +36,7 @@ public class TraceIdFilter implements Filter {
 
         // 4. (可选) 打印日志，确认 TraceId 提取成功
         // 注意：这里只打印一次即可，无需在 Controller 中重复打印
-//        log.info("✅ Received traceId from request headers: CF-RAY='{}', X-Trace-Id='{}', final traceId='{}'", cfRay, xTraceId, traceId);
+        log.info("✅ Received traceId from request headers: CF-RAY='{}', X-Trace-Id='{}', final traceId='{}'", cfRay, xTraceId, traceId);
 
         try {
             // 5. 调用链中下一个 Filter 或 Controller
