@@ -27,27 +27,33 @@ public class TraceIdFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 
-        // **优化 1: 使用 TraceIdUtils 提取 Trace ID**
+        // 1. 手动获取原始头部值用于日志打印
+        String cfRay = exchange.getRequest().getHeaders().getFirst(TRACE_ID_HEADER_CF_RAY);
+        String xTraceId = exchange.getRequest().getHeaders().getFirst(TRACE_ID_HEADER_X_TRACE_ID);
+
+        // 2. 使用 TraceIdUtils 提取最终的 Trace ID
         String traceId = TraceIdUtils.getTraceId(exchange);
 
-        log.info("✅ WebFlux traceId initialized: final traceId='{}'", traceId);
+        // 3. 打印详细的接收和最终确定的 Trace ID 日志
+        log.info("✅ Received traceId from request headers: CF-RAY='{}', X-Trace-Id='{}', final traceId='{}'",
+                cfRay != null ? cfRay : "",
+                xTraceId != null ? xTraceId : "",
+                traceId);
 
-        // 2. 将 TraceId 放入 Reactor Context
+        // 4. 将 Trace ID 放入 Reactor Context
         return chain.filter(exchange)
-                // 3. 将 Trace ID 设置到 MDC (可选但推荐，用于主线程日志)
+                // 5. 将 Trace ID 设置到 MDC (可选但推荐，用于主线程日志)
                 .doOnEach(signal -> {
                     if (signal.isOnNext() || signal.isOnComplete() || signal.isOnError()) {
                         TraceIdUtils.setTraceId(traceId);
                     }
                 })
                 .doFinally(signalType -> TraceIdUtils.clearMdc()) // 清理 MDC
-                // 4. 将新的 Context 注入到下游的 Mono 中
+                // 6. 将新的 Context 注入到下游的 Mono 中
                 .contextWrite(Context.of(CONTEXT_KEY_TRACE_ID, traceId));
     }
 
-    // **优化 2: 移除冗余的 getTraceId 方法，已委托给 TraceIdUtils**
-    /* private String getTraceId(String cfRay, String xTraceId) { ... }
-     */
+    // 辅助方法保持不变
 
     /**
      * 【重要辅助方法】 (保持不变)

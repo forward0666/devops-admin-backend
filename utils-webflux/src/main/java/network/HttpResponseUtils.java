@@ -45,6 +45,11 @@ public class HttpResponseUtils {
         return ResponseEntity.ok(buildResponse(HttpStatus.OK, "OK", data));
     }
 
+    /** 200 OK 的原始响应体 Map */
+    public static Map<String, Object> okResponseMap(String msg, Map<String, Object> data) {
+        return buildResponse(HttpStatus.OK, msg, data);
+    }
+
     /** 201 Created */
     public static ResponseEntity<Map<String, Object>> created(String msg) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -112,10 +117,20 @@ public class HttpResponseUtils {
         return writeError(exchange, HttpStatus.INTERNAL_SERVER_ERROR, msg);
     }
 
+    /** 500 Internal Error 的原始响应体 Map */
+    public static Map<String, Object> errorResponseMap(String msg) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, msg, null);
+    }
+
     /**
      * 快捷方法：写入成功 JSON (用于自定义响应)
      */
     public static Mono<Void> writeOk(ServerWebExchange exchange, Object data) {
         return WebExchangeUtils.responseJson(exchange, ok(data));
+    }
+
+    /** 201 Created 的原始响应体 Map */
+    public static Map<String, Object> createdResponseMap(String msg, Map<String, Object> data) {
+        return buildResponse(HttpStatus.CREATED, msg, data);
     }
 }
