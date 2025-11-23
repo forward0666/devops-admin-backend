@@ -7,13 +7,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
- * 安全工具类 - 提供通用认证与响应封装逻辑
- *
- * 功能：
- * 1. 校验请求头 X-Encrypted-Data 是否匹配密钥
- * 2. 构造标准认证失败响应（401 / 405）
- * 3. 标记认证成功响应头
- * 4. 提供安全日志输出格式
+ * 安全工具类 - 提供通用认证逻辑
  */
 @Slf4j
 public class AuthValidationUtils {
@@ -60,22 +54,9 @@ public class AuthValidationUtils {
     }
 
     /**
-     * 返回未授权响应（401）
+     * ⚠️ 移除: unauthorizedResponse 和 methodNotAllowedResponse
+     * 理由：在 AuthFilter 中统一使用 HttpResponseUtils 终止流，避免 WebFlux 响应逻辑不一致。
      */
-    public static void unauthorizedResponse(ServerHttpResponse response, String logPrefix, String ip, String method, String path) {
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        response.getHeaders().add("X-Authorization-Status", "UNAUTHORIZED");
-        log.warn("{} ❌ Unauthorized: IP={}, Method={}, Path={}", logPrefix, ip, method, path);
-    }
-
-    /**
-     * 返回禁止访问响应（405）
-     */
-    public static void methodNotAllowedResponse(ServerHttpResponse response, String logPrefix, String ip, String method, String path) {
-        response.setStatusCode(HttpStatus.METHOD_NOT_ALLOWED);
-        response.getHeaders().add("X-Authorization-Status", "NOT_ALLOWED");
-        log.warn("{} ⛔ Method not allowed: IP={}, Method={}, Path={}", logPrefix, ip, method, path);
-    }
 
     /**
      * 在响应头中标记认证成功

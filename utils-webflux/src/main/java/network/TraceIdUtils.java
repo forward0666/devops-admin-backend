@@ -3,6 +3,7 @@ package network;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.MDC;
 import org.springframework.web.server.ServerWebExchange;
+import webflux.WebExchangeUtils;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -22,22 +23,13 @@ public class TraceIdUtils {
 
     /** 获取全链路 traceId（优先 CF-RAY -> X-Trace-Id -> UUID） */
     public static String getTraceId(ServerWebExchange exchange) {
-        String cfRay = ClientHeaderUtils.getClientHeader(exchange, "CF-RAY");
+        String cfRay = WebExchangeUtils.getHeader(exchange, "CF-RAY");
         if (cfRay != null && !cfRay.isBlank()) return cfRay;
 
-        String xTraceId = ClientHeaderUtils.getClientHeader(exchange, "X-Trace-Id");
+        String xTraceId = WebExchangeUtils.getHeader(exchange, "X-Trace-Id");
         if (xTraceId != null && !xTraceId.isBlank()) return xTraceId;
 
         return UUID.randomUUID().toString();
-    }
-
-    /** 设置 MDC 并返回带 X-Trace-Id 的下游请求 Exchange */
-    public static ServerWebExchange enrichExchange(ServerWebExchange exchange) {
-        String traceId = getTraceId(exchange);
-        setTraceId(traceId);
-        return exchange.mutate()
-                .request(r -> r.header("X-Trace-Id", traceId))
-                .build();
     }
 
     /** 设置 MDC traceId */
@@ -118,13 +110,19 @@ public class TraceIdUtils {
 
         @NotNull
         @Override
-        public List<Runnable> shutdownNow() { return delegate.shutdownNow(); }
+        public List<Runnable> shutdownNow() {
+            return delegate.shutdownNow();
+        }
 
         @Override
-        public boolean isShutdown() { return delegate.isShutdown(); }
+        public boolean isShutdown() {
+            return delegate.isShutdown();
+        }
 
         @Override
-        public boolean isTerminated() { return delegate.isTerminated(); }
+        public boolean isTerminated() {
+            return delegate.isTerminated();
+        }
 
         @Override
         public boolean awaitTermination(long timeout, @NotNull TimeUnit unit) throws InterruptedException {

@@ -35,7 +35,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 @SpringBootApplication(scanBasePackages = {
         "com.backend.gateway", // 主工程包
         "config",
-        "monitor"
+        "monitor",
+        "filter"
 })
 @EnableDiscoveryClient
 @RefreshScope

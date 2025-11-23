@@ -2,105 +2,120 @@ package network;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import webflux.WebExchangeUtils;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * HTTP 响应工具类
- * 提供统一的 JSON 响应封装，支持返回 status、code、message、data
+ * HTTP 响应构建工具类
+ * <p>
+ * 1. 提供统一的 JSON 结构封装：{status, code, message, data}
+ * 2. 提供直接写入 Response 流的快捷方法 (用于 Filter/Gateway)
  */
 public class HttpResponseUtils {
 
-    private static Map<String, Object> buildResponse(HttpStatus status, String msg, Map<String, Object> data) {
+    private HttpResponseUtils() {}
+
+    /**
+     * 核心构建逻辑：统一响应结构
+     */
+    private static Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
         Map<String, Object> result = new HashMap<>();
         result.put("status", status.is2xxSuccessful() ? "ok" : "error");
         result.put("code", status.value());
         result.put("message", msg != null ? msg : status.getReasonPhrase());
-        if (data != null && !data.isEmpty()) {
+        if (data != null) {
             result.put("data", data);
         }
         return result;
     }
 
-    /** 200 OK */
+    // ==================== 1. 返回 ResponseEntity (Controller 常用) ====================
+
+    /** 200 OK (无数据) */
     public static ResponseEntity<Map<String, Object>> ok() {
         return ok(null);
     }
 
-    public static ResponseEntity<Map<String, Object>> ok(Map<String, Object> data) {
+    /** 200 OK (带数据) */
+    public static ResponseEntity<Map<String, Object>> ok(Object data) {
         return ResponseEntity.ok(buildResponse(HttpStatus.OK, "OK", data));
     }
 
     /** 201 Created */
     public static ResponseEntity<Map<String, Object>> created(String msg) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(HttpStatus.CREATED, msg, null));
-    }
-
-    /** 204 No Content */
-    public static ResponseEntity<Map<String, Object>> noContent() {
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(buildResponse(HttpStatus.NO_CONTENT, "No Content", null));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(buildResponse(HttpStatus.CREATED, msg, null));
     }
 
     /** 400 Bad Request */
     public static ResponseEntity<Map<String, Object>> badRequest(String msg) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(buildResponse(HttpStatus.BAD_REQUEST, msg, null));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildResponse(HttpStatus.BAD_REQUEST, msg, null));
     }
 
     /** 401 Unauthorized */
     public static ResponseEntity<Map<String, Object>> unauthorized(String msg) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(buildResponse(HttpStatus.UNAUTHORIZED, msg, null));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(buildResponse(HttpStatus.UNAUTHORIZED, msg, null));
     }
 
     /** 403 Forbidden */
     public static ResponseEntity<Map<String, Object>> forbidden(String msg) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(buildResponse(HttpStatus.FORBIDDEN, msg, null));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(buildResponse(HttpStatus.FORBIDDEN, msg, null));
     }
 
     /** 404 Not Found */
     public static ResponseEntity<Map<String, Object>> notFound(String msg) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(buildResponse(HttpStatus.NOT_FOUND, msg, null));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildResponse(HttpStatus.NOT_FOUND, msg, null));
     }
 
-    /** 405 Method Not Allowed */
-    public static ResponseEntity<Map<String, Object>> methodNotAllowed(String msg) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(buildResponse(HttpStatus.METHOD_NOT_ALLOWED, msg, null));
-    }
-
-    /** 409 Conflict */
-    public static ResponseEntity<Map<String, Object>> conflict(String msg) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildResponse(HttpStatus.CONFLICT, msg, null));
-    }
-
-    /** 422 Unprocessable Entity */
-    public static ResponseEntity<Map<String, Object>> unprocessableEntity(String msg) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, msg, null));
+    /** 429 Too Many Requests (限流常用) */
+    public static ResponseEntity<Map<String, Object>> tooManyRequests(String msg) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(buildResponse(HttpStatus.TOO_MANY_REQUESTS, msg, null));
     }
 
     /** 500 Internal Server Error */
     public static ResponseEntity<Map<String, Object>> internalError(String msg) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, msg, null));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, msg, null));
     }
 
-    /** 503 Service Unavailable */
-    public static ResponseEntity<Map<String, Object>> serviceUnavailable(String msg) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, msg, null));
-    }
-    /** 直接将 ResponseEntity 写入响应流 */
-    public static Mono<Void> write(ServerHttpResponse response, ResponseEntity<?> entity) {
-        return ResponseWriterUtils.writeJson(response, entity);
+    // ==================== 2. 直接写入响应流 (Filter/Gateway 常用) ====================
+
+    /**
+     * 通用写入方法
+     */
+    public static Mono<Void> write(ServerWebExchange exchange, ResponseEntity<?> entity) {
+        return WebExchangeUtils.responseJson(exchange, entity);
     }
 
-    /** 快捷方法：直接输出错误 JSON */
-    public static Mono<Void> writeError(ServerHttpResponse response, String msg) {
-        return ResponseWriterUtils.writeJson(response, internalError(msg));
+    /**
+     * 快捷方法：写入错误 JSON (用于过滤器拦截，如鉴权失败)
+     */
+    public static Mono<Void> writeError(ServerWebExchange exchange, HttpStatus status, String msg) {
+        ResponseEntity<Map<String, Object>> entity = ResponseEntity.status(status)
+                .body(buildResponse(status, msg, null));
+        return WebExchangeUtils.responseJson(exchange, entity);
     }
 
-    /** 快捷方法：直接输出成功 JSON */
-    public static Mono<Void> writeOk(ServerHttpResponse response, Map<String, Object> data) {
-        return ResponseWriterUtils.writeJson(response, ok(data));
+    /**
+     * 快捷方法：默认写入 500 错误
+     */
+    public static Mono<Void> writeError(ServerWebExchange exchange, String msg) {
+        return writeError(exchange, HttpStatus.INTERNAL_SERVER_ERROR, msg);
     }
 
+    /**
+     * 快捷方法：写入成功 JSON (用于自定义响应)
+     */
+    public static Mono<Void> writeOk(ServerWebExchange exchange, Object data) {
+        return WebExchangeUtils.responseJson(exchange, ok(data));
+    }
 }
