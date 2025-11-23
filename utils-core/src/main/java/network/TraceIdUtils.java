@@ -1,6 +1,6 @@
 package network;
 
-import org.jetbrains.annotations.NotNull;
+import jakarta.validation.constraints.NotNull;
 import org.slf4j.MDC;
 import org.springframework.web.server.ServerWebExchange;
 
