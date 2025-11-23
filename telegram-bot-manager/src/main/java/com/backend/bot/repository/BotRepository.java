@@ -13,9 +13,4 @@ public interface BotRepository extends ReactiveCrudRepository<BotEntity, Long> {
      */
     Mono<BotEntity> findByBotName(String botName);
 
-    /**
-     * ✅ 修正点 2: 必须将 findByToken 更改为 findByBotToken
-     * 以匹配 BotEntity 中的 private String botToken;
-     */
-    Mono<BotEntity> findByBotToken(String token);
 }
