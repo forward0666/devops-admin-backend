@@ -1,14 +1,24 @@
 package com.backend.bot.dto;
 
-/**
- * Telegram API 核心 DTOs，用于解析 Webhook 传入的 JSON 结构。
- * 使用 Java Records (since Java 16) 替代 Lombok 和手动访问器简化结构。
- * Record 自动提供了与组件名匹配的公共访问方法 (如 BotUpdateDto.callbackQuery())，解决了访问权限问题。
- */
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-// --- Chat DTO ---
+// --- Chat DTO (包含 ID) ---
 public record ChatDto(
-        // 字段名与 JSON 匹配，通常不需要 @JsonProperty
+        // 映射 Telegram 的 id 字段 (chat_id)
+        @JsonProperty("id")
         Long id,
-        String type // e.g., "private", "group"
-) {}
+
+        // 映射 Telegram 的 type 字段 (private, group, supergroup, channel)
+        @JsonProperty("type")
+        String type,
+
+        // 映射 Telegram 的 title 字段 (群组/频道名，私聊中不存在)
+        @JsonProperty("title")
+        String title,
+
+        // 映射 Telegram 的 username 字段
+        @JsonProperty("username")
+        String username
+        // 其他字段（first_name, last_name, bio 等）可根据需要添加
+) {
+}

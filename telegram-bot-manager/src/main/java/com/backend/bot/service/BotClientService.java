@@ -131,11 +131,11 @@ public class BotClientService {
                 .body(BodyInserters.fromValue(bodyMap))
                 .retrieve()
                 .toBodilessEntity() // 不需要响应体，只关心状态
-                .doOnSuccess(response -> log.info("Message sent successfully to chatId: {}", chatId))
+                .doOnSuccess(response -> log.info("✅ Message sent successfully to chatId: {}", chatId))
                 // ❗ 最终修复: 处理连接在应用关闭时的 PrematureCloseException
                 .onErrorResume(PrematureCloseException.class, e -> {
                     // 在优雅关闭成功后，这属于预期情况，只记录 WARN
-                    log.warn("Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", chatId);
+                    log.warn("⚠️ Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", chatId);
                     return Mono.empty(); // 失败时吞掉异常，返回完成信号
                 })
                 .onErrorResume(e -> {
