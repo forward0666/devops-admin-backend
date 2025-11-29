@@ -24,14 +24,23 @@ import java.util.concurrent.ThreadPoolExecutor;
                 "config",
                 "monitor",
                 "filter"
-        },
+        }
+        ,
         exclude = {
-                org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration.class,
+                org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
+                org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
         }
+
+//        ,
+//        exclude = {
+//                org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
+//                org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration.class,
+//                org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
+//                org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration.class,
+//                org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
+//        }
 )
 
 @EnableDiscoveryClient

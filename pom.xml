@@ -26,20 +26,30 @@
         <module>cloudflare-logs-producer</module>    <!-- Cloudflare日志生成者 -->
         <module>cloudflare-logs-consumer</module>   <!-- Cloudflare日志消费者：处理日志数据 -->
         <module>telegram-bot-manager</module>
-<!--        <module>manage</module>                     &lt;!&ndash; 管理服务模块：核心业务逻辑处理 &ndash;&gt;-->
-<!--        <module>security</module>                   &lt;!&ndash; 安全服务模块：认证和授权管理 &ndash;&gt;-->
-<!--        <module>cloudflare-logs-consumer</module>   &lt;!&ndash; Cloudflare日志消费者：处理日志数据 &ndash;&gt;-->
     </modules>
 
     <!-- 全局属性配置 -->
+<!--    <properties>-->
+<!--        <java.version>21</java.version>                           &lt;!&ndash; Java版本：21 &ndash;&gt;-->
+<!--        <spring-boot.version>3.2.5</spring-boot.version>           &lt;!&ndash; Spring Boot版本：3.2.5 &ndash;&gt;-->
+<!--        <spring-cloud.version>2023.0.1</spring-cloud.version>      &lt;!&ndash; Spring Cloud版本：2023.0.1 &ndash;&gt;-->
+<!--        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>&lt;!&ndash; Spring Cloud Alibaba版本 &ndash;&gt;-->
+<!--        &lt;!&ndash; 统一使用 UTF-8 编码进行编译 &ndash;&gt;-->
+<!--        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>      &lt;!&ndash; 源代码编码：UTF-8 &ndash;&gt;-->
+<!--        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>&lt;!&ndash; 报告输出编码：UTF-8 &ndash;&gt;-->
+<!--    </properties>-->
+
     <properties>
-        <java.version>21</java.version>                           <!-- Java版本：21 -->
-        <spring-boot.version>3.2.5</spring-boot.version>           <!-- Spring Boot版本：3.2.5 -->
-        <spring-cloud.version>2023.0.1</spring-cloud.version>      <!-- Spring Cloud版本：2023.0.1 -->
-        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version><!-- Spring Cloud Alibaba版本 -->
-        <!-- 统一使用 UTF-8 编码进行编译 -->
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>      <!-- 源代码编码：UTF-8 -->
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding><!-- 报告输出编码：UTF-8 -->
+        <java.version>21</java.version>
+        <spring-boot.version>3.2.5</spring-boot.version>
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
+        <kafka.version>3.2.0</kafka.version>
+        <clickhouse.version>0.8.2</clickhouse.version>
+        <lombok.version>1.18.30</lombok.version>
+        <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
     <!-- 依赖管理：统一管理所有子模块的依赖版本 -->
@@ -69,6 +79,28 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Kafka -->
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>${kafka.version}</version>
+            </dependency>
+
+            <!-- ClickHouse -->
+            <dependency>
+                <groupId>com.clickhouse</groupId>
+                <artifactId>clickhouse-jdbc</artifactId>
+                <version>${clickhouse.version}</version>
+                <classifier>shaded-all</classifier>
+            </dependency>
+
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -97,13 +129,6 @@
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <!-- 版本由Spring Boot依赖管理自动控制 -->
                      <version>${spring-boot.version}</version>
-<!--                    <executions>-->
-<!--                        <execution>-->
-<!--                            <goals>-->
-<!--                                <goal>repackage</goal>-->
-<!--                            </goals>-->
-<!--                        </execution>-->
-<!--                    </executions>-->
                 </plugin>
             </plugins>
         </pluginManagement>

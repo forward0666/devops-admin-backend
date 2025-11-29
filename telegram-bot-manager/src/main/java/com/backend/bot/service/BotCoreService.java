@@ -2,7 +2,7 @@ package com.backend.bot.service;
 
 import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.entity.BotEntity;
-import com.backend.bot.repository.BotRepository;
+import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers; // 引入 Schedulers
 
 import java.time.Duration;
 
@@ -26,16 +27,8 @@ public class BotCoreService {
 
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
-
-    // 键结构: bot:entity:name:NAME (BotName 是唯一的)
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
 
-    /**
-     * 注册新 Bot：
-     * 1. 保存到 R2DBC 数据库
-     * 2. 调用 Telegram API 注册 Webhook
-     * 3. 缓存到 Redis
-     */
     public Mono<BotVo> registerNewBot(BotRegisterDto dto) {
 
         BotEntity config = new BotEntity();
@@ -44,7 +37,6 @@ public class BotCoreService {
         config.setBotName(dto.getBotName());
         config.setStatus(1);
 
-        // 1. 响应式保存到数据库
         return botRepository.save(config)
                 .flatMap(savedConfig -> {
                     // 2. 注册 Webhook
@@ -55,12 +47,6 @@ public class BotCoreService {
                 .map(this::convertToVo);
     }
 
-    /**
-     * 通过 BotName 查找 Bot 配置：
-     * 1. 查 Redis (BotName -> Entity JSON)
-     * 2. 查 R2DBC 数据库 (BotName)
-     * 3. 缓存无效标记
-     */
     public Mono<BotEntity> findByBotName(String botName) {
         String entityCacheKey = CACHE_ENTITY_PREFIX + botName;
 
@@ -68,17 +54,25 @@ public class BotCoreService {
         return redisTemplate.opsForValue().get(entityCacheKey)
                 .flatMap(json -> {
                     if ("INVALID".equals(json)) {
-                        log.debug("Bot name cache marked as INVALID: {}", botName);
-                        return Mono.empty(); // 缓存标记为无效
-                    }
-                    try {
-                        BotEntity entity = objectMapper.readValue(json, BotEntity.class);
-                        log.debug("Bot entity cache hit for name: {}", botName);
-                        return Mono.just(entity);
-                    } catch (JsonProcessingException e) {
-                        log.error("Failed to deserialize BotEntity from Redis for name: {}, attempting DB lookup", botName, e);
+                        log.debug("💬 Bot name cache marked as INVALID: {}", botName);
                         return Mono.empty();
                     }
+
+                    // 🟢 关键修复：将阻塞的 objectMapper.readValue 移动到独立的线程池
+                    return Mono.fromCallable(() -> {
+                                try {
+                                    BotEntity entity = objectMapper.readValue(json, BotEntity.class);
+                                    log.debug("💬 Bot entity cache hit for name: {}", botName);
+                                    return entity;
+                                } catch (JsonProcessingException e) {
+                                    log.error("🚨 Failed to deserialize BotEntity from Redis for name: {}, attempting DB lookup", botName, e);
+                                    throw new RuntimeException(e);
+                                }
+                            })
+                            .subscribeOn(Schedulers.boundedElastic()); // 切换到阻塞线程池
+                })
+                .onErrorResume(RuntimeException.class, e -> {
+                    return Mono.empty();
                 })
                 // 2. 缓存未命中：查询 R2DBC 数据库
                 .switchIfEmpty(
@@ -91,8 +85,6 @@ public class BotCoreService {
                                 )
                 );
     }
-
-    // ❗ 已移除 getBotEntityByToken(String token) 方法
 
     /**
      * 辅助方法：将 BotEntity 响应式缓存到 Redis (只缓存 Bot Name 键)
@@ -111,11 +103,11 @@ public class BotCoreService {
 
             return cacheEntity
                     .thenReturn(entity)
-                    .doOnSuccess(e -> log.debug("Successfully cached bot entity by name: {}", entity.getBotName()))
-                    .doOnError(e -> log.error("Failed to cache bot entity by name", e));
+                    .doOnSuccess(e -> log.debug("💬 Successfully cached bot entity by name: {}", entity.getBotName()))
+                    .doOnError(e -> log.error("🚨 Failed to cache bot entity by name", e));
 
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize BotEntity for caching", e);
+            log.error("🚨 Failed to serialize BotEntity for caching", e);
             return Mono.just(entity);
         }
     }
@@ -128,6 +120,4 @@ public class BotCoreService {
         }
         return vo;
     }
-
-    // ❗ 已移除 public Mono<BotEntity> isValidBot(String token) 方法
 }

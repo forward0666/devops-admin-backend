@@ -6,8 +6,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient; // 替换 RestTemplate
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.PrematureCloseException; // 引入 PrematureCloseException
 
 import java.util.Map;
 
@@ -43,7 +44,7 @@ public class BotClientService {
                 .retrieve()
                 .bodyToMono(String.class)
                 .onErrorResume(e -> {
-                    log.error("Telegram setWebhook API call failed for token: {}", token, e);
+                    log.error("❌Telegram setWebhook API call failed for token: {}", token, e);
                     // 返回一个包含错误信息的 Mono
                     return Mono.just("{\"ok\":false, \"description\":\"Telegram API error: " + e.getMessage() + "\"}");
                 })
@@ -54,29 +55,6 @@ public class BotClientService {
      * 获取 Bot 的 Webhook 状态及 pending 消息数。
      * 【转换点 1】：返回 Mono<Map<String, Object>>
      */
-//    public Mono<Map<String, Object>> getWebhookInfo(String token) {
-//
-//        String path = "/bot" + token + "/getWebhookInfo";
-//
-//        return telegramWebClient.get()
-//                .uri(path)
-//                .retrieve()
-//                .bodyToMono(String.class)
-//                .flatMap(jsonResponse -> {
-//                    // ⚠️ JSON 序列化仍然是阻塞操作，理想情况下应在单独的线程上执行 (如 Schedulers.boundedElastic)
-//                    try {
-//                        Map<String, Object> map = objectMapper.readValue(jsonResponse, new TypeReference<Map<String, Object>>() {});
-//                        return Mono.just(map);
-//                    } catch (Exception e) {
-//                        log.error("JSON mapping failed for getWebhookInfo response", e);
-//                        return Mono.error(new RuntimeException("JSON 解析失败", e));
-//                    }
-//                })
-//                .onErrorResume(e -> {
-//                    log.error("Telegram getWebhookInfo API call failed for token: {}", token, e);
-//                    return Mono.just(Map.of("ok", false, "description", "Telegram API call failed: " + e.getMessage()));
-//                });
-//    }
     public Mono<Map<String, Object>> getWebhookInfo(String token) {
         String path = "/bot" + token + "/getWebhookInfo";
 
@@ -91,16 +69,17 @@ public class BotClientService {
                         Map<String, Object> map = objectMapper.readValue(jsonResponse, new TypeReference<Map<String, Object>>() {});
                         return Mono.just(map);
                     } catch (Exception e) {
-                        log.error("JSON mapping failed for getWebhookInfo response", e);
+                        log.error("❌ JSON mapping failed for getWebhookInfo response", e);
                         return Mono.error(new RuntimeException("JSON 解析失败", e));
                     }
                 })
                 .onErrorResume(e -> {
                     // ... 错误处理逻辑保持不变
-                    log.error("Telegram getWebhookInfo API call failed for token: {}", token, e);
+                    log.error("❌ Telegram getWebhookInfo API call failed for token: {}", token, e);
                     return Mono.just(Map.of("ok", false, "description", "Telegram API call failed: " + e.getMessage()));
                 });
     }
+
     /**
      * 发送消息给 Telegram 用户/群组。
      * 【转换点 1】：返回 Mono<Void>
@@ -117,8 +96,14 @@ public class BotClientService {
                 .retrieve()
                 .toBodilessEntity() // 不需要响应体，只关心状态
                 .doOnSuccess(response -> log.info("Message sent successfully to chatId: {}", chatId))
+                // ❗ 最终修复: 处理连接在应用关闭时的 PrematureCloseException
+                .onErrorResume(PrematureCloseException.class, e -> {
+                    // 在优雅关闭成功后，这属于预期情况，只记录 WARN
+                    log.warn("Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", chatId);
+                    return Mono.empty(); // 失败时吞掉异常，返回完成信号
+                })
                 .onErrorResume(e -> {
-                    log.error("Failed to send message to chatId: {}, Error: {}", chatId, e.getMessage());
+                    log.error("❌ Failed to send message to chatId: {}, Error: {}", chatId, e.getMessage());
                     return Mono.empty(); // 失败时吞掉异常，返回完成信号
                 })
                 .then(); // 转换为 Mono<Void>

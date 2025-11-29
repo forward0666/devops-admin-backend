@@ -86,6 +86,12 @@
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-redis</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.16.1</version> <!-- 建议使用与您项目中的 jackson-core/databind 兼容的最新稳定版本 -->
+        </dependency>
     </dependencies>
 
 

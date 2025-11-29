@@ -47,14 +47,16 @@ import java.util.concurrent.ThreadPoolExecutor;
         "shutdown",
         "config",
         "monitor"
-        },
-        exclude = {
-        org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
-        org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration.class,
-        org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
-        org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration.class
+        }
+//        ,
+//        exclude = {
+//        org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
+//        org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration.class,
+//        org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
+//        org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration.class
 //        org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
-        })
+//        }
+        )
 @EnableDiscoveryClient
 @RefreshScope
 @EnableScheduling

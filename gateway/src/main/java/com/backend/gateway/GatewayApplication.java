@@ -36,7 +36,8 @@ import java.util.concurrent.ThreadPoolExecutor;
         "com.backend.gateway", // 主工程包
         "config",
         "monitor",
-        "filter"
+        "filter",
+        "exception"
 })
 @EnableDiscoveryClient
 @RefreshScope
