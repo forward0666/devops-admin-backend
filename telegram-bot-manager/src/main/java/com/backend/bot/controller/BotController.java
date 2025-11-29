@@ -1,126 +1,28 @@
 package com.backend.bot.controller;
 
-import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.SetWebhookDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
-import com.backend.bot.vo.BotVo;
-import jakarta.validation.Valid;
+import com.backend.bot.dto.TelegramMarkup;
+import com.backend.bot.dto.TelegramMarkup.InlineKeyboardMarkup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import network.HttpResponseUtils; // 导入我们统一的响应工具类
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration; // 引入 Duration
-import java.util.HashMap;
-import java.util.Map;
-
+import java.time.Duration;
 
 @RestController
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
+// ❌ 移除 @RequestMapping("/webhook")，以匹配 Telegram Webhook 实际发送的路径 /callback/{botName}
 public class BotController {
 
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
 
-    @PostMapping("/addBot")
-    public Mono<ResponseEntity<Map<String, Object>>> addBot(
-            @Valid @RequestBody Mono<BotRegisterDto> dtoMono) {
-
-        return dtoMono
-                .doOnNext(dto -> log.info("✅ Received request to register bot: {}", dto.getBotUsername()))
-                .flatMap(botCoreService::registerNewBot)
-                .map(botVo -> {
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("bot", botVo);
-                    return HttpResponseUtils.created("✅ Bot 注册成功并已设置 Webhook");
-                })
-                .onErrorResume(e -> {
-                    log.error("❌ Bot registration failed", e);
-                    return Mono.just(HttpResponseUtils.internalError("❌ Bot 注册失败: " + e.getMessage()));
-                });
-    }
-
-    @PostMapping("/setWebhook")
-    public Mono<ResponseEntity<Map<String, Object>>> setBotWebhook(
-            @Valid @RequestBody Mono<SetWebhookDto> dtoMono,
-            ServerWebExchange exchange) {
-
-        return dtoMono.flatMap(dto -> {
-            log.info("✅ Setting webhook for botName: {} to URL: {}", dto.getBotName(), dto.getUrl());
-
-            return botCoreService.findByBotName(dto.getBotName())
-                    .flatMap(botEntity -> {
-                        if (botEntity.getBotToken() == null) {
-                            return Mono.just(HttpResponseUtils.badRequest("❌ Bot Token 缺失"));
-                        }
-                        String token = botEntity.getBotToken();
-                        String url = dto.getUrl();
-                        String secretToken = dto.getSecretToken();
-
-                        return botClientService.setWebhook(token, url, secretToken)
-                                .map(resultJson -> {
-                                    boolean success = resultJson != null && resultJson.contains("\"ok\":true");
-                                    if (success) {
-                                        return HttpResponseUtils.ok();
-                                    } else {
-                                        return HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误");
-                                    }
-                                })
-                                .onErrorResume(e -> {
-                                    log.error("❌setWebhook API call failed for {}", dto.getBotName(), e);
-                                    return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置时发生内部错误"));
-                                });
-                    })
-                    .switchIfEmpty(Mono.just(HttpResponseUtils.notFound("❌ Bot 不存在")));
-        });
-    }
-
-    @GetMapping("/getWebhookInfo")
-    public Mono<ResponseEntity<Map<String, Object>>> getBotWebhookInfo(@RequestParam String botName) {
-
-        log.info("Getting webhook info for botName: {}", botName);
-
-        return botCoreService.findByBotName(botName)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("❌ Bot 不存在或 Token 缺失")))
-                .flatMap(botEntity -> {
-                    if (botEntity.getBotToken() == null) {
-                        return Mono.error(new IllegalArgumentException("❌Bot Token 缺失"));
-                    }
-                    String token = botEntity.getBotToken();
-
-                    return botClientService.getWebhookInfo(token)
-                            .map(info -> {
-                                if (info.containsKey("ok") && (Boolean) info.get("ok")) {
-                                    Map<String, Object> data = new HashMap<>();
-                                    data.put("webhookInfo", info.get("result"));
-                                    return HttpResponseUtils.ok(data);
-                                } else {
-                                    String errMsg = info.containsKey("description") ? (String) info.get("description") : "Webhook 状态查询失败";
-                                    return HttpResponseUtils.internalError(errMsg);
-                                }
-                            });
-                })
-                .onErrorResume(IllegalArgumentException.class, e -> {
-                    return Mono.just(HttpResponseUtils.badRequest(e.getMessage()));
-                })
-                .onErrorResume(e -> {
-                    log.error("❌getWebhookInfo failed for {}", botName, e);
-                    return Mono.just(HttpResponseUtils.internalError("❌ 查询 Webhook 状态时发生内部错误"));
-                });
-    }
-
-    /**
-     * Webhook 回调处理方法
-     * 关键诊断日志已添加在 STAGE 1, 2, 3，用于精确诊断延迟。
-     */
-    @PostMapping("/callback/{botName}")
+    @PostMapping("/callback/{botName}") // 路径现为 /callback/{botName}，与日志中的路径一致
     @ResponseStatus(HttpStatus.OK)
     public Mono<Void> onUpdateReceived(
             @PathVariable String botName,
@@ -147,35 +49,79 @@ public class BotController {
                         return Mono.empty();
                     }
 
-                    if (botUpdate.message() == null || botUpdate.message().text() == null) {
-                        return Mono.empty();
-                    }
-
-                    String text = botUpdate.message().text();
-                    Long chatId = botUpdate.message().chat().id();
-                    String type = botUpdate.message().chat().type();
                     String token = botEntity.getBotToken();
                     String botUsername = botEntity.getBotUsername();
+                    String botType = botEntity.getBotType(); // 获取 botType 字符串
                     String logIdentifier = String.format("[%s/%s]", botName, botUsername);
 
-                    log.info("✅ {} Received message in {}: {} ", logIdentifier, type, text);
+                    // --- 1. 处理 Callback Query (按钮点击) ---
+                    if (botUpdate.callbackQuery() != null) {
+                        String callbackData = botUpdate.callbackQuery().data();
+                        Long chatId = botUpdate.callbackQuery().message().chat().id();
+                        String callbackQueryId = botUpdate.callbackQuery().id();
 
-                    String responseText;
-                    if ("private".equals(type)) {
-                        responseText = "Bot Manager Received message: " + text;
-                    } else if (text.startsWith("/status")) {
-                        responseText = "Bot Status: Active (Name: " + botName + ")";
-                    } else if (text.contains("你好")) {
-                        responseText = "大家好，我是由 Bot Manager 管理的机器人！";
-                    } else {
+                        log.info("⚙️ {} Received callback query: {}", logIdentifier, callbackData);
+
+                        // 1.1 立即响应 callback_query 以停止按钮上的加载动画
+                        botClientService.answerCallbackQuery(token, callbackQueryId, "已接收请求: " + callbackData)
+                                .subscribe(
+                                        null,
+                                        e -> log.error("❌ Failed to answer callback query for bot {}. Error: {}", logIdentifier, e.getMessage())
+                                );
+
+                        // 1.2 根据 callbackData 执行业务逻辑 (示例：回复一个消息)
+                        String responseText = "您点击了: " + callbackData + "。 Bot类型: " + botType;
+                        botClientService.sendMessage(token, chatId, responseText, null)
+                                .subscribe(
+                                        null,
+                                        e -> log.error("❌ Failed to send response to callback query for bot {}. Error: {}", logIdentifier, e.getMessage())
+                                );
+
+                        // 确保 Webhook 链立即返回 Mono<Void>
                         return Mono.empty();
                     }
 
-                    log.info("✅ {} STAGE 3: Preparing to send response message. Initiating Telegram API call (Detached).", logIdentifier);
 
-                    // 异步触发，不等待结果
-                    botClientService.sendMessage(token, chatId, responseText)
-                            .subscribe();
+                    // --- 2. 处理 Message Update (文本消息) ---
+                    if (botUpdate.message() != null && botUpdate.message().text() != null) {
+                        String text = botUpdate.message().text();
+                        Long chatId = botUpdate.message().chat().id();
+                        String type = botUpdate.message().chat().type();
+
+
+                        // --- 动态键盘逻辑：根据 /start 命令或特定关键词触发 ---
+                        if (text.startsWith("/start") || ("private".equals(type) && text.contains("你好"))) {
+
+                            log.info("✅ {} Received menu trigger message in {}: {} ", logIdentifier, type, text);
+
+                            InlineKeyboardMarkup replyMarkup = TelegramMarkup.createDynamicKeyboard(botType);
+                            String responseText = "欢迎使用！请从下方按钮中选择您需要的服务：";
+
+                            if (replyMarkup == null) {
+                                responseText = String.format("欢迎！机器人类型 [%s] 无法识别，请联系管理员。", botType);
+                            }
+
+                            log.info("✅ {} STAGE 3: Preparing to send response message with keyboard (Type: {}).", logIdentifier, botType);
+
+                            // 异步触发，不等待结果，传入生成的键盘对象
+                            botClientService.sendMessage(token, chatId, responseText, replyMarkup)
+                                    .subscribe(
+                                            // 添加 onError 消费，确保如果 sendMessage 失败，错误会被打印
+                                            null, // onSuccess - not needed
+                                            e -> log.error("❌ Failed to send START message for bot {}. Error: {}", logIdentifier, e.getMessage())
+                                    );
+
+                        } else if ("private".equals(type)) {
+                            String responseText = "Bot Manager Received message: " + text + "\n请发送 /start 启动菜单。";
+                            botClientService.sendMessage(token, chatId, responseText, null).subscribe();
+                        } else if (text.startsWith("/status")) {
+                            String responseText = "Bot Status: Active (Name: " + botName + ")";
+                            botClientService.sendMessage(token, chatId, responseText, null).subscribe();
+                        } else {
+                            // 忽略其他消息
+                            return Mono.empty();
+                        }
+                    }
 
                     // 确保主 Webhook 链立即返回 Mono<Void>
                     return Mono.empty();

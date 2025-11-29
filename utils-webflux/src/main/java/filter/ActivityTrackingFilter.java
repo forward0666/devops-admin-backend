@@ -104,7 +104,7 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
     }
 
     /**
-     * 优雅地写入一个 200 OK 响应，这是 Webhook 超时的标准处理方式。
+     * 优雅地写入一h个 200 OK 响应，这是 Webook 超时的标准处理方式。
      */
     private Mono<Void> handleWebhookTimeout(ServerWebExchange exchange) {
         // 如果响应未提交，设置状态码为 200 OK，并完成响应。
