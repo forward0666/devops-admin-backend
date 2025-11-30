@@ -120,6 +120,7 @@
                         <compilerArgs>
                             <arg>-parameters</arg>
                         </compilerArgs>
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
 

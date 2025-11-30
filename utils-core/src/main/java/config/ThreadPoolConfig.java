@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.*;
 /**
- * 通用线程池配置（utils-core 公共组件）
+ * 通用线程池配置（template-core 公共组件）
  *
  * 动态根据 CPU 核心数调整线程池大小：
  * - 核心线程数 = CPU 核心数
