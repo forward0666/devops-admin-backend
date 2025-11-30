@@ -1,7 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.dto.BotRegisterDto;
-import com.backend.bot.entity.BotConfigEntity;
+import com.backend.bot.entity.BotConfigEntity; // 统一使用 BotConfigEntity
 import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,6 +29,8 @@ public class BotCoreService {
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
+
+    // 修正 Key 格式，为 botName 和 ID 组合留出空间
     private static final String CACHE_WHITELIST_PREFIX = "bot:whitelist:set:";
 
 
@@ -64,11 +66,13 @@ public class BotCoreService {
                     // 🟢 关键修复：将阻塞的 objectMapper.readValue 移动到独立的线程池
                     return Mono.fromCallable(() -> {
                                 try {
+                                    // 确保这里使用 BotConfigEntity.class
                                     BotConfigEntity entity = objectMapper.readValue(json, BotConfigEntity.class);
                                     log.debug("💬 Bot entity cache hit for name: {}", botName);
                                     return entity;
                                 } catch (JsonProcessingException e) {
-                                    log.error("🚨 Failed to deserialize BotEntity from Redis for name: {}, attempting DB lookup", botName, e);
+                                    // 确保日志中提及 BotConfigEntity
+                                    log.error("🚨 Failed to deserialize BotConfigEntity from Redis for name: {}, attempting DB lookup", botName, e);
                                     throw new RuntimeException(e);
                                 }
                             })
@@ -90,7 +94,7 @@ public class BotCoreService {
     }
 
     /**
-     * 辅助方法：将 BotEntity 响应式缓存到 Redis (只缓存 Bot Name 键)
+     * 辅助方法：将 BotConfigEntity 响应式缓存到 Redis (只缓存 Bot Name 键)
      */
     private Mono<BotConfigEntity> cacheBotEntity(BotConfigEntity entity) {
         if (entity == null) return Mono.empty();
@@ -110,7 +114,7 @@ public class BotCoreService {
                     .doOnError(e -> log.error("🚨 Failed to cache bot entity by name", e));
 
         } catch (JsonProcessingException e) {
-            log.error("🚨 Failed to serialize BotEntity for caching", e);
+            log.error("🚨 Failed to serialize BotConfigEntity for caching", e); // 确保日志中提及 BotConfigEntity
             return Mono.just(entity);
         }
     }
@@ -129,31 +133,34 @@ public class BotCoreService {
      * 流程：Redis Set Check -> MySQL Query -> Redis Set Cache
      *
      * @param botConfigId 机器人配置ID (对应 bot_config.id)
+     * @param botName     机器人的友好名称/中文描述（用于 Redis Key 可读性）
      * @param chatId      要验证的聊天ID
      * @return Mono<Boolean> - true 如果允许，false 如果不允许。
      */
-
-    public Mono<Boolean> isChatIdAuthorized(Long botConfigId, Long chatId) {
+    public Mono<Boolean> isChatIdAuthorized(Long botConfigId, String botName, Long chatId) {
         if (botConfigId == null || chatId == null) {
+            log.warn("🚨 Auth check failed: Missing botConfigId or chatId. BotName: {}", botName);
             return Mono.just(false);
         }
-    // Redis Key: bot:whitelist:set:{botConfigId}
-        String redisKey = CACHE_WHITELIST_PREFIX + botConfigId;
+
+        // 核心修改：Redis Key 包含 botName 和 botConfigId，提高可读性
+        // 示例 Key: bot:whitelist:set:测试白名单开发机器人:1
+        String redisKey = CACHE_WHITELIST_PREFIX + botName + ":" + botConfigId;
         String chatIdStr = String.valueOf(chatId);
 
         // 1. 尝试从 Redis Set 中检查是否存在
         return redisTemplate.opsForSet().isMember(redisKey, chatIdStr)
                 .flatMap(isMember -> {
                     if (Boolean.TRUE.equals(isMember)) {
-                        log.debug("✅ Chat ID {} cache hit in Redis whitelist for bot {}", chatId, botConfigId);
+                        log.debug("✅ Chat ID {} cache hit in Redis whitelist for bot {} (Key: {})", chatId, botName, redisKey);
                         return Mono.just(true); // Redis 命中，授权成功
                     }
 
                     // 2. Redis 未命中：查询 MySQL
-                    log.debug("🔍 Chat ID {} not found in Redis. Checking MySQL for bot {}", chatId, botConfigId);
+                    log.debug("🔍 Chat ID {} not found in Redis. Checking MySQL for bot {} (ID: {})", chatId, botName, botConfigId);
                     return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
                             .flatMap(entity -> {
-                                log.info("✅ Chat ID {} found in MySQL whitelist. Caching to Redis for bot {}.", chatId, botConfigId);
+                                log.info("✅ Chat ID {} found in MySQL whitelist. Caching to Redis {} (ID: {}).", chatId, botName, botConfigId);
 
                                 // 3. MySQL 命中：缓存到 Redis Set
                                 // OpsForSet.add() 返回的是成功添加的元素数量
@@ -164,12 +171,12 @@ public class BotCoreService {
                             })
                             .switchIfEmpty(
                                     // 4. MySQL 未命中
-                                    Mono.fromRunnable(() -> log.warn("❌ Chat ID {} not authorized in DB for bot {}", chatId, botConfigId))
+                                    Mono.fromRunnable(() -> log.warn("❌ Chat ID {} not authorized in DB for bot {} (ID: {})", chatId, botName, botConfigId))
                                             .then(Mono.just(false))
                             );
                 })
                 .onErrorResume(e -> {
-                    log.error("🚨 Error during authorization check (Redis/DB) for bot {} and chat {}", botConfigId, chatId, e);
+                    log.error("🚨 Error during authorization check (Redis/DB) for bot {} (ID: {}) and chat {}", botName, botConfigId, chatId, e);
                     // 数据库或 Redis 出现故障时，为了安全，默认拒绝授权
                     return Mono.just(false);
                 });

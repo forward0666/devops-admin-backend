@@ -87,7 +87,7 @@ public class BotWebhookController {
                 .flatMap(botConfigEntity ->
                         // 3. 异步校验 Chat ID 白名单 (新增核心逻辑)
                         // 假设 BotConfigEntity 有 getId() 方法
-                        botCoreService.isChatIdAuthorized(botConfigEntity.getId(), chatId)
+                        botCoreService.isChatIdAuthorized(botConfigEntity.getId(),botConfigEntity.getBotName(), chatId)
                                 .flatMap(isAllowed -> {
                                     if (isAllowed) {
                                         log.info("STAGE 2: BotConfigEntity found, Chat ID authorized. Executing business logic.");
