@@ -3,7 +3,7 @@ package com.backend.bot.service;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.template.TelegramMarkup;
-import com.backend.bot.entity.BotEntity; // 假设 BotEntity 位于这个包
+import com.backend.bot.entity.BotConfigEntity; // 假设 BotEntity 位于这个包
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class BotUpdateHandlerService {
      * @param botUpdate Telegram Webhook Update DTO
      * @return Mono<Void> 表示处理完成
      */
-    public Mono<Void> handleUpdate(BotEntity botEntity, BotUpdateDto botUpdate) {
+    public Mono<Void> handleUpdate(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
 
         String token = botEntity.getBotToken();
         String botName = botEntity.getBotName();

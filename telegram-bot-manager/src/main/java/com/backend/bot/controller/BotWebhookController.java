@@ -20,7 +20,7 @@ public class BotWebhookController {
     private final BotCoreService botCoreService;
     private final BotUpdateHandlerService botUpdateHandlerService;
 
-    // 辅助方法：尝试从 BotUpdateDto 中提取 chatId (保留在此 Controller 或移到工具类)
+    // 辅助方法：尝试从 BotUpdateDto 中提取 chatId (保持不变)
     private Optional<Long> extractChatId(BotUpdateDto update) {
         if (update.message() != null && update.message().chat() != null) {
             return Optional.ofNullable(update.message().chat().id());
@@ -49,29 +49,58 @@ public class BotWebhookController {
         log.info("✅ START processing webhook for bot: {}{}", botName, chatIdLog);
         // -------------------------
 
+        // 如果无法提取 Chat ID (例如：某些特殊的 Inline Query)，则跳过白名单检查
+        if (chatIdOpt.isEmpty()) {
+            log.warn("⚠️ Cannot extract Chat ID from update. Skipping authorization check and proceeding with BotEntity lookup.");
+            // 假设 findByBotName 返回 BotConfigEntity
+            return botCoreService.findByBotName(botName)
+                    .flatMap(botConfigEntity -> botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate))
+                    .then()
+                    .onErrorResume(e -> {
+                        log.error("❌ Error processing callback (No Chat ID) for bot {}", botName, e);
+                        return Mono.empty();
+                    });
+        }
+
+        Long chatId = chatIdOpt.get(); // 确定 chatId 存在
+
         return Mono.just(botUpdate)
-                .doOnNext(update -> log.info("✅ STAGE 1: Webhook body received, looking up BotEntity."))
+                .doOnNext(update -> log.info("✅ STAGE 1: Webhook body received, looking up BotConfigEntity."))
                 .flatMap(update ->
-                        // 1. 查找 Bot 实体并设置超时
+                        // 1. 查找 Bot 配置实体并设置超时
                         botCoreService.findByBotName(botName)
                                 .timeout(Duration.ofSeconds(1), Mono.empty())
                                 .onErrorResume(java.util.concurrent.TimeoutException.class, e -> {
-                                    log.warn("⚠️ BotEntity lookup timed out (1s) during webhook processing for bot: {}", botName);
+                                    log.warn("⚠️ BotConfigEntity lookup timed out (1s) during webhook processing for bot: {}", botName);
                                     return Mono.empty();
                                 })
                 )
-                .filter(botEntity -> {
+                .filter(botConfigEntity -> {
                     // 2. 校验 Bot 状态
-                    if (botEntity.getStatus() == null || botEntity.getStatus() != 1) {
+                    // 假设 BotConfigEntity 有 getStatus() 方法
+                    if (botConfigEntity.getStatus() == null || botConfigEntity.getStatus() != 1) {
                         log.warn("⚠️ Webhook received update for inactive or unknown bot: {}", botName);
                         return false; // 状态不活跃则过滤掉
                     }
                     return true;
                 })
-                .doOnNext(entity -> log.info("STAGE 2: BotEntity found, executing business logic."))
-                .flatMap(botEntity ->
-                        // 3. 核心：将业务逻辑委派给 BotUpdateHandlerService
-                        botUpdateHandlerService.handleUpdate(botEntity, botUpdate)
+                .flatMap(botConfigEntity ->
+                        // 3. 异步校验 Chat ID 白名单 (新增核心逻辑)
+                        // 假设 BotConfigEntity 有 getId() 方法
+                        botCoreService.isChatIdAuthorized(botConfigEntity.getId(), chatId)
+                                .flatMap(isAllowed -> {
+                                    if (isAllowed) {
+                                        log.info("STAGE 2: BotConfigEntity found, Chat ID authorized. Executing business logic.");
+                                        return Mono.just(botConfigEntity); // 授权成功，继续传递实体
+                                    } else {
+                                        log.warn("❌ Rejected update for bot {} from UNAUTHORIZED Chat ID: {}", botName, chatId);
+                                        return Mono.empty(); // 授权失败，终止链
+                                    }
+                                })
+                )
+                .flatMap(botConfigEntity ->
+                        // 4. 核心：将业务逻辑委派给 BotUpdateHandlerService
+                        botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate)
                 )
                 // 确保主 Webhook 链立即返回 Mono<Void>
                 .doFinally(signalType -> {
