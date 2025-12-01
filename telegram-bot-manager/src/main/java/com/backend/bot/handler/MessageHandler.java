@@ -27,7 +27,7 @@ public class MessageHandler implements UpdateHandler {
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
         String token = botEntity.getBotToken();
         String botName = botEntity.getBotName();
-        String botType = botEntity.getBotType();
+        String botType = botEntity.getBotType().getDbValue();
         String logIdentifier = String.format("[%s]", botName);
 
         String text = botUpdate.message().text();

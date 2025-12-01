@@ -1,8 +1,7 @@
-package com.backend.bot.handler.impl;
+package com.backend.bot.handler;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
-import com.backend.bot.handler.UpdateHandler;
 import com.backend.bot.service.BotClientService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +24,7 @@ public class CallbackQueryHandler implements UpdateHandler {
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
         String token = botEntity.getBotToken();
         String botName = botEntity.getBotName();
-        String botType = botEntity.getBotType();
+        String botType = botEntity.getBotType().getDbValue();
         String logIdentifier = String.format("[%s]", botName);
 
         String callbackData = botUpdate.callbackQuery().data();

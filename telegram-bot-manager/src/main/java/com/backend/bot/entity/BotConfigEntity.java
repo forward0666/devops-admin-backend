@@ -1,5 +1,6 @@
 package com.backend.bot.entity;
 
+import com.backend.bot.enums.BotType;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient; // 导入 Transient
@@ -16,7 +17,8 @@ public class BotConfigEntity {
     private Long id;
     private String botName;
     private String botUsername;
-    private String botType;
+    // 🚀 使用枚举类型代替字符串
+    private BotType botType;
     private String botToken;
     private Integer status;
     private LocalDateTime createdAt;
