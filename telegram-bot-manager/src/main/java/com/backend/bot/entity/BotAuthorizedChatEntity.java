@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 对应数据库 bot_authorized_chat 表
+ * 【修复】：保留 botConfigId 字段，以支持 Repository 中的 findByBotConfigIdAndChatId 查询方法。
  */
 @Data
 @Table("bot_authorized_chat")
@@ -17,7 +18,7 @@ public class BotAuthorizedChatEntity {
     @Id
     private Long id;
 
-    // 对应数据库字段 bot_config_id
+    // 🚀 必须保留此字段，以支持 Repository 的方法名解析
     @Column("bot_config_id")
     private Long botConfigId;
 
