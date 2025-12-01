@@ -1,5 +1,6 @@
 package com.backend.bot.service;
 
+import com.backend.bot.config.TelegramProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,13 @@ public class BotClientService {
     // 注入 WebClient，通常在配置类中配置好 base url
     private final WebClient telegramWebClient;
     private final ObjectMapper objectMapper;
+    private final TelegramProperties telegramProperties;
 
-    @Value("${telegram.api-base-url:https://api.telegram.org}")
-    private String telegramApiBaseUrl;
-
-    @Value("${telegram.webhook-domain}")
-    private String webhookDomain;
+//    @Value("${telegram.api-base-url:https://api.telegram.org}")
+//    private String telegramApiBaseUrl;
+//
+//    @Value("${telegram.webhook-domain}")
+//    private String webhookDomain;
 
     /**
      * 注册/更新 Webhook URL。

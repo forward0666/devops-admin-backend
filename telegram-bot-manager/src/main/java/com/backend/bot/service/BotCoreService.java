@@ -30,10 +30,18 @@ public class BotCoreService {
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
 
-    // 修正 Key 格式，为 botName 和 ID 组合留出空间
+
+    /**
+     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
+     */
     private static final String CACHE_WHITELIST_PREFIX = "bot:whitelist:set:";
 
-
+    /**
+     * 注册新 Bot
+     *
+     * @param dto 包含 Bot 注册信息的 DTO
+     * @return 注册后的 BotVo
+     */
     public Mono<BotVo> registerNewBot(BotRegisterDto dto) {
 
         BotConfigEntity config = new BotConfigEntity();
@@ -51,11 +59,15 @@ public class BotCoreService {
                 .flatMap(this::cacheBotEntity) // 3. 响应式缓存
                 .map(this::convertToVo);
     }
-
+    /**
+     * 根据 Bot 名称查询 Bot 实体
+     *
+     * @param botName Bot 名称
+     * @return BotConfigEntity 或空 Mono
+     */
     public Mono<BotConfigEntity> findByBotName(String botName) {
         String entityCacheKey = CACHE_ENTITY_PREFIX + botName;
 
-        // 1. 尝试从 Redis 缓存中读取 Entity JSON
         return redisTemplate.opsForValue().get(entityCacheKey)
                 .flatMap(json -> {
                     if ("INVALID".equals(json)) {
@@ -63,30 +75,31 @@ public class BotCoreService {
                         return Mono.empty();
                     }
 
-                    // 🟢 关键修复：将阻塞的 objectMapper.readValue 移动到独立的线程池
+                    // 1. 在阻塞线程池中执行反序列化
                     return Mono.fromCallable(() -> {
                                 try {
-                                    // 确保这里使用 BotConfigEntity.class
-                                    BotConfigEntity entity = objectMapper.readValue(json, BotConfigEntity.class);
-                                    log.debug("💬 Bot entity cache hit for name: {}", botName);
-                                    return entity;
+                                    return objectMapper.readValue(json, BotConfigEntity.class);
                                 } catch (JsonProcessingException e) {
-                                    // 确保日志中提及 BotConfigEntity
+                                    // 2. 详细记录反序列化失败的日志
                                     log.error("🚨 Failed to deserialize BotConfigEntity from Redis for name: {}, attempting DB lookup", botName, e);
+                                    // 3. 将 checked exception 转换为 RuntimeException 抛出
                                     throw new RuntimeException(e);
                                 }
                             })
-                            .subscribeOn(Schedulers.boundedElastic()); // 切换到阻塞线程池
+                            .subscribeOn(Schedulers.boundedElastic()) // 切换线程池
+                            // 4. 仅在成功时记录命中日志
+                            .doOnSuccess(entity -> log.debug("💬 Bot entity cache hit for name: {}", botName));
                 })
+                // 5. 统一处理从 fromCallable 抛出的所有 RuntimeException (包括序列化失败)
                 .onErrorResume(RuntimeException.class, e -> {
                     return Mono.empty();
                 })
-                // 2. 缓存未命中：查询 R2DBC 数据库
+                // 6. 缓存未命中：查询数据库
                 .switchIfEmpty(
                         botRepository.findByBotName(botName)
-                                .flatMap(this::cacheBotEntity) // 3. 缓存结果
+                                .flatMap(this::cacheBotEntity)
                                 .switchIfEmpty(
-                                        // 4. 数据库中不存在：缓存 INVALID 标记
+                                        // 7. 数据库中不存在：缓存 INVALID 标记
                                         redisTemplate.opsForValue().set(entityCacheKey, "INVALID", CACHE_INVALID_DURATION)
                                                 .then(Mono.empty())
                                 )
@@ -118,7 +131,12 @@ public class BotCoreService {
             return Mono.just(entity);
         }
     }
-
+    /**
+     * 将 BotConfigEntity 转换为 BotVo
+     *
+     * @param botEntity BotConfigEntity 实体
+     * @return 转换后的 BotVo
+     */
     private BotVo convertToVo(BotConfigEntity botEntity) {
         // 占位符，实现 Entity 到 VO 的转换逻辑
         BotVo vo = new BotVo();
@@ -181,5 +199,26 @@ public class BotCoreService {
                     return Mono.just(false);
                 });
 
+    }
+
+    /**
+     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
+     *
+     * @param botName Bot 名称
+     * @param botId Bot ID
+     * @return 缓存 Key
+     */
+    private String getCacheEntityKey(String botName, String botId) {
+        return CACHE_ENTITY_PREFIX + botName + ":" + botId;
+    }
+
+    /**
+     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
+     *
+     * @param botName Bot 名称
+     * @return 缓存 Key
+     */
+    private String getCacheWhitelistKey(String botName) {
+        return CACHE_WHITELIST_PREFIX + botName;
     }
 }

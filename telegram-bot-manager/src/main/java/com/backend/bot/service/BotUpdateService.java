@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class BotUpdateHandlerService {
+public class BotUpdateService {
 
     private final BotClientService botClientService;
 
@@ -59,7 +59,7 @@ public class BotUpdateHandlerService {
                 );
 
         // 1.2 根据 callbackData 执行业务逻辑 (示例：回复一个消息)
-        String responseText = "您点击了: " + callbackData + "。 Bot类型: " + botType;
+        String responseText = "了您点击: " + callbackData + "。 Bot类型: " + botType;
 
         // 确保 Webhook 链立即返回 Mono<Void>，同时异步发送消息
         return botClientService.sendMessage(token, chatId, responseText, null)
@@ -69,51 +69,6 @@ public class BotUpdateHandlerService {
                 })
                 .then(Mono.empty());
     }
-
-//    private Mono<Void> handleMessageUpdate(String token, BotUpdateDto botUpdate, String logIdentifier, String botType) {
-//        String text = botUpdate.message().text();
-//        Long chatId = botUpdate.message().chat().id();
-//        String type = botUpdate.message().chat().type();
-//
-//        // --- 动态键盘逻辑：根据 /start 命令或特定关键词触发 ---
-//        if (text.startsWith("/start") || ("private".equals(type) && text.contains("你好"))) {
-//
-//            log.info("✅ {} Received menu trigger message in {}: {} ", logIdentifier, type, text);
-//
-//            InlineKeyboardMarkup replyMarkup = TelegramMarkup.createDynamicKeyboard(botType);
-//            String responseText = "欢迎使用！请从下方按钮中选择您需要的服务：";
-//
-//            if (replyMarkup == null) {
-//                responseText = String.format("欢迎！机器人类型 [%s] 无法识别，请联系管理员。", botType);
-//            }
-//
-//            log.info("✅ {} STAGE 3: Preparing to send response message with keyboard (Type: {}).", logIdentifier, botType);
-//
-//            // 异步触发，不等待结果，传入生成的键盘对象
-//            return botClientService.sendMessage(token, chatId, responseText, replyMarkup)
-//                    .onErrorResume(e -> {
-//                        log.error("❌ Failed to send START message for bot {}. Error: {}", logIdentifier, e.getMessage());
-//                        return Mono.empty();
-//                    })
-//                    .then(Mono.empty()); // 确保返回 Mono<Void>
-//        }
-//
-//        // --- 其他文本消息处理 ---
-//        else if ("private".equals(type)) {
-//            String responseText = "Bot Manager Received message: " + text + "\n请发送 /start 启动菜单。";
-//            return botClientService.sendMessage(token, chatId, responseText, null)
-//                    .onErrorResume(e -> Mono.empty())
-//                    .then(Mono.empty());
-//        } else if (text.startsWith("/status")) {
-//            String responseText = "Bot Status: Active (Name: " + botUpdate.callbackQuery().message().chat().id() + ")"; // 注意：这里botName可能更合理
-//            return botClientService.sendMessage(token, chatId, responseText, null)
-//                    .onErrorResume(e -> Mono.empty())
-//                    .then(Mono.empty());
-//        }
-//
-//        // 忽略其他消息
-//        return Mono.empty();
-//    }
 
     private Mono<Void> handleMessageUpdate(String token, BotUpdateDto botUpdate, String logIdentifier, String botType) {
         // 使用 Record 访问器 message() 来获取 MessageDto

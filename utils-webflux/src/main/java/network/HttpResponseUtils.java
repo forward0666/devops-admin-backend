@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import webflux.WebExchangeUtils;
+import webflux.WebExchangeUtils; // 假设这个类存在
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +28,7 @@ public class HttpResponseUtils {
         result.put("code", status.value());
         result.put("message", msg != null ? msg : status.getReasonPhrase());
         if (data != null) {
+            // 注意：这里将业务数据放在 "data" 键下
             result.put("data", data);
         }
         return result;
@@ -50,11 +51,26 @@ public class HttpResponseUtils {
         return buildResponse(HttpStatus.OK, msg, data);
     }
 
-    /** 201 Created */
+    /**
+     * 201 Created - 只包含消息，不包含数据体
+     * @param msg 响应消息
+     */
     public static ResponseEntity<Map<String, Object>> created(String msg) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(buildResponse(HttpStatus.CREATED, msg, null));
     }
+
+    /**
+     * 201 Created - 包含消息和数据体
+     * 【新增的方法，用于支持 Controller 返回 BotVo】
+     * @param msg 响应消息
+     * @param data 响应数据（Map 形式）
+     */
+    public static ResponseEntity<Map<String, Object>> created(String msg, Map<String, Object> data) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(buildResponse(HttpStatus.CREATED, msg, data));
+    }
+
 
     /** 400 Bad Request */
     public static ResponseEntity<Map<String, Object>> badRequest(String msg) {
@@ -98,6 +114,7 @@ public class HttpResponseUtils {
      * 通用写入方法
      */
     public static Mono<Void> write(ServerWebExchange exchange, ResponseEntity<?> entity) {
+        // 假设 WebExchangeUtils 存在
         return WebExchangeUtils.responseJson(exchange, entity);
     }
 

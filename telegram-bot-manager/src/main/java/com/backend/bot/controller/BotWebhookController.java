@@ -2,7 +2,7 @@ package com.backend.bot.controller;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.service.BotCoreService;
-import com.backend.bot.service.BotUpdateHandlerService;
+import com.backend.bot.service.BotUpdateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -12,26 +12,15 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.Optional;
 
+import static com.backend.bot.utils.BotUpdateUtils.extractChatId;
+
 @RestController
 @RequiredArgsConstructor
 @Slf4j
 public class BotWebhookController {
 
     private final BotCoreService botCoreService;
-    private final BotUpdateHandlerService botUpdateHandlerService;
-
-    // 辅助方法：尝试从 BotUpdateDto 中提取 chatId (保持不变)
-    private Optional<Long> extractChatId(BotUpdateDto update) {
-        if (update.message() != null && update.message().chat() != null) {
-            return Optional.ofNullable(update.message().chat().id());
-        }
-        if (update.callbackQuery() != null &&
-                update.callbackQuery().message() != null &&
-                update.callbackQuery().message().chat() != null) {
-            return Optional.ofNullable(update.callbackQuery().message().chat().id());
-        }
-        return Optional.empty();
-    }
+    private final BotUpdateService botUpdateHandlerService;
 
     /**
      * 接收 Telegram Webhook 更新的端点。
