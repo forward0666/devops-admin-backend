@@ -34,11 +34,13 @@ public class TraceIdUtils {
 
     /** 设置 MDC traceId */
     public static void setTraceId(String traceId) {
+
         MDC.put("traceId", traceId);
     }
 
     /** 清理 MDC traceId */
     public static void clearMdc() {
+
         MDC.remove("traceId");
     }
 
