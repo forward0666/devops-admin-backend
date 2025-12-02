@@ -5,7 +5,7 @@ import com.backend.bot.dto.InlineKeyboardMarkupDto; // <--- 修复导入
 /**
  * 键盘模板生成接口。
  */
-public interface KeyboardTemplate {
+public interface MenuTemplate {
     /**
      * 生成特定机器人的内联键盘标记。
      * @return InlineKeyboardMarkupDto 对象。
