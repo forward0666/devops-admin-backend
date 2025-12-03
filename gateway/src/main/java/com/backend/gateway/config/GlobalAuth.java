@@ -2,16 +2,15 @@ package com.backend.gateway.config;
 
 import com.backend.gateway.filter.AuthFilter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier; // 导入 Qualifier
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.ExecutorService;
+import reactor.core.scheduler.Scheduler; // 导入 Scheduler
 import org.springframework.cache.CacheManager;
 
 /**
  * 全局认证过滤器
- * 支持线程池异步验证 & traceId
  */
 @Slf4j
 @RefreshScope
@@ -22,10 +21,10 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
     private String secret;
 
     /**
-     * 使用构造器注入线程池
+     * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
      */
-    public GlobalAuth(ExecutorService executorService, CacheManager cacheManager) {
-        super(BaseAuthConfig.class, executorService, cacheManager);
+    public GlobalAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
+        super(BaseAuthConfig.class, scheduler, cacheManager); // 传递 scheduler
     }
 
     @Override
@@ -33,12 +32,8 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
         return secret;
     }
 
-    /**
-     * 可以在这里覆盖 authorizedRequest() 做方法级拦截
-     */
     @Override
     protected boolean authorizedRequest(String method) {
-        // 例如阻止 GET 请求，默认不阻止
         return false;
     }
 }

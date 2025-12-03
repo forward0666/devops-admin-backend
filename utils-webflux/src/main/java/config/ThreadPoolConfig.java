@@ -2,50 +2,55 @@ package config;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
-import network.ThreadPoolUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
-import java.util.concurrent.*;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * 通用线程池配置（template-core 公共组件）
  *
- * 动态根据 CPU 核心数调整线程池大小：
- * - 核心线程数 = CPU 核心数
- * - 最大线程数 = CPU 核心数 * 2
- * - 队列容量 = 1000
- * - 空闲线程保活时间 = 60s
- * - 线程命名格式 = common-worker-%d
+ * 改造为 WebFlux 友好的 BoundedElastic Scheduler，专用于处理阻塞任务 (例如数据库/外部API调用)。
  */
 @Slf4j
 @Configuration
 public class ThreadPoolConfig {
 
-    @Bean(destroyMethod = "shutdown")
-    public ExecutorService executorService() {
+    // 建议使用单独的名称来标识这是一个 Scheduler
+    @Bean(destroyMethod = "dispose") // Scheduler 的销毁方法是 dispose()
+    public Scheduler blockingTaskScheduler() {
         // 根据 CPU 动态计算
         int core = Runtime.getRuntime().availableProcessors();
-        int max = core * 2;
+        // WebFlux 推荐使用 BoundedElastic，它会按需扩展，直到达到最大限制。
 
-        // 构建命名线程工厂
+        // 命名格式
         ThreadFactory threadFactory = new ThreadFactoryBuilder()
-                .setNameFormat("worker-%d")
-                .setDaemon(false)
+                .setNameFormat("blocking-worker-%d") // 命名修改，区分于默认的 elastic
+                .setDaemon(true) // 建议设置为守护线程，利于应用关闭
                 .build();
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                core,
-                max,
-                60L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(1000),
+
+        // 1. 线程池最大线程数（对应原来的 max = core * 2）
+        int maxThreads = core * 2;
+        // 2. 队列容量 (对应原来的 1000)
+        int queueCapacity = 1000;
+        // 3. 空闲线程保活时间 (对应原来的 60L, TimeUnit.SECONDS)
+        int ttlSeconds = 60;
+
+        Scheduler scheduler = Schedulers.newBoundedElastic(
+                maxThreads,
+                queueCapacity,
                 threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+                ttlSeconds
         );
 
-        // ✅ 启动后打印一次线程池状态
-        log.info("✅ ThreadPool initialized (core={}, max={}, queueSize={})", core, max, 1000);
-        ThreadPoolUtils.logThreadPoolStatus(executor, "CommonWorkerPool");
-        return executor;
+        log.info("✅ BoundedElastic Scheduler initialized (max={}, queueCapacity={}, ttl={})",
+                maxThreads, queueCapacity, ttlSeconds);
+
+        // ⚠️ 注意：Scheduler 无法像 ThreadPoolExecutor 那样直接打印状态，因为它是动态的。
+        // 使用 logThreadPoolStatus 的功能将不再适用。
+
+        return scheduler;
     }
 }

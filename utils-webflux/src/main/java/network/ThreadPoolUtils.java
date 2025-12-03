@@ -1,57 +1,22 @@
 package network;
 
 import lombok.extern.slf4j.Slf4j;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import reactor.core.scheduler.Scheduler; // 引入 Scheduler
 
 /**
- * 通用线程池工具类
- * - 支持动态 batchSize 计算（结合 CPU / 线程池负载）
- * - 可用于 K8s 环境自动适配资源变化
+ * 通用工具类 (针对非阻塞改造，移除线程池负载计算)
  */
 @Slf4j
 public class ThreadPoolUtils {
 
-    /**
-     * 智能计算 batchSize：根据 CPU 核心数 + 当前线程负载动态分配
-     */
-    public static int calculateSmartBatchSize(ExecutorService executorService,
-                                              int totalTasks,
-                                              int minBatchSize,
-                                              int maxBatchSize) {
-        if (executorService == null || totalTasks <= 0) {
-            return minBatchSize;
-        }
-
-        int cpuCores = Runtime.getRuntime().availableProcessors();
-        int maxThreads = cpuCores * 2; // 默认推测最大线程数（容器下自适应）
-        int activeThreads = 0;
-
-        if (executorService instanceof ThreadPoolExecutor tpe) {
-            maxThreads = tpe.getMaximumPoolSize();
-            activeThreads = tpe.getActiveCount();
-        }
-
-        int availableThreads = Math.max(1, maxThreads - activeThreads);
-        int batchSize = Math.max(minBatchSize, totalTasks / Math.max(cpuCores, availableThreads));
-
-        if (maxBatchSize > 0) batchSize = Math.min(batchSize, maxBatchSize);
-
-        log.info("🧮 Dynamic batchSize={} (total={}, cpuCores={}, active={}, available={}, max={})",
-                batchSize, totalTasks, cpuCores, activeThreads, availableThreads, maxThreads);
-
-        return batchSize;
-    }
-
-    public static int calculateSmartBatchSize(ExecutorService executorService,
-                                              int totalTasks,
-                                              int minBatchSize) {
-        return calculateSmartBatchSize(executorService, totalTasks, minBatchSize, -1);
-    }
+    // ⚠️ 移除 calculateSmartBatchSize 及其重载方法。
+    // 在 WebFlux 中，应使用 buffer() 操作符代替手动计算 batch size。
 
     /**
-     * 打印线程池运行状态
+     * 【仅保留打印状态，不用于 WebFlux】
+     * 打印传统线程池运行状态
      */
     public static void logThreadPoolStatus(ThreadPoolExecutor executor, String poolName) {
         if (executor == null) return;
@@ -62,5 +27,10 @@ public class ThreadPoolUtils {
                 executor.getCompletedTaskCount(),
                 executor.getLargestPoolSize(),
                 executor.getMaximumPoolSize());
+    }
+
+    // ℹ️ 建议：可以添加一个辅助方法，帮助开发者正确地在 Mono/Flux 链中切换 Scheduler
+    public static void executeBlockingTask(Scheduler scheduler) {
+        log.warn("⚠️ executeBlockingTask 辅助方法占位。在实际业务中，请使用 mono.subscribeOn(scheduler)");
     }
 }

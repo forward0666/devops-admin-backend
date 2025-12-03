@@ -1,21 +1,22 @@
 package com.backend.gateway.filter;
 
 import com.backend.gateway.config.BaseAuthConfig;
-import filter.TraceIdFilter; // 导入 TraceIdWebFilter 以获取 Context Key
+import filter.TraceIdFilter;
 import lombok.extern.slf4j.Slf4j;
-import network.HttpResponseUtils; // 导入统一响应工具类
-import network.TraceIdUtils; // 导入 MDC/TraceId 实用工具
+import network.HttpResponseUtils;
+import network.TraceIdUtils;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
 import security.AuthValidationUtils;
 import webflux.WebExchangeUtils;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
+import java.util.concurrent.Callable; // 引入 Callable 用于 Mono.fromCallable
+import java.util.concurrent.ExecutorService; // 仍然保留，但不再是核心依赖
+import java.util.concurrent.CompletableFuture; // 移除
 
 /**
  * 授权过滤器工厂
@@ -24,13 +25,15 @@ import java.util.function.Supplier;
 @Slf4j
 public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterFactory<T> {
 
-    private final ExecutorService executorService;
+    // 🌟 核心修改 1: 将 ExecutorService 替换为 Scheduler
+    private final Scheduler scheduler;
     private final CacheManager cacheManager;
 
-    public AuthFilter(Class<T> configClass, ExecutorService executorService, CacheManager cacheManager) {
+    // 🌟 核心修改 2: 构造器接受 Scheduler
+    public AuthFilter(Class<T> configClass, Scheduler scheduler, CacheManager cacheManager) {
         super(configClass);
-        // 使用 TraceIdUtils.mdcExecutor 确保异步线程池支持 MDC
-        this.executorService = TraceIdUtils.mdcExecutor(executorService);
+        // 不再需要 TraceIdUtils.mdcExecutor，因为我们将使用 Reactor Context 传播
+        this.scheduler = scheduler;
         this.cacheManager = cacheManager;
     }
 
@@ -43,11 +46,8 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
 
     public GatewayFilter apply(T config) {
         if (!config.isEnabled()) {
-            // 如果禁用，返回一个不执行任何操作的过滤器
             return (exchange, chain) -> chain.filter(exchange);
         }
-
-        // 【结构优化点】：将复杂的过滤逻辑抽离到私有方法中
         return createAuthGatewayFilter(config);
     }
 
@@ -56,7 +56,6 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
      */
     private GatewayFilter createAuthGatewayFilter(T config) {
 
-        // 实际的过滤逻辑，包含了异步和 Reactor Context 处理
         return (exchange, chain) -> Mono.deferContextual(contextView -> {
 
             // 1. 从 Reactor Context 中获取 Trace ID (由 TraceIdWebFilter 注入)
@@ -65,14 +64,19 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                     .map(Object::toString)
                     .orElse("NO_TRACE_ID");
 
-            // 提前获取 Exchange 的核心信息
+            // 🌟 [可选优化] 在主线程设置 MDC，确保后续日志能打印 Trace ID
+            if (!"NO_TRACE_ID".equals(traceId)) {
+                TraceIdUtils.setTraceId(traceId);
+            }
+            // ❗ 注意：这里不需要清 MDC，因为这是 I/O 线程，留给 doFinally/框架清理
+
             final String method = WebExchangeUtils.getMethod(exchange);
             final String path = WebExchangeUtils.getPath(exchange);
             final String routeId = WebExchangeUtils.getRouteId(exchange);
             final String ip = WebExchangeUtils.getClientIp(exchange);
 
-            // 2. 异步验证 Supplier：MDC 仅用于此 Supplier 内部的日志记录
-            Supplier<Boolean> validationSupplier = () -> {
+            // 2. 阻塞验证 Callable：用于 Mono.fromCallable()，包含所有阻塞逻辑和 MDC 切换
+            Callable<Boolean> validationCallable = () -> {
                 TraceIdUtils.setTraceId(traceId); // 异步线程开始时设置 MDC
                 try {
                     String cacheKey = "auth:" + ip + ":" + method + ":" + path;
@@ -84,7 +88,9 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                         return cached;
                     }
 
+                    // 💥 真正的阻塞操作在这里执行
                     boolean authorized = AuthValidationUtils.isAuthorized(exchange, getSecret());
+
                     if (!authorized || authorizedRequest(method)) {
                         log.warn("[traceId={}] ❌ Unauthorized or method not allowed | IP={} | Route={} | Method={} | Path={}",
                                 traceId, ip, routeId, method, path);
@@ -101,34 +107,33 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                 }
             };
 
-            // 3. 异步执行并返回 Mono
-            CompletableFuture<Boolean> validationFuture = CompletableFuture
-                    .supplyAsync(validationSupplier, executorService);
+            // 3. 🌟 核心修改 3: 使用 Mono.fromCallable 和 subscribeOn
+            Mono<Boolean> validationMono = Mono.fromCallable(validationCallable)
+                    .subscribeOn(scheduler); // 切换到阻塞专用的 Scheduler
 
-            return Mono.fromFuture(validationFuture)
+            return validationMono
                     .flatMap(authorized -> {
                         if (!authorized) {
-                            TraceIdUtils.setTraceId(traceId);
+                            // 失败路径：不需要额外的 MDC.set/clear，因为 HttpResponseUtils 及其后的日志应依赖 Logback 配置
                             log.warn("[traceId={}] ❌ Request blocked | IP={} | Route={} | Method={} | Path={}",
                                     traceId, ip, routeId, method, path);
-                            TraceIdUtils.clearMdc();
-                            // 【修正点 A】：传递 ServerWebExchange exchange
+                            // 返回一个带响应的 Mono
                             return HttpResponseUtils.write(exchange,
                                     HttpResponseUtils.unauthorized("Unauthorized or service unavailable"));
                         }
                         // 验证成功，继续执行过滤器链
                         return chain.filter(exchange);
                     })
-                    // 确保在主线程日志记录或错误恢复时 Trace ID 仍可用
                     .onErrorResume(ex -> {
-                        TraceIdUtils.setTraceId(traceId);
+                        // 错误处理路径
                         log.error("[traceId={}] ❌ Downstream unavailable | IP={} | Route={} | Method={} | Path={} | Exception={}",
                                 traceId, ip, routeId, method, path, ex.toString());
-                        TraceIdUtils.clearMdc();
-                        // 【修正点 B】：传递 ServerWebExchange exchange
+                        // 返回一个带响应的 Mono
                         return HttpResponseUtils.write(exchange,
                                 HttpResponseUtils.internalError("Downstream service unavailable"));
-                    });
+                    })
+                    // 🌟 核心修改 4: 确保 Trace ID 在整个链执行完毕后被清理
+                    .doFinally(signal -> TraceIdUtils.clearMdc());
         });
     }
 }
