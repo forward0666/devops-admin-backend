@@ -34,4 +34,12 @@ public interface UserSessionService {
      * @return 一个表示操作完成的 Mono<Void>
      */
     Mono<Void> clearUserSession(Long userId);
+
+    /**
+     * 🌟 取消针对指定用户可能存在的待处理消息自动删除任务。
+     *
+     * @param userId 用户的 Telegram ID
+     * @return 一个表示操作完成的 Mono<Void>。如果不存在任务，也应成功返回。
+     */
+    Mono<Void> cancelPendingDeletion(Long userId);
 }

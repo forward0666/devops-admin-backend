@@ -178,6 +178,40 @@ public class BotClientService {
     }
 
     /**
+     * 【新增】发送消息并返回完整的 JSON 响应字符串，用于提取 message_id。
+     * @param token 机器人 Token
+     * @param chatId 聊天 ID
+     * @param text 消息文本
+     * @param replyMarkup 内联键盘对象
+     * @return 包含 Telegram API 响应的 JSON 字符串 Mono
+     */
+    public Mono<String> sendMenuMessageWithResponse(String token, Long chatId, String text, InlineKeyboardMarkupDto replyMarkup) {
+        String path = "/bot" + token + "/sendMessage";
+
+        Map<String, Object> bodyMap = new HashMap<>();
+        bodyMap.put("chat_id", chatId);
+        bodyMap.put("text", text);
+        bodyMap.put("parse_mode", "Markdown"); // 确保格式化生效
+
+        if (replyMarkup != null) {
+            bodyMap.put("reply_markup", replyMarkup);
+        }
+
+        return telegramWebClient.post()
+                .uri(path)
+                .body(BodyInserters.fromValue(bodyMap))
+                .retrieve()
+                // 关键点：返回响应体为 String，以便 StartCommandHandler 可以解析
+                .bodyToMono(String.class)
+                .retryWhen(telegramRetryPolicy)
+                .doOnSuccess(response -> log.info("✅ Message sent successfully and full JSON response received for chatId: {}", chatId))
+                .onErrorResume(e -> {
+                    log.error("❌ Failed to send message with response to chatId: {}. Error: {}", chatId, e.getMessage());
+                    return Mono.error(e); // 向上抛出错误
+                });
+    }
+
+    /**
      * 替换消息的内联键盘。
      */
     public Mono<Void> editMessageReplyMarkup(String token, Long chatId, Long messageId, InlineKeyboardMarkupDto replyMarkup) {
@@ -235,6 +269,35 @@ public class BotClientService {
                 .onErrorResume(e -> {
                     log.error("❌ Failed to edit message text for chatId: {}, messageId: {}. Error: {}", chatId, messageId, e.getMessage());
                     return Mono.error(e); // 向上抛出错误，让 CallbackQueryHandler 处理优雅降级
+                })
+                .then();
+    }
+
+    /**
+     * 【新增】删除指定消息。用于菜单超时自动销毁。
+     * @param token 机器人 Token
+     * @param chatId 聊天 ID
+     * @param messageId 消息 ID
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteMessage(String token, Long chatId, Long messageId) {
+        String path = "/bot" + token + "/deleteMessage";
+
+        Map<String, Object> bodyMap = new HashMap<>();
+        bodyMap.put("chat_id", chatId);
+        bodyMap.put("message_id", messageId);
+
+        return telegramWebClient.post()
+                .uri(path)
+                .body(BodyInserters.fromValue(bodyMap))
+                .retrieve()
+                .toBodilessEntity()
+                .retryWhen(telegramRetryPolicy)
+                .doOnSuccess(response -> log.warn("✅ Message {} deleted successfully in chatId: {}", messageId, chatId))
+                .onErrorResume(e -> {
+                    // Telegram API 如果消息已不存在会返回 400 错误，这里忽略它
+                    log.warn("⚠️ Failed to delete message {} in chatId: {}. May already be deleted. Error: {}", messageId, chatId, e.getMessage());
+                    return Mono.empty();
                 })
                 .then();
     }

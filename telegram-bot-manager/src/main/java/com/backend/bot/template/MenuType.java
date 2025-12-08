@@ -71,4 +71,15 @@ public class MenuType {
 
         return template != null ? template.createKeyboard() : null;
     }
+
+    /**
+     * 🌟 遗留方法：为了兼容 StartCommandHandler 的旧调用方式，但现在 StartCommandHandler 应该直接调用
+     * createDynamicKeyboard("IP_WHITE_LIST") 来获取主菜单。
+     *
+     * @deprecated 应该使用 createDynamicKeyboard("IP_WHITE_LIST") 替代
+     */
+    @Deprecated
+    public static InlineKeyboardMarkupDto createMainMenu() {
+        return createDynamicKeyboard("IP_WHITE_LIST");
+    }
 }
