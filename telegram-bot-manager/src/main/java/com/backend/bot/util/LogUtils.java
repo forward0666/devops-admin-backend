@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType; // 🌟 新增导入 SignalType
 import reactor.util.context.ContextView;
 
 import java.util.Optional;
@@ -35,33 +36,53 @@ public class LogUtils {
             String botName,
             BotUpdateDto botUpdate) {
 
-        // 1. 从 Context 中获取 Trace ID (此步骤无法抽象到 LogUtils 外部)
         String traceId = contextView.hasKey(TraceIdFilter.CONTEXT_KEY_TRACE_ID)
                 ? contextView.get(TraceIdFilter.CONTEXT_KEY_TRACE_ID).toString()
                 : null;
 
-        // 2. [可选但强烈推荐] 手动同步 MDC，确保后续异步链中的日志都能打印 Trace ID
         LogUtils.syncTraceIdToMDC(traceId);
 
-        // 3. 构建 Trace ID 日志标识
         String traceIdLog = LogUtils.buildTraceIdLogPrefix(traceId);
 
-        // 4. 构建 Chat ID 日志
         Optional<Long> chatIdOpt = extractChatId(botUpdate);
         String chatIdLog = LogUtils.buildChatIdLogSuffix(chatIdOpt);
 
-        // 5. 日志记录
         log.info("{} ✅ [Webhook] Received update for bot: {}{}. Publishing event...",
                 traceIdLog, botName, chatIdLog);
 
-        // 6. 发布事件 (携带 Trace ID)
         eventPublisher.publishEvent(new BotUpdateEvent(botName, botUpdate, traceId));
 
-        // 7. 立即返回
         return Mono.empty();
     }
 
-    // --- 辅助方法 (供其他 Controller 使用) ---
+    // --- 辅助方法 (供其他 Controller/Service 使用) ---
+
+    /**
+     * 辅助方法：从 Mono Context 中提取 traceId 并将其设置到 MDC 中。
+     * 应该在反应式流的开始处调用。
+     *
+     * @return 一个 Mono<Void>，用于在反应式链中执行设置操作。
+     */
+    public static Mono<Void> setMdcFromContext() {
+        return Mono.deferContextual(contextView -> {
+            Optional<Object> traceIdOpt = contextView.getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID);
+            if (traceIdOpt.isPresent()) {
+                String traceId = traceIdOpt.get().toString();
+                MDC.put("traceId", traceId);
+            }
+            return Mono.empty();
+        });
+    }
+
+    /**
+     * 辅助方法：在反应式流结束时执行 MDC 清理操作。
+     * 应该在 doFinally(LogUtils::clearMDC) 中调用。
+     *
+     * @param signalType 反应式流的结束信号类型 (ON_COMPLETE, ON_ERROR, CANCEL)。
+     */
+    public static void clearMDC(SignalType signalType) { // 🌟 关键修正：使用 SignalType
+        MDC.clear();
+    }
 
     /**
      * 辅助方法：将 Trace ID 写入 SLF4J 的 MDC，以便 Logback/Log4j2 能够捕获它。
@@ -72,6 +93,16 @@ public class LogUtils {
             MDC.put(TRACE_ID_KEY, traceId);
         }
     }
+
+    /**
+     * 辅助方法：从 ContextView 中同步 Trace ID 到 MDC。
+     * @param contextView 当前的 ContextView
+     */
+    public static void syncTraceIdToMDC(ContextView contextView) {
+        contextView.getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID)
+                .ifPresent(traceId -> MDC.put("traceId", traceId.toString()));
+    }
+
 
     /**
      * 根据传入的 traceId 字符串构建日志前缀。

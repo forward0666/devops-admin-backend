@@ -3,12 +3,13 @@ package com.backend.bot.controller;
 import com.backend.bot.dto.SetWebhookDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
-import filter.TraceIdFilter; // 🌟 导入 TraceIdFilter
+// import filter.TraceIdFilter; // 🌟 移除：不再直接使用 TraceIdFilter
+// import org.slf4j.MDC; // 🌟 移除：不再直接操作 MDC.put/clear
+import com.backend.bot.util.LogUtils; // 🌟 导入 LogUtils
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
-import org.slf4j.MDC; // 🌟 导入 MDC
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
@@ -16,7 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional; // 🌟 导入 Optional
+// import java.util.Optional; // 🌟 移除：不再直接使用 Optional
 
 @RestController
 @RequiredArgsConstructor
@@ -26,17 +27,7 @@ public class BotWebhookConfigController {
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
 
-    // 辅助方法：获取 Trace ID 并设置 MDC
-    private Mono<Void> setMdcFromContext() {
-        return Mono.deferContextual(contextView -> {
-            Optional<Object> traceIdOpt = contextView.getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID);
-            if (traceIdOpt.isPresent()) {
-                String traceId = traceIdOpt.get().toString();
-                MDC.put("traceId", traceId);
-            }
-            return Mono.empty();
-        });
-    }
+    // ❌ 移除重复的私有辅助方法 setMdcFromContext()
 
     /**
      * 手动设置 Bot 的 Webhook URL。
@@ -46,7 +37,8 @@ public class BotWebhookConfigController {
             @Valid @RequestBody Mono<SetWebhookDto> dtoMono,
             ServerWebExchange exchange) {
 
-        return setMdcFromContext() // 🌟 步骤 1: 设置 MDC
+        // 🌟 步骤 1: 使用 LogUtils 抽象的 MDC 设置方法
+        return LogUtils.setMdcFromContext()
                 .then(dtoMono)
                 .doOnNext(dto -> log.info("✅ Setting webhook for botName: {} to URL: {}", dto.getBotName(), dto.getUrl()))
                 .flatMap(dto -> {
@@ -76,7 +68,8 @@ public class BotWebhookConfigController {
                             })
                             .switchIfEmpty(Mono.just(HttpResponseUtils.notFound("❌ Bot 不存在")));
                 })
-                .doFinally(signal -> MDC.clear()); // 🌟 步骤 2: 在链结束时清除 MDC
+                // 🌟 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
+                .doFinally(LogUtils::clearMDC);
     }
 
     /**
@@ -85,7 +78,8 @@ public class BotWebhookConfigController {
     @GetMapping("/getWebhookInfo")
     public Mono<ResponseEntity<Map<String, Object>>> getBotWebhookInfo(@RequestParam String botName) {
 
-        return setMdcFromContext() // 🌟 步骤 1: 设置 MDC
+        // 🌟 步骤 1: 使用 LogUtils 抽象的 MDC 设置方法
+        return LogUtils.setMdcFromContext()
                 .then(Mono.defer(() -> {
                     log.info("Getting webhook info for botName: {}", botName);
 
@@ -117,6 +111,7 @@ public class BotWebhookConfigController {
                                 return Mono.just(HttpResponseUtils.internalError("❌ 查询 Webhook 状态时发生内部错误"));
                             });
                 }))
-                .doFinally(signal -> MDC.clear()); // 🌟 步骤 2: 在链结束时清除 MDC
+                // 🌟 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
+                .doFinally(LogUtils::clearMDC);
     }
 }
