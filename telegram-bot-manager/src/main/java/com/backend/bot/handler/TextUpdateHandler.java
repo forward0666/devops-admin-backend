@@ -16,6 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // 导入 CallbackQueryHandler 中的状态常量
+import static com.backend.bot.constants.CallbackConstants.*;
 import static com.backend.bot.handler.CallbackQueryHandler.*;
 
 @Component
