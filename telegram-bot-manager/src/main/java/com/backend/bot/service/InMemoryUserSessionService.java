@@ -20,8 +20,9 @@ public class InMemoryUserSessionService implements UserSessionService {
     // 使用 ConcurrentHashMap 存储会话状态：Key=UserId, Value=UserSessionEntity
     private final ConcurrentMap<Long, UserSessionEntity> userSessions = new ConcurrentHashMap<>();
 
-    // 🌟 存储待处理的自动删除任务，Key=UserId, Value=Disposable (用于取消任务)
+    // 存储菜单自动销毁任务：Key=UserId, Value=Disposable
     private final ConcurrentMap<Long, Disposable> pendingDeletions = new ConcurrentHashMap<>();
+
 
     @Override
     public Mono<Void> updateUserSession(Long userId, String newState, Long referenceMessageId) {
@@ -53,50 +54,31 @@ public class InMemoryUserSessionService implements UserSessionService {
     @Override
     public Mono<Void> clearUserSession(Long userId) {
         return Mono.fromRunnable(() -> {
-            // 1. 清除会话状态
             userSessions.remove(userId);
             log.info("🗑️ User session cleared for userId: {}", userId);
-
-            // 2. 确保取消任何待处理的菜单删除任务（防止误删）
-            cancelPendingDeletionInternal(userId);
         });
     }
 
-    // --- 自动删除相关方法 ---
-
-    /**
-     * 内部方法：取消针对指定用户可能存在的待处理消息自动删除任务。
-     */
-    private void cancelPendingDeletionInternal(Long userId) {
-        Disposable disposable = pendingDeletions.remove(userId);
-        if (disposable != null && !disposable.isDisposed()) {
-            disposable.dispose();
-            log.debug("✅ Pending menu deletion canceled for userId: {}", userId);
-        }
-    }
-
-    /**
-     * 🌟 实现 UserSessionService 接口中的方法：取消针对指定用户可能存在的待处理消息自动删除任务。
-     */
     @Override
-    public Mono<Void> cancelPendingDeletion(Long userId) {
-        return Mono.fromRunnable(() -> cancelPendingDeletionInternal(userId));
-    }
-
-    /**
-     * 供 StartCommandHandler 调用：存储待处理的自动删除任务。
-     *
-     * @param userId 用户的 Telegram ID
-     * @param disposable 自动删除任务的 Disposable 引用
-     * @return 一个表示操作完成的 Mono<Void>
-     */
-    public Mono<Void> storePendingDeletion(Long userId, Disposable disposable) {
+    public Mono<Void> storePendingDeletion(Long userId, Disposable deletionTask) {
         return Mono.fromRunnable(() -> {
             // 确保旧任务被取消
-            cancelPendingDeletionInternal(userId);
+            cancelPendingDeletion(userId).subscribe();
+            pendingDeletions.put(userId, deletionTask);
+            log.debug("⏳ Stored new deletion task for userId: {}", userId);
+        });
+    }
 
-            pendingDeletions.put(userId, disposable);
-            log.debug("⏳ Stored new pending deletion task for userId: {}", userId);
+    @Override
+    public Mono<Void> cancelPendingDeletion(Long userId) {
+        return Mono.fromRunnable(() -> {
+            Disposable disposable = pendingDeletions.remove(userId);
+            if (disposable != null && !disposable.isDisposed()) {
+                disposable.dispose();
+                log.info("✅ Cancelled pending menu deletion task for userId: {}", userId);
+            } else if (disposable != null) {
+                log.debug("⚠️ Attempted to cancel a task that was already disposed for userId: {}", userId);
+            }
         });
     }
 }

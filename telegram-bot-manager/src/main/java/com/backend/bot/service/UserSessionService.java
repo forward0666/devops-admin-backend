@@ -1,6 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.entity.UserSessionEntity;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 
 /**
@@ -34,6 +35,15 @@ public interface UserSessionService {
      * @return 一个表示操作完成的 Mono<Void>
      */
     Mono<Void> clearUserSession(Long userId);
+
+    /**
+     * 存储待处理的菜单自动销毁任务。
+     *
+     * @param userId 用户的 Telegram ID
+     * @param deletionTask 自动销毁的 Disposable 任务
+     * @return 一个表示操作完成的 Mono<Void>
+     */
+    Mono<Void> storePendingDeletion(Long userId, Disposable deletionTask);
 
     /**
      * 🌟 取消针对指定用户可能存在的待处理消息自动删除任务。
