@@ -7,19 +7,27 @@ import com.backend.bot.service.BotClientService;
 import com.backend.bot.template.MenuType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order; // 引入 Order
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Order(10) // 🌟 优先级设置：设置为 10，比回调低，比普通文本高
 public class MessageHandler implements UpdateHandler {
 
     private final BotClientService botClientService;
 
     @Override
     public boolean support(BotUpdateDto update) {
-        return update.message() != null && update.message().text() != null;
+        // 🌟 关键修复：MessageHandler 应该只处理命令（以 '/' 开头的文本）
+        if (update.message() != null && update.message().text() != null) {
+            String text = update.message().text().trim();
+            // 确保是命令，而不是普通文本
+            return !text.isEmpty() && text.startsWith("/");
+        }
+        return false;
     }
 
     @Override
@@ -27,9 +35,9 @@ public class MessageHandler implements UpdateHandler {
         String token = botEntity.getBotToken();
         String botName = botEntity.getBotName();
 
-        // 🚀 修复点 1：使用 .getDbValue() 获取枚举对应的字符串值
+        // ... [省略 handle 方法中未改动的逻辑] ...
+
         String botTypeDbValue = botEntity.getBotType().getDbValue();
-        String logIdentifier = String.format("[%s]", botName);
 
         String text = botUpdate.message().text();
         Long chatId = botUpdate.message().chat().id();
@@ -37,51 +45,31 @@ public class MessageHandler implements UpdateHandler {
 
         // 1. --- 仅响应 /start 命令 ---
         if (text != null && text.startsWith("/start")) {
-            log.info("✅ {} Received /start command in {} chat. Chat ID: {}", logIdentifier, type, chatId);
+            // 🌟 只需要依赖 Logback/Log4j2 自动打印 MDC 中的 traceId 即可
+            log.info("✅ Received /start command for bot: {} in {} chat. Chat ID: {}", botName, type, chatId);
 
             // 动态生成内联键盘
-            // 🚀 修复点 2：将 .getDbValue() 传递给需要字符串参数的方法
             InlineKeyboardMarkupDto replyMarkup = MenuType.createDynamicKeyboard(botTypeDbValue);
-//            String fullWidthSpace = "\u3000";
-//            U+0020 (标准空格): 容易被压缩。
-//            U+3000 (全角空格): 宽度好，但在 PC 端表现不稳定。
-//            U+00A0 (NBSP): 宽度窄但保证不被压缩。是跨客户端对齐的最佳折衷方案。
-//            String nbs = "\u00A0";
-//            String responseText = "✨✨✨ 选择服务👇👇";
-//            String standardSpace = " ";
-//            String padding = standardSpace.repeat(8); // 示例：重复 8 次标准空格
-//
-//            String responseText = String.format(
-//                    "✨✨ 选择服务 👇👇",
-//                    padding
-//            );
+
             String responseText = "✨✨✨ 选择服务: 👇👇";
             if (replyMarkup == null) {
-                // 🚀 修复点 3：日志中使用 .getDbValue()
                 responseText = String.format("欢迎！机器人类型 [%s] 无法识别，请联系管理员。", botTypeDbValue);
             }
 
-            // 🚀 修复点 4：日志中使用 .getDbValue()
-            log.info("✅ {} STAGE 3: Preparing to send response message with keyboard (Type: {}).", logIdentifier, botTypeDbValue);
+            // 🌟 只需要依赖 Logback/Log4j2 自动打印 MDC 中的 traceId 即可
+            log.info("✅ STAGE 3: Preparing to send response message with keyboard (Bot: {}, Type: {}).", botName, botTypeDbValue);
 
             return botClientService.sendMessage(token, chatId, responseText, replyMarkup)
                     .onErrorResume(e -> {
-                        log.error("❌ Failed to send START message for bot {}. Error: {}", logIdentifier, e.getMessage());
+                        // 🌟 只需要依赖 Logback/Log4j2 自动打印 MDC 中的 traceId 即可
+                        log.error("❌ Failed to send START message for bot {}. Error: {}", botName, e.getMessage());
                         return Mono.empty();
                     })
                     .then();
         }
 
-//        // 2. --- /status 命令处理 ---
-//        else if ("private".equals(type) && text.startsWith("/status")) {
-//            String responseText = "Bot Status: Active (Chat ID: " + chatId + ")";
-//            return botClientService.sendMessage(token, chatId, responseText, null)
-//                    .onErrorResume(e -> Mono.empty())
-//                    .then();
-//        }
-
         // 3. --- 忽略其他所有消息 ---
-        log.debug("Skipping message update (Type: {}): {}", type, text);
+        log.debug("Skipping message update for bot {} (Type: {}): {}", botName, type, text);
         return Mono.empty();
     }
 }

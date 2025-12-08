@@ -1,6 +1,6 @@
 package com.backend.bot.service;
 
-import com.backend.bot.utils.RetryUtil;
+import com.backend.bot.util.RetryUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;

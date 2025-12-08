@@ -1,20 +1,22 @@
 package com.backend.bot.service;
 
 import com.backend.bot.config.TelegramProperties;
-import com.backend.bot.utils.RetryUtil; // 导入 RetryUtil
+import com.backend.bot.dto.InlineKeyboardMarkupDto;
+import com.backend.bot.util.RetryUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.PrematureCloseException;
-import reactor.util.retry.Retry; // 导入 Retry
+import reactor.util.retry.Retry;
+import reactor.core.scheduler.Scheduler;
 
-import java.time.Duration; // 导入 Duration
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,15 +27,21 @@ public class BotClientService {
     private final WebClient telegramWebClient;
     private final ObjectMapper objectMapper;
     private final TelegramProperties telegramProperties;
-    private final Retry telegramRetryPolicy; // 增加 Retry 字段
+    private final Retry telegramRetryPolicy;
+    private final Scheduler blockingTaskScheduler;
 
-    // 使用构造函数注入依赖，并初始化重试策略
-    public BotClientService(WebClient telegramWebClient, ObjectMapper objectMapper, TelegramProperties telegramProperties) {
+    public BotClientService(WebClient telegramWebClient,
+                            ObjectMapper objectMapper,
+                            TelegramProperties telegramProperties,
+                            // 注入自定义 Scheduler
+                            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) {
+
         this.telegramWebClient = telegramWebClient;
         this.objectMapper = objectMapper;
         this.telegramProperties = telegramProperties;
+        this.blockingTaskScheduler = blockingTaskScheduler;
 
-        // 🚀 初始化指数退避重试策略：最大重试 3 次，初始退避 100ms
+        // 初始化指数退避重试策略：最大重试 3 次，初始退避 100ms
         this.telegramRetryPolicy = RetryUtil.exponentialBackoff(3, Duration.ofMillis(100));
     }
 
@@ -55,10 +63,11 @@ public class BotClientService {
                 // 🚀 应用重试策略
                 .retryWhen(telegramRetryPolicy)
                 .onErrorResume(e -> {
+                    // 🌟 日志依赖 MDC 自动打印 traceId
                     log.error("❌Telegram setWebhook API call failed for token: {}", token, e);
-                    // 返回一个包含错误信息的 Mono
                     return Mono.just("{\"ok\":false, \"description\":\"Telegram API error: " + e.getMessage() + "\"}");
                 })
+                // 🌟 日志依赖 MDC 自动打印 traceId
                 .doOnSuccess(response -> log.info("setWebhook response received successfully."));
     }
 
@@ -73,20 +82,24 @@ public class BotClientService {
                 .uri(path)
                 .retrieve()
                 .bodyToMono(String.class)
-                // 🚀 应用重试策略
                 .retryWhen(telegramRetryPolicy)
-                // 🟢 切换到 boundedElastic 线程池执行阻塞操作
-                .publishOn(reactor.core.scheduler.Schedulers.boundedElastic())
+
+                // 🌟 关键修改：使用注入的自定义 Scheduler
+                .publishOn(blockingTaskScheduler)
+
                 .flatMap(jsonResponse -> {
                     try {
+                        // 阻塞操作：ObjectMapper.readValue()
                         Map<String, Object> map = objectMapper.readValue(jsonResponse, new TypeReference<Map<String, Object>>() {});
                         return Mono.just(map);
                     } catch (Exception e) {
+                        // 🌟 日志依赖 MDC 自动打印 traceId
                         log.error("❌ JSON mapping failed for getWebhookInfo response", e);
                         return Mono.error(new RuntimeException("JSON 解析失败", e));
                     }
                 })
                 .onErrorResume(e -> {
+                    // 🌟 日志依赖 MDC 自动打印 traceId
                     log.error("❌ Telegram getWebhookInfo API call failed for token: {}", token, e);
                     return Mono.just(Map.of("ok", false, "description", "Telegram API call failed: " + e.getMessage()));
                 });
@@ -99,24 +112,25 @@ public class BotClientService {
     public Mono<Void> answerCallbackQuery(String token, String callbackQueryId, String text) {
         String path = "/bot" + token + "/answerCallbackQuery";
 
-        // 构建 URI，包括 callback_query_id 和 text
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromPath(path)
                 .queryParam("callback_query_id", callbackQueryId)
                 .queryParam("text", text)
-                .queryParam("show_alert", false); // 默认不显示警报
+                .queryParam("show_alert", false);
 
         return telegramWebClient.get()
                 .uri(uriBuilder.build().encode().toUriString())
                 .retrieve()
-                .toBodilessEntity() // 不需要响应体，只关心状态
+                .toBodilessEntity()
                 // 🚀 应用重试策略
                 .retryWhen(telegramRetryPolicy)
+                // 🌟 日志依赖 MDC 自动打印 traceId
                 .doOnSuccess(response -> log.debug("Callback query answered successfully: {}", callbackQueryId))
                 .onErrorResume(e -> {
+                    // 🌟 日志依赖 MDC 自动打印 traceId
                     log.error("❌ Failed to answer callback query: {}", callbackQueryId, e);
                     return Mono.empty();
                 })
-                .then(); // 转换为 Mono<Void>
+                .then();
     }
 
     /**
@@ -127,32 +141,31 @@ public class BotClientService {
 
         String path = "/bot" + token + "/sendMessage";
 
-        // 1. 构建请求体 Map
         Map<String, Object> bodyMap = new HashMap<>();
         bodyMap.put("chat_id", chatId);
         bodyMap.put("text", text);
 
         if (replyMarkup != null) {
-            // Telegram 要求 reply_markup 是一个 JSON 对象
             bodyMap.put("reply_markup", replyMarkup);
         }
 
         // 2. 执行 POST 请求
         return telegramWebClient.post()
                 .uri(path)
-                // 使用 BodyInserters.fromValue(bodyMap) 将 Map 自动序列化为 JSON 请求体
                 .body(BodyInserters.fromValue(bodyMap))
                 .retrieve()
-                .toBodilessEntity() // 不需要响应体，只关心状态
+                .toBodilessEntity()
                 // 🚀 应用重试策略
                 .retryWhen(telegramRetryPolicy)
+                // 🌟 日志依赖 MDC 自动打印 traceId
                 .doOnSuccess(response -> log.info("✅ Message sent successfully to chatId: {}", chatId))
-                // ❗ 最终修复: 处理连接在应用关闭时的 PrematureCloseException
                 .onErrorResume(PrematureCloseException.class, e -> {
+                    // 🌟 日志依赖 MDC 自动打印 traceId
                     log.warn("⚠️ Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", chatId);
                     return Mono.empty();
                 })
                 .onErrorResume(e -> {
+                    // 🌟 日志依赖 MDC 自动打印 traceId
                     log.error("❌ Failed to send message to chatId: {}, Error: {}", chatId, e.getMessage());
                     return Mono.empty();
                 })
@@ -162,5 +175,67 @@ public class BotClientService {
     // 重载方法：兼容不带键盘的调用
     public Mono<Void> sendMessage(String token, Long chatId, String text) {
         return sendMessage(token, chatId, text, null);
+    }
+
+    /**
+     * 替换消息的内联键盘。
+     */
+    public Mono<Void> editMessageReplyMarkup(String token, Long chatId, Long messageId, InlineKeyboardMarkupDto replyMarkup) {
+        String path = "/bot" + token + "/editMessageReplyMarkup";
+
+        Map<String, Object> bodyMap = new HashMap<>();
+        bodyMap.put("chat_id", chatId);
+        bodyMap.put("message_id", messageId);
+
+        // Telegram 要求 reply_markup 是一个 JSON 对象
+        bodyMap.put("reply_markup", replyMarkup);
+
+        return telegramWebClient.post()
+                .uri(path)
+                .body(BodyInserters.fromValue(bodyMap))
+                .retrieve()
+                .toBodilessEntity()
+                .retryWhen(telegramRetryPolicy)
+                .doOnSuccess(response -> log.debug("✅ Message markup edited successfully for chatId: {}", chatId))
+                .onErrorResume(e -> {
+                    log.error("❌ Failed to edit message markup to chatId: {}, messageId: {}. Error: {}", chatId, messageId, e.getMessage());
+                    return Mono.error(e); // 抛出错误，以便上层逻辑（如 Handler）可以处理
+                })
+                .then();
+    }
+
+    /**
+     * 编辑已发送消息的文本内容和/或键盘。
+     * 如果 replyMarkup 为 null，则移除键盘。
+     */
+    public Mono<Void> editMessageText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto replyMarkup) {
+        String path = "/bot" + token + "/editMessageText";
+
+        Map<String, Object> bodyMap = new HashMap<>(); // 假设你使用了 HashMap 来构建请求体
+        bodyMap.put("chat_id", chatId);
+        bodyMap.put("message_id", messageId);
+        bodyMap.put("text", text);
+        // 启用 Markdown 解析，确保 IP 提示格式正确
+        bodyMap.put("parse_mode", "Markdown");
+
+        // 如果提供了键盘，则添加
+        if (replyMarkup != null) {
+            bodyMap.put("reply_markup", replyMarkup);
+        }
+        // 如果 replyMarkup 为 null，则不发送该字段，API会移除旧键盘
+
+        return telegramWebClient.post() // 假设你的 WebClient 实例名为 telegramWebClient
+                .uri(path)
+                .body(BodyInserters.fromValue(bodyMap))
+                .retrieve()
+                .toBodilessEntity() // 因为这个 API 通常只返回状态
+                // 🌟 重要的：添加你的重试策略和错误处理
+                .retryWhen(telegramRetryPolicy) // 假设你的重试策略实例名为 telegramRetryPolicy
+                .doOnSuccess(response -> log.debug("✅ Message text edited successfully for chatId: {}", chatId))
+                .onErrorResume(e -> {
+                    log.error("❌ Failed to edit message text for chatId: {}, messageId: {}. Error: {}", chatId, messageId, e.getMessage());
+                    return Mono.error(e); // 向上抛出错误，让 CallbackQueryHandler 处理优雅降级
+                })
+                .then();
     }
 }

@@ -8,34 +8,45 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers; // 引入 Schedulers
+import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
 import com.backend.bot.repository.BotAuthorizedChatRepository; // <--- 新增导入
 import java.time.Duration;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class BotCoreService {
 
     private final BotRepository botRepository;
     private final BotClientService botClient;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final BotAuthorizedChatRepository authorizedChatRepository; // <--- 确保注入
+    private final BotAuthorizedChatRepository authorizedChatRepository;
+    private final Scheduler blockingTaskScheduler; // 🌟 新增 Scheduler 字段
 
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
-
-
-    /**
-     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
-     */
     private static final String CACHE_WHITELIST_PREFIX = "bot:whitelist:set:";
-
+    // 🌟 显式构造函数，注入所有依赖，包括自定义 Scheduler
+    public BotCoreService(
+            BotRepository botRepository,
+            BotClientService botClient,
+            ReactiveStringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            BotAuthorizedChatRepository authorizedChatRepository,
+            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) { // 🌟 使用 Qualifier
+        this.botRepository = botRepository;
+        this.botClient = botClient;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.authorizedChatRepository = authorizedChatRepository;
+        this.blockingTaskScheduler = blockingTaskScheduler; // 🌟 赋值
+    }
     /**
      * 注册新 Bot
      *
@@ -65,6 +76,7 @@ public class BotCoreService {
      * @param botName Bot 名称
      * @return BotConfigEntity 或空 Mono
      */
+
     public Mono<BotConfigEntity> findByBotName(String botName) {
         String entityCacheKey = CACHE_ENTITY_PREFIX + botName;
 
@@ -80,13 +92,12 @@ public class BotCoreService {
                                 try {
                                     return objectMapper.readValue(json, BotConfigEntity.class);
                                 } catch (JsonProcessingException e) {
-                                    // 2. 详细记录反序列化失败的日志
                                     log.error("🚨 Failed to deserialize BotConfigEntity from Redis for name: {}, attempting DB lookup", botName, e);
-                                    // 3. 将 checked exception 转换为 RuntimeException 抛出
                                     throw new RuntimeException(e);
                                 }
                             })
-                            .subscribeOn(Schedulers.boundedElastic()) // 切换线程池
+                            // 🌟 关键修改：使用注入的 blockingTaskScheduler 替换 Schedulers.boundedElastic()
+                            .subscribeOn(blockingTaskScheduler)
                             // 4. 仅在成功时记录命中日志
                             .doOnSuccess(entity -> log.debug("💬 Bot entity cache hit for name: {}", botName));
                 })
@@ -105,7 +116,6 @@ public class BotCoreService {
                                 )
                 );
     }
-
     /**
      * 辅助方法：将 BotConfigEntity 响应式缓存到 Redis (只缓存 Bot Name 键)
      */

@@ -25,7 +25,7 @@ public class IpWhitelistMenu implements MenuTemplate {
 
         inlineKeyboard.addRow(
                 // 增加 🧑‍💻 图标
-                new InlineKeyboardButtonDto("4、其他" + navigate, "callback_data_OTHER_ACTION")
+                new InlineKeyboardButtonDto("4、其他" + "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + navigate, "callback_data_OTHER_ACTION")
         );
         return inlineKeyboard;
     }

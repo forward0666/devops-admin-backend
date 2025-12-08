@@ -8,5 +8,6 @@ import com.backend.bot.dto.BotUpdateDto;
  */
 public record BotUpdateEvent(
         String botName,
-        BotUpdateDto botUpdate
+        BotUpdateDto botUpdate,
+        String traceId
 ) {}

@@ -16,6 +16,10 @@ public record MessageDto(
         @JsonProperty("chat")
         ChatDto chat,
 
+        // **[新增]** 映射 Telegram 的 from 字段，用于获取 userId
+        @JsonProperty("from")
+        UserDto from,
+
         // 映射 Telegram 的 text 字段 (消息文本)
         @JsonProperty("text")
         String text

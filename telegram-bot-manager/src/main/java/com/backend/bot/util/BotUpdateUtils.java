@@ -1,4 +1,4 @@
-package com.backend.bot.utils; // 假设您使用 .utils 包
+package com.backend.bot.util; // 假设您使用 .util 包
 
 import com.backend.bot.dto.BotUpdateDto;
 import java.util.Optional;

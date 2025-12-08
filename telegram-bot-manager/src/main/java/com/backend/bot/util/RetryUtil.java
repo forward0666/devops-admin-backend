@@ -1,4 +1,4 @@
-package com.backend.bot.utils;
+package com.backend.bot.util;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClientException;

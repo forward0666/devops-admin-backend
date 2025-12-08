@@ -1,58 +1,65 @@
 package com.backend.bot.listener;
 
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.event.BotUpdateEvent;
+import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotUpdateService;
-import lombok.RequiredArgsConstructor;
+import filter.TraceIdFilter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Scheduler;
 
 import java.time.Duration;
-import java.util.Optional;
 
-import static com.backend.bot.utils.BotUpdateUtils.extractChatId;
+import static com.backend.bot.util.BotUpdateUtils.extractChatId;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class BotUpdateListener {
 
     private final BotCoreService botCoreService;
     private final BotUpdateService botUpdateHandlerService;
+    private final Scheduler blockingTaskScheduler;
+
+    public BotUpdateListener(
+            BotCoreService botCoreService,
+            BotUpdateService botUpdateHandlerService,
+            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) {
+        this.botCoreService = botCoreService;
+        this.botUpdateHandlerService = botUpdateHandlerService;
+        this.blockingTaskScheduler = blockingTaskScheduler;
+    }
 
     /**
      * 监听 BotUpdateEvent 事件。
-     * 这里的逻辑完全从 Controller 迁移而来。
      */
-    @Async // 可选：结合 Spring 的 TaskExecutor 使用，或者依赖下方的 subscribeOn
     @EventListener
     public void handleBotUpdateEvent(BotUpdateEvent event) {
         String botName = event.botName();
         BotUpdateDto botUpdate = event.botUpdate();
+        String traceId = event.traceId();
 
-        // 提取 Chat ID 用于日志和白名单校验
-        Optional<Long> chatIdOpt = extractChatId(botUpdate);
-        Long chatId = chatIdOpt.orElse(null);
+        // 提取 Chat ID...
+        // 假设 extractChatId 方法返回 Optional<Long>
+        Long chatId = extractChatId(botUpdate).orElse(null);
 
-        log.info("📨 [AsyncListener] Processing event for bot: {} (ChatID: {})", botName, chatId);
+        // 1. 从 Mono.defer 开始，将 Trace ID 写入 Context
+        Mono<Void> processingPipeline = Mono.defer(() -> {
+                    // 2. 在 Context 写入后，在 Mono 链中打印日志
+                    log.info("{}📨 [AsyncListener] Processing event for bot: {} (ChatID: {})",traceId, botName, chatId);
 
-        // 构建响应式业务流
-        Mono<Void> processingPipeline = Mono.just(botName)
-                // 1. 查找 Bot 配置实体
-                .flatMap(name -> botCoreService.findByBotName(name)
-                        .timeout(Duration.ofSeconds(2), Mono.empty()) // 放宽一点超时时间，因为是后台处理
-                        .onErrorResume(java.util.concurrent.TimeoutException.class, e -> {
-                            log.warn("⚠️ BotConfigEntity lookup timed out for bot: {}", name);
-                            return Mono.empty();
-                        })
-                )
-                // 2. 校验 Bot 状态
+                    return botCoreService.findByBotName(botName) // 🌟 重新从查找 Bot 实体开始
+                            .timeout(Duration.ofSeconds(2), Mono.empty())
+                            .onErrorResume(java.util.concurrent.TimeoutException.class, e -> {
+                                log.warn("⚠️ BotConfigEntity lookup timed out for bot: {}", botName);
+                                return Mono.empty();
+                            });
+                })
+                // 3. 校验 Bot 状态 (类型已经是 Mono<BotConfigEntity>)
                 .filter(botConfigEntity -> {
                     if (botConfigEntity.getStatus() == null || botConfigEntity.getStatus() != 1) {
                         log.warn("⏸️ Bot {} is inactive. Ignoring update.", botName);
@@ -60,9 +67,8 @@ public class BotUpdateListener {
                     }
                     return true;
                 })
-                // 3. 异步校验 Chat ID 白名单
+                // 4. 异步校验 Chat ID 白名单
                 .flatMap(botConfigEntity -> {
-                    // 如果没有 ChatID (例如 InlineQuery)，直接放行或根据需求处理
                     if (chatId == null) {
                         log.debug("⚠️ No Chat ID found, skipping whitelist check for bot {}", botName);
                         return Mono.just(botConfigEntity);
@@ -71,24 +77,42 @@ public class BotUpdateListener {
                     return botCoreService.isChatIdAuthorized(botConfigEntity.getId(), botConfigEntity.getBotName(), chatId)
                             .flatMap(isAllowed -> {
                                 if (Boolean.TRUE.equals(isAllowed)) {
-                                    return Mono.just(botConfigEntity); // 授权成功
+                                    return Mono.just(botConfigEntity);
                                 } else {
                                     log.warn("⛔ Rejected update for bot {} from UNAUTHORIZED Chat ID: {}", botName, chatId);
-                                    return Mono.empty(); // 授权失败
+                                    return Mono.empty();
                                 }
                             });
                 })
-                // 4. 核心：执行业务逻辑
-                .flatMap(botConfigEntity -> botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate))
-                // 错误处理
+                // 5. 核心：执行业务逻辑
+                .flatMap(botConfigEntity -> {
+                    // 【新增调试日志】确认 Update 成功通过所有前置校验，进入 handler service
+                    if (botUpdate.message() != null && botUpdate.message().text() != null) {
+                        log.info("✅ Update passed filters. Routing TEXT message (Length: {}) to BotUpdateHandlerService.",
+                                botUpdate.message().text().length());
+                    } else if (botUpdate.callbackQuery() != null) {
+                        log.info("✅ Update passed filters. Routing CALLBACK query to BotUpdateHandlerService.");
+                    } else {
+                        log.info("✅ Update passed filters. Routing OTHER update type to BotUpdateHandlerService.");
+                    }
+
+                    return botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate);
+                })
+                // 6. 错误处理
                 .doOnError(e -> log.error("❌ Error in async listener for bot {}", botName, e))
                 .onErrorResume(e -> Mono.empty())
-                .then();
+                .then() // 转换为 Mono<Void>
+                // 🌟 关键：将 Trace ID 写入 Context
+                .contextWrite(context -> {
+                    if (traceId != null) {
+                        return context.put(TraceIdFilter.CONTEXT_KEY_TRACE_ID, traceId);
+                    }
+                    return context;
+                });
 
-        // 🔥 关键：手动订阅以触发执行 (Fire-and-Forget)
-        // 使用 boundedElastic 线程池，避免阻塞事件分发线程
+        // 7. 手动订阅以触发执行 (Fire-and-Forget)
         processingPipeline
-                .subscribeOn(Schedulers.boundedElastic())
+                .subscribeOn(blockingTaskScheduler)
                 .subscribe();
     }
 }

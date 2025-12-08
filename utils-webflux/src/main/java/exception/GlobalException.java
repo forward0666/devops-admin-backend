@@ -47,6 +47,57 @@ public class GlobalException { // <-- 使用您指定的类名
     }
 
     /**
+     * 【新增】捕获 AggressiveTimeoutException。
+     * 用于处理由 Webhook 过滤器抛出、但最终需要返回 504 的普通 API 超时请求。
+     * 这样做可以清晰地将 AggressiveTimeoutException 的日志与普通 TimeoutException 的日志区分开来。
+     */
+    @ExceptionHandler(AggressiveTimeoutException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleAggressiveTimeoutException(AggressiveTimeoutException ex) {
+        log.error("🚨 Global AggressiveTimeoutException caught (504 Gateway Timeout): {}", ex.getMessage());
+
+        String message = "系统强制执行的积极超时。";
+
+        // 返回 504 Gateway Timeout
+        Map<String, Object> errorBody = HttpResponseUtils.internalError(message).getBody();
+
+        if (errorBody != null) {
+            errorBody.put("code", HttpStatus.GATEWAY_TIMEOUT.value());
+            errorBody.put("status", "error");
+        }
+
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.GATEWAY_TIMEOUT)
+                .body(errorBody));
+    }
+
+    /**
+     * 捕获所有 TimeoutException 及其子类 (在新增了 AggressiveTimeoutException 处理器后，
+     * 此方法主要用于捕获标准的 TimeoutException，如 WebClient 超时)。
+     * 返回 504 Gateway Timeout 响应。
+     */
+    @ExceptionHandler(TimeoutException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleTimeoutException(TimeoutException ex) {
+        // 此处理器在 AggressiveTimeoutException 处理器之后执行，因此只处理标准的 TimeoutException
+        log.error("🚨 Global Standard TimeoutException caught (504 Gateway Timeout): {}", ex.getMessage());
+        String message = "请求处理超时，请稍后重试。";
+
+        // 返回 504 Gateway Timeout
+        // 使用 HttpResponseUtils 的 internalError 方法生成主体结构
+        Map<String, Object> errorBody = HttpResponseUtils.internalError(message).getBody();
+
+        // 确保响应体中的 'code' 字段反映正确的 504 状态码
+        if (errorBody != null) {
+            errorBody.put("code", HttpStatus.GATEWAY_TIMEOUT.value());
+            errorBody.put("status", "error");
+        }
+
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.GATEWAY_TIMEOUT)
+                .body(errorBody));
+    }
+
+
+    /**
      * 捕获 Spring WebFlux 在尝试写入响应时遇到的 UnsupportedOperationException，
      * 通常是因为在响应已提交后尝试修改只读的 HTTP Headers（如 Content-Type）。
      * 这不是一个需要用户干预的内部错误，通常是请求生命周期结束的副作用。
@@ -74,36 +125,6 @@ public class GlobalException { // <-- 使用您指定的类名
 
         // 无法向已关闭的连接发送响应，但返回 NO_CONTENT 确保 WebFlux 链完成。
         return Mono.just(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
-    }
-
-    /**
-     * 捕获所有 TimeoutException 及其子类 (包括 AggressiveTimeoutException)，
-     * 通常由 WebClient 或 Reactor 运算符抛出。
-     * 返回 504 Gateway Timeout 响应。
-     * 此处理器仅对非 Webhook 路径生效，Webhook 路径由 Filter 处理。
-     */
-    @ExceptionHandler(TimeoutException.class)
-    public Mono<ResponseEntity<Map<String, Object>>> handleTimeoutException(TimeoutException ex) {
-        log.error("🚨 Global TimeoutException caught: {}", ex.getMessage());
-        String message = "请求处理超时，请稍后重试。";
-        // 假设 AggressiveTimeoutException 在同一包下
-        if (ex instanceof AggressiveTimeoutException) {
-            message = "系统强制执行的积极超时。";
-        }
-
-        // 返回 504 Gateway Timeout
-        // 使用 HttpResponseUtils 的 internalError 方法生成主体结构
-        Map<String, Object> errorBody = HttpResponseUtils.internalError(message).getBody();
-
-        // 确保响应体中的 'code' 字段反映正确的 504 状态码
-        if (errorBody != null) {
-            errorBody.put("code", HttpStatus.GATEWAY_TIMEOUT.value());
-            errorBody.put("status", "error");
-        }
-
-        return Mono.just(ResponseEntity
-                .status(HttpStatus.GATEWAY_TIMEOUT)
-                .body(errorBody));
     }
 
     /**

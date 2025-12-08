@@ -46,7 +46,13 @@ public class MenuType {
             // --- B. 回调数据匹配：返回二级菜单或最终操作键盘 ---
 
             // 注意：这里的 case 需要与你在 Step 1 定义的 **按钮回调数据** 匹配
-//            case "DOMAIN_WHITELIST_ACTION" -> new IpWhitelistSubMenu(); // 假设这是域名加白后的二级菜单
+            case "DOMAIN_WHITELIST_ACTION" -> new IpWhitelistSubMenu();
+
+            // 🌟 新增：最终操作的回调数据，返回 null
+            case "FRONTEND_DOMAIN_ACTION", "BACKEND_DOMAIN_ACTION", "MIDDLEWARE_DOMAIN_ACTION" -> {
+                yield null; // 明确返回 null，表示不生成新键盘
+            }
+
 //            case "ASSET_INFO_ACTION" -> new AssetInfoMenu();
 //            case "DEVOP_DUTY_ACTION" -> new DevopDutyMenu();
 //
