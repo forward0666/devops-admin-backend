@@ -1,5 +1,6 @@
 package com.backend.bot.handler;
 
+import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
@@ -46,12 +47,15 @@ public class CallbackQueryHandler implements UpdateHandler {
 
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
-        String token = botEntity.getBotToken();
-        String botName = botEntity.getBotName();
-        String logIdentifier = String.format("[%s]", botName);
+        // 🌟 使用 HandlerContext 简化数据提取
+        HandlerContext context = new HandlerContext(botEntity, botUpdate);
+
+        String token = context.token();
+        String logIdentifier = context.logIdentifier();
+        Long userId = context.userId();
+        Long chatId = context.chatId();
 
         String callbackData = botUpdate.callbackQuery().data();
-        Long userId = botUpdate.callbackQuery().from().id();
         String callbackQueryId = botUpdate.callbackQuery().id();
 
         log.info("⚙️ {} Received callback query: {}", logIdentifier, callbackData);
@@ -83,7 +87,7 @@ public class CallbackQueryHandler implements UpdateHandler {
                 })
                 .orElseGet(() -> {
                     // 如果没有 Handler 支持，执行默认操作
-                    return handleUnknownAction(token, botUpdate.callbackQuery().message().chat().id(), callbackData, logIdentifier);
+                    return handleUnknownAction(token, chatId, callbackData, logIdentifier);
                 });
 
 
