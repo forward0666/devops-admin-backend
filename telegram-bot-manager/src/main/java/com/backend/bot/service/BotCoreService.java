@@ -18,7 +18,6 @@ import java.time.Duration;
 
 @Service
 @Slf4j
-//@RequiredArgsConstructor
 public class BotCoreService {
 
     private final BotRepository botRepository;
@@ -28,25 +27,33 @@ public class BotCoreService {
     private final BotAuthorizedChatRepository authorizedChatRepository;
     private final Scheduler blockingTaskScheduler; // 🌟 新增 Scheduler 字段
 
+    // 🌟 新增 CacheTemplateService 依赖
+    private final CacheTemplateService cacheTemplateService;
+
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
     private static final String CACHE_WHITELIST_PREFIX = "bot:whitelist:set:";
-    // 🌟 显式构造函数，注入所有依赖，包括自定义 Scheduler
+    private static final String CACHE_KEY_SEPARATOR = ":"; // 统一键分隔符
+
+    // 🌟 显式构造函数，注入所有依赖，包括自定义 Scheduler 和 CacheTemplateService
     public BotCoreService(
             BotRepository botRepository,
             BotClientService botClient,
             ReactiveStringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
             BotAuthorizedChatRepository authorizedChatRepository,
-            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) { // 🌟 使用 Qualifier
+            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler,
+            CacheTemplateService cacheTemplateService) { // 🌟 注入 CacheTemplateService
         this.botRepository = botRepository;
         this.botClient = botClient;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.authorizedChatRepository = authorizedChatRepository;
-        this.blockingTaskScheduler = blockingTaskScheduler; // 🌟 赋值
+        this.blockingTaskScheduler = blockingTaskScheduler;
+        this.cacheTemplateService = cacheTemplateService; // 🌟 赋值
     }
+
     /**
      * 注册新 Bot
      *
@@ -70,59 +77,47 @@ public class BotCoreService {
                 .flatMap(this::cacheBotEntity) // 3. 响应式缓存
                 .map(this::convertToVo);
     }
+
     /**
-     * 根据 Bot 名称查询 Bot 实体
+     * 【重构】根据 Bot 名称查询 Bot 实体 (使用 CacheTemplateService)
      *
      * @param botName Bot 名称
      * @return BotConfigEntity 或空 Mono
      */
-
     public Mono<BotConfigEntity> findByBotName(String botName) {
-        String entityCacheKey = CACHE_ENTITY_PREFIX + botName;
 
-        return redisTemplate.opsForValue().get(entityCacheKey)
-                .flatMap(json -> {
-                    if ("INVALID".equals(json)) {
-                        log.debug("💬 Bot name cache marked as INVALID: {}", botName);
-                        return Mono.empty();
-                    }
+        // 1. 统一生成缓存 Key
+        String cacheKey = getBotEntityCacheKey(botName);
 
-                    // 1. 在阻塞线程池中执行反序列化
-                    return Mono.fromCallable(() -> {
-                                try {
-                                    return objectMapper.readValue(json, BotConfigEntity.class);
-                                } catch (JsonProcessingException e) {
-                                    log.error("🚨 Failed to deserialize BotConfigEntity from Redis for name: {}, attempting DB lookup", botName, e);
-                                    throw new RuntimeException(e);
-                                }
-                            })
-                            // 🌟 关键修改：使用注入的 blockingTaskScheduler 替换 Schedulers.boundedElastic()
-                            .subscribeOn(blockingTaskScheduler)
-                            // 4. 仅在成功时记录命中日志
-                            .doOnSuccess(entity -> log.debug("💬 Bot entity cache hit for name: {}", botName));
-                })
-                // 5. 统一处理从 fromCallable 抛出的所有 RuntimeException (包括序列化失败)
-                .onErrorResume(RuntimeException.class, e -> {
-                    return Mono.empty();
-                })
-                // 6. 缓存未命中：查询数据库
-                .switchIfEmpty(
-                        botRepository.findByBotName(botName)
-                                .flatMap(this::cacheBotEntity)
-                                .switchIfEmpty(
-                                        // 7. 数据库中不存在：缓存 INVALID 标记
-                                        redisTemplate.opsForValue().set(entityCacheKey, "INVALID", CACHE_INVALID_DURATION)
-                                                .then(Mono.empty())
-                                )
-                );
+        // 2. 定义数据库查询逻辑
+        Mono<BotConfigEntity> dbFetcher = botRepository.findByBotName(botName);
+
+        // 3. 调用通用的 Value 旁路缓存模板
+        return cacheTemplateService.getValueOrFetch(
+                cacheKey,
+                CACHE_VALID_DURATION,
+                CACHE_INVALID_DURATION,
+                dbFetcher,
+                BotConfigEntity.class
+        );
     }
+
+    /**
+     * 辅助方法：生成 Bot 实体缓存 Key
+     * 格式: bot:entity:name:<botName>
+     */
+    private String getBotEntityCacheKey(String botName) {
+        return CACHE_ENTITY_PREFIX + botName;
+    }
+
     /**
      * 辅助方法：将 BotConfigEntity 响应式缓存到 Redis (只缓存 Bot Name 键)
+     * 此方法现在仅处理 Bot 注册时的初始缓存，逻辑已简化。
      */
     private Mono<BotConfigEntity> cacheBotEntity(BotConfigEntity entity) {
         if (entity == null) return Mono.empty();
 
-        String entityKey = CACHE_ENTITY_PREFIX + entity.getBotName();
+        String entityKey = getBotEntityCacheKey(entity.getBotName());
 
         try {
             String entityJson = objectMapper.writeValueAsString(entity);
@@ -137,10 +132,11 @@ public class BotCoreService {
                     .doOnError(e -> log.error("🚨 Failed to cache bot entity by name", e));
 
         } catch (JsonProcessingException e) {
-            log.error("🚨 Failed to serialize BotConfigEntity for caching", e); // 确保日志中提及 BotConfigEntity
+            log.error("🚨 Failed to serialize BotConfigEntity for caching", e);
             return Mono.just(entity);
         }
     }
+
     /**
      * 将 BotConfigEntity 转换为 BotVo
      *
@@ -151,14 +147,15 @@ public class BotCoreService {
         // 占位符，实现 Entity 到 VO 的转换逻辑
         BotVo vo = new BotVo();
         if (botEntity != null) {
+            vo.setBotName(botEntity.getBotName());
+            vo.setBotUsername(botEntity.getBotUsername());
             // conversion logic
         }
         return vo;
     }
 
     /**
-     * 异步检查指定的 Chat ID 是否在 Bot 的白名单中。
-     * 流程：Redis Set Check -> MySQL Query -> Redis Set Cache
+     * 【重构】异步检查指定的 Chat ID 是否在 Bot 的白名单中 (使用 CacheTemplateService)
      *
      * @param botConfigId 机器人配置ID (对应 bot_config.id)
      * @param botName     机器人的友好名称/中文描述（用于 Redis Key 可读性）
@@ -171,64 +168,37 @@ public class BotCoreService {
             return Mono.just(false);
         }
 
-        // 核心修改：Redis Key 包含 botName 和 botConfigId，提高可读性
-        // 示例 Key: bot:whitelist:set:测试白名单开发机器人:1
-        String redisKey = CACHE_WHITELIST_PREFIX + botName + ":" + botConfigId;
+        // 1. 统一生成缓存 Key
+        String cacheKey = getWhitelistCacheKey(botName, botConfigId);
         String chatIdStr = String.valueOf(chatId);
 
-        // 1. 尝试从 Redis Set 中检查是否存在
-        return redisTemplate.opsForSet().isMember(redisKey, chatIdStr)
-                .flatMap(isMember -> {
-                    if (Boolean.TRUE.equals(isMember)) {
-                        log.debug("✅ Chat ID {} cache hit in Redis whitelist for bot {} (Key: {})", chatId, botName, redisKey);
-                        return Mono.just(true); // Redis 命中，授权成功
-                    }
+        // 2. 定义数据库查询逻辑
+        Mono<Boolean> dbFetcher = authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
+                .hasElement(); // 将 Mono<Entity> 转换为 Mono<Boolean>
 
-                    // 2. Redis 未命中：查询 MySQL
-                    log.debug("🔍 Chat ID {} not found in Redis. Checking MySQL for bot {} (ID: {})", chatId, botName, botConfigId);
-                    return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
-                            .flatMap(entity -> {
-                                log.info("✅ Chat ID {} found in MySQL whitelist. Caching to Redis {} (ID: {}).", chatId, botName, botConfigId);
-
-                                // 3. MySQL 命中：缓存到 Redis Set
-                                // OpsForSet.add() 返回的是成功添加的元素数量
-                                return redisTemplate.opsForSet().add(redisKey, chatIdStr)
-                                        // 确保设置过期时间，防止集合无限增长
-                                        .flatMap(count -> redisTemplate.expire(redisKey, CACHE_VALID_DURATION))
-                                        .thenReturn(true);
-                            })
-                            .switchIfEmpty(
-                                    // 4. MySQL 未命中
-                                    Mono.fromRunnable(() -> log.warn("❌ Chat ID {} not authorized in DB for bot {} (ID: {})", chatId, botName, botConfigId))
-                                            .then(Mono.just(false))
-                            );
-                })
-                .onErrorResume(e -> {
-                    log.error("🚨 Error during authorization check (Redis/DB) for bot {} (ID: {}) and chat {}", botName, botConfigId, chatId, e);
-                    // 数据库或 Redis 出现故障时，为了安全，默认拒绝授权
-                    return Mono.just(false);
-                });
-
+        // 3. 调用通用的 Set 旁路缓存模板
+        return cacheTemplateService.checkSetMembershipOrFetch(
+                cacheKey,
+                chatIdStr,
+                CACHE_VALID_DURATION,
+                dbFetcher
+        );
     }
 
     /**
-     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
+     * 辅助方法：生成白名单缓存 Key
+     * 格式: bot:whitelist:set:<botName>:<botConfigId>
      *
      * @param botName Bot 名称
-     * @param botId Bot ID
+     * @param botConfigId Bot 配置 ID
      * @return 缓存 Key
      */
-    private String getCacheEntityKey(String botName, String botId) {
-        return CACHE_ENTITY_PREFIX + botName + ":" + botId;
+    private String getWhitelistCacheKey(String botName, Long botConfigId) {
+        // 确保 botName 不包含 : 字符，防止 key 结构混乱
+        String sanitizedBotName = botName.replace(CACHE_KEY_SEPARATOR, "_");
+        return CACHE_WHITELIST_PREFIX + sanitizedBotName + CACHE_KEY_SEPARATOR + botConfigId;
     }
 
-    /**
-     * 缓存 Bot 实体的 Key 格式，为 botName 和 ID 组合留出空间
-     *
-     * @param botName Bot 名称
-     * @return 缓存 Key
-     */
-    private String getCacheWhitelistKey(String botName) {
-        return CACHE_WHITELIST_PREFIX + botName;
-    }
+    // ❌ 移除未使用的 getCacheEntityKey(String botName, String botId)
+    // ❌ 移除未使用的 getCacheWhitelistKey(String botName)
 }
