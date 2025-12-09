@@ -14,7 +14,11 @@ public record UserDto(
 
         // 映射 Telegram 的 first_name 字段
         @JsonProperty("first_name")
-        String firstName
+        String firstName,
         // 其他字段（username, language_code 等）可根据需要添加
+
+        @JsonProperty("username")
+        String username
 ) {
+
 }

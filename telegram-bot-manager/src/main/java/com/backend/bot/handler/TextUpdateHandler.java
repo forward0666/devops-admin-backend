@@ -8,7 +8,7 @@ import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.Order; // 引入 @Order
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -32,7 +32,7 @@ public class TextUpdateHandler implements UpdateHandler {
     // 定义用于解析输入的正则表达式
     private static final String IP_USER_PATTERN_REGEX = "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\+(\\w+)$";
     private static final Pattern IP_USER_PATTERN = Pattern.compile(IP_USER_PATTERN_REGEX);
-    private static final String PARSE_ERROR_TEXT = "输入格式错误！请确保格式为：`IP+用户名` (e.g. 1.1.1.1+username)。";
+    private static final String PARSE_ERROR_TEXT = "输入格式错误！请确保格式为：IP+目标用户 (e.g. 1.1.1.1+forward)。";
 
     @Override
     public boolean support(BotUpdateDto update) {
@@ -82,9 +82,10 @@ public class TextUpdateHandler implements UpdateHandler {
 
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
-        String token = botEntity.getBotToken();
-        String botName = botEntity.getBotName();
-        String logIdentifier = String.format("[%s]", botName);
+        // 提取 Bot 配置信息
+        final String token = botEntity.getBotToken();
+        final String botName = botEntity.getBotName();
+        final String logIdentifier = String.format("[%s]", botName);
 
         // 【新增调试日志】确认进入 handle 方法
         log.debug("✅ {} TextUpdateHandler successfully entered handle method.", logIdentifier);
@@ -92,20 +93,23 @@ public class TextUpdateHandler implements UpdateHandler {
         // 打印整个接收到的 BotUpdateDto，以便完整查看信息
         log.info("📥 {} Full Update DTO received: {}", logIdentifier, botUpdate);
 
-        String userText = botUpdate.message().text().trim();
-        Long chatId = botUpdate.message().chat().id();
-        Long userId = botUpdate.message().from().id();
+        // 🌟 优化：在方法开始处统一提取并声明为 final，使代码更具可读性和响应式安全
+        final String userText = botUpdate.message().text().trim();
+        final Long chatId = botUpdate.message().chat().id();
+        final Long userId = botUpdate.message().from().id();
+        final String finalOperatorName = getOperatorName(botUpdate, userId);
 
         // 1. 获取用户当前会话状态
         return userSessionService.getUserSession(userId)
                 .flatMap(session -> {
+                    // 统一使用 session.getState()
                     String state = session.getState();
-                    log.info("📝 {} User {} current state is: {}", logIdentifier, userId, state);
+                    log.info("📝 {} User {} (Op: {}) current state is: {}", logIdentifier, userId, finalOperatorName, state);
 
                     // 2. 根据状态进行分发处理
                     return switch (state) {
                         case STATE_AWAITING_FRONTEND_IP, STATE_AWAITING_BACKEND_IP, STATE_AWAITING_MIDDLEWARE_IP ->
-                                handleAwaitingIpInput(token, chatId, userId, userText, session);
+                                handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName);
                         default ->
                             // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
                                 handleDefaultText(token, chatId, userText, logIdentifier);
@@ -116,9 +120,35 @@ public class TextUpdateHandler implements UpdateHandler {
     }
 
     /**
-     * 处理等待 IP 和用户名输入的逻辑。
+     * 辅助方法：格式化操作人名称 (firstName + (@username) 或 userId)
      */
-    private Mono<Void> handleAwaitingIpInput(String token, Long chatId, Long userId, String userText, UserSessionEntity session) {
+    private static String getOperatorName(BotUpdateDto botUpdate, Long userId) {
+        String userFirstName = botUpdate.message().from().firstName();
+        String userUsername = botUpdate.message().from().username();
+        String operatorName;
+
+        if (userFirstName != null && !userFirstName.isEmpty()) {
+            // 优先使用 firstName
+            operatorName = userFirstName;
+            if (userUsername != null && !userUsername.isEmpty()) {
+                // 如果 username 存在，进行组合：firstName (@username)
+                operatorName += " (@" + userUsername + ")";
+            }
+        } else if (userUsername != null && !userUsername.isEmpty()) {
+            // 如果 firstName 缺失，仅使用 username
+            operatorName = "@" + userUsername;
+        } else {
+            // 如果两者都没有，使用 userId 作为后备
+            operatorName = String.valueOf(userId);
+        }
+
+        return operatorName;
+    }
+
+    /**
+     * 处理等待 IP 和目标标识输入的逻辑。
+     */
+    private Mono<Void> handleAwaitingIpInput(String token, Long chatId, Long userId, String userText, UserSessionEntity session, String operatorName) {
         String state = session.getState();
         String domainType = getDomainType(state);
 
@@ -129,19 +159,20 @@ public class TextUpdateHandler implements UpdateHandler {
             return botClientService.sendMessage(token, chatId, PARSE_ERROR_TEXT, null).then();
         }
 
-        // 2. 解析 IP 和用户名
+        // 2. 解析 IP 和目标标识
         String ip = matcher.group(1);
-        String username = matcher.group(2);
+        String targetIdentifier = matcher.group(2);
 
-        log.info("✅ Parsed input. IP: {}, Username: {}", ip, username);
+        log.info("✅ Parsed input for {}. IP: {}, Target ID: {}, Operator: {}", domainType, ip, targetIdentifier, operatorName);
 
-        // 3. 执行加白操作 (假设 WhitelistService 负责实际的业务逻辑)
+        // 3. 执行加白操作 (传入目标标识和操作人)
         // Mono<String> 包含最终发送给用户的消息
-        Mono<String> whitelistResultMono = whitelistService.addIpToWhitelist(ip, username, domainType)
+        Mono<String> whitelistResultMono = whitelistService.addIpToWhitelist(ip, targetIdentifier, domainType)
                 .map(success -> {
                     if (success) {
-                        return String.format("🎉 **%s 加白成功！**\n\n- **目标:** %s\n- **IP:** `%s`\n- **操作人:** `%s`",
-                                domainType, domainType, ip, username);
+                        // 最终消息使用格式化的 operatorName
+                        return String.format("🎉 %s 加白成功！\n\n- 目标: %s\n- 用户: %s\n- IP: %s\n- 操作人: %s",
+                                domainType, domainType, targetIdentifier, ip, operatorName);
                     } else {
                         return "❌ 加白失败！请联系管理员。";
                     }
@@ -174,7 +205,7 @@ public class TextUpdateHandler implements UpdateHandler {
             return botClientService.sendMessage(token, chatId, welcomeText, null).then();
         }
 
-        // 🌟 修复：忽略其他普通文本，不再回复任何提示。
+        // 修复：忽略其他普通文本，不再回复任何提示。
         log.debug("🤫 {} Ignoring non-session text: {}", logIdentifier, userText);
         return Mono.empty();
     }
