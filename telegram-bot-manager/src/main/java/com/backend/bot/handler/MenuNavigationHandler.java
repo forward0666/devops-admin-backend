@@ -6,13 +6,14 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
-import com.backend.bot.service.InteractiveMessageService; // 🌟 引入新服务
+import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.template.MenuType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.util.context.ContextView; // 引入 ContextView
 
 /**
  * 专门处理菜单跳转（下钻和返回）逻辑的处理器。
@@ -25,7 +26,7 @@ import reactor.core.publisher.Mono;
 public class MenuNavigationHandler implements CallbackActionHandler {
 
     private final BotClientService botClientService;
-    private final InteractiveMessageService interactiveMessageService; // 🌟 注入新服务
+    private final InteractiveMessageService interactiveMessageService;
 
     // 自动销毁常量
     private static final int SECONDARY_MENU_DELETE_DELAY_SECONDS = 10;
@@ -61,25 +62,29 @@ public class MenuNavigationHandler implements CallbackActionHandler {
         int delaySeconds = getDeletionDelay(callbackData);
         String menuText = String.format(MENU_PROMPT_TEXT, delaySeconds);
 
-        // 1. 编辑当前消息，更新键盘
-        return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
-                .doOnSuccess(response -> {
-                    // 2. 🌟 调用 InteractiveMessageService 封装的逻辑来安排自动删除任务
-                    interactiveMessageService.scheduleMessageDeletion(
-                            token,
-                            userId,
-                            chatId,
-                            messageId,
-                            delaySeconds,
-                            logIdentifier
-                    ).subscribe();
-                })
-                .onErrorResume(e -> {
-                    log.error("❌ {} Failed to edit message (ID: {}) for navigation. Sending new /start prompt.", logIdentifier, messageId, e);
-                    // 如果编辑失败（消息太旧），提示用户重新开始
-                    return botClientService.sendMessage(token, chatId, "菜单操作失败或消息过时，请重新 /start。", null);
-                })
-                .then();
+        // 1. 🌟 关键修复：使用 Mono.deferContextual 捕获 ContextView
+        return Mono.deferContextual(contextView -> {
+            // 2. 编辑当前消息，更新键盘
+            return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
+                    .doOnSuccess(response -> {
+                        // 3. 🌟 调用 InteractiveMessageService 封装的逻辑，并传入 ContextView
+                        interactiveMessageService.scheduleMessageDeletion(
+                                token,
+                                userId,
+                                chatId,
+                                messageId,
+                                delaySeconds,
+                                logIdentifier,
+                                contextView // <-- 传入 ContextView 以保证 traceId 传播
+                        ).subscribe();
+                    })
+                    .onErrorResume(e -> {
+                        log.error("❌ {} Failed to edit message (ID: {}) for navigation. Sending new /start prompt.", logIdentifier, messageId, e);
+                        // 如果编辑失败（消息太旧），提示用户重新开始
+                        return botClientService.sendMessage(token, chatId, "菜单操作失败或消息过时，请重新 /start。", null);
+                    })
+                    .then();
+        });
     }
 
     /**

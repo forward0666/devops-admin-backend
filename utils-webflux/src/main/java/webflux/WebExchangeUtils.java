@@ -73,6 +73,10 @@ public class WebExchangeUtils {
         InetSocketAddress remoteAddress = exchange.getRequest().getRemoteAddress();
         return remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "UNKNOWN";
     }
+    /** 获取请求 ID */
+    public static String getId(ServerWebExchange exchange) {
+        return exchange.getRequest().getId();
+    }
 
     // ==================== 2. 读：参数与属性 ====================
 

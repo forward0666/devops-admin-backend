@@ -1,6 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.entity.UserSessionEntity;
+import com.backend.bot.util.LogUtils; // 假设存在 LogUtils
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
@@ -26,59 +27,74 @@ public class InMemoryUserSessionService implements UserSessionService {
 
     @Override
     public Mono<Void> updateUserSession(Long userId, String newState, Long referenceMessageId) {
-        return Mono.fromRunnable(() -> {
-            UserSessionEntity session = UserSessionEntity.builder()
-                    .userId(userId)
-                    .currentState(newState)
-                    .referenceMessageId(referenceMessageId)
-                    .build();
+        return Mono.deferContextual(contextView -> {
+            final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            return Mono.fromRunnable(() -> {
+                UserSessionEntity session = UserSessionEntity.builder()
+                        .userId(userId)
+                        .currentState(newState)
+                        .referenceMessageId(referenceMessageId)
+                        .build();
 
-            userSessions.put(userId, session);
-            log.info("📝 User session updated for userId: {}. New state: {}", userId, newState);
+                userSessions.put(userId, session);
+                log.info("{}📝 User session updated for userId: {}. New state: {}", logPrefix, userId, newState);
+            });
         });
     }
 
     @Override
     public Mono<UserSessionEntity> getUserSession(Long userId) {
-        return Mono.defer(() -> {
-            UserSessionEntity session = userSessions.get(userId);
-            if (session != null) {
-                log.debug("🔎 Found session for userId: {}. State: {}", userId, session.getCurrentState());
-                return Mono.just(session);
-            }
-            log.debug("🔎 No session found for userId: {}", userId);
-            return Mono.empty();
+        return Mono.deferContextual(contextView -> {
+            final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            return Mono.defer(() -> {
+                UserSessionEntity session = userSessions.get(userId);
+                if (session != null) {
+                    log.debug("{}🔎 Found session for userId: {}. State: {}", logPrefix, userId, session.getCurrentState());
+                    return Mono.just(session);
+                }
+                log.debug("{}🔎 No session found for userId: {}", logPrefix, userId);
+                return Mono.empty();
+            });
         });
     }
 
     @Override
     public Mono<Void> clearUserSession(Long userId) {
-        return Mono.fromRunnable(() -> {
-            userSessions.remove(userId);
-            log.info("🗑️ User session cleared for userId: {}", userId);
+        return Mono.deferContextual(contextView -> {
+            final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            return Mono.fromRunnable(() -> {
+                userSessions.remove(userId);
+                log.info("{}🗑️ User session cleared for userId: {}", logPrefix, userId);
+            });
         });
     }
 
     @Override
     public Mono<Void> storePendingDeletion(Long userId, Disposable deletionTask) {
-        return Mono.fromRunnable(() -> {
-            // 确保旧任务被取消
-            cancelPendingDeletion(userId).subscribe();
-            pendingDeletions.put(userId, deletionTask);
-            log.debug("⏳ Stored new deletion task for userId: {}", userId);
+        return Mono.deferContextual(contextView -> {
+            final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            return Mono.fromRunnable(() -> {
+                // 确保旧任务被取消
+                cancelPendingDeletion(userId).subscribe();
+                pendingDeletions.put(userId, deletionTask);
+                log.debug("{}⏳ Stored new deletion task for userId: {}", logPrefix, userId);
+            });
         });
     }
 
     @Override
     public Mono<Void> cancelPendingDeletion(Long userId) {
-        return Mono.fromRunnable(() -> {
-            Disposable disposable = pendingDeletions.remove(userId);
-            if (disposable != null && !disposable.isDisposed()) {
-                disposable.dispose();
-                log.info("✅ Cancelled pending menu deletion task for userId: {}", userId);
-            } else if (disposable != null) {
-                log.debug("⚠️ Attempted to cancel a task that was already disposed for userId: {}", userId);
-            }
+        return Mono.deferContextual(contextView -> {
+            final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            return Mono.fromRunnable(() -> {
+                Disposable disposable = pendingDeletions.remove(userId);
+                if (disposable != null && !disposable.isDisposed()) {
+                    disposable.dispose();
+                    log.info("{}✅ Cancelled pending menu deletion task for userId: {}", logPrefix, userId);
+                } else if (disposable != null) {
+                    log.debug("{}⚠️ Attempted to cancel a task that was already disposed for userId: {}", logPrefix, userId);
+                }
+            });
         });
     }
 }

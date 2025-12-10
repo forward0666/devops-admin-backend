@@ -5,6 +5,7 @@ import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InMemoryUserSessionService;
+import com.backend.bot.service.InteractiveMessageService; // 引入新的服务
 import com.backend.bot.template.MenuType;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,12 +17,10 @@ import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import org.slf4j.MDC;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import java.time.Duration;
-import java.util.Optional;
-
-import static com.backend.bot.util.BotUpdateUtils.extractChatId;
 
 @Component
 @RequiredArgsConstructor
@@ -31,6 +30,7 @@ public class StartCommandHandler implements UpdateHandler {
 
     private final BotClientService botClientService;
     private final InMemoryUserSessionService userSessionService;
+    private final InteractiveMessageService interactiveMessageService; // 注入新的服务
     private final ObjectMapper objectMapper;
 
     // 菜单消息文本
@@ -39,7 +39,6 @@ public class StartCommandHandler implements UpdateHandler {
 
     @Override
     public boolean support(BotUpdateDto update) {
-        // support 是同步方法，不建议在此处依赖 MDC，以避免 Trace ID 错乱
         boolean isStartCommand = update.message() != null &&
                 update.message().text() != null &&
                 update.message().text().trim().startsWith("/start");
@@ -50,45 +49,39 @@ public class StartCommandHandler implements UpdateHandler {
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
         String token = botEntity.getBotToken();
-        String botName = botEntity.getBotName();
         Long chatId = botUpdate.message().chat().id();
         Long userId = botUpdate.message().from().id();
 
         String chatTitle = botUpdate.message().chat().title();
-
-        // 提取用户昵称
         String firstName = botUpdate.message().from().firstName();
 
         return Mono.deferContextual(contextView -> {
-                    // 🌟 关键修正：使用新的工具方法，一步完成 MDC 同步和日志前缀获取
+                    // 1. 捕获原始上下文 (包含 traceId)，传递给 service
+                    final ContextView finalContext = contextView;
+
+                    // 2. 准备 MDC 和日志前缀
                     String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
-                    // 1. 构建用户日志后缀 (用户名称)
-                    // 如果 firstName 不为空，则显示 "(用户名称)"
+                    // 3. 构建用户日志后缀
                     String userLogSuffix = firstName != null && !firstName.isEmpty()
                             ? String.format(" (%s)", firstName)
                             : "";
-
-                    // 2. 构建聊天日志后缀 (Chat ID: xxx(群组名))
-                    // 使用提供的 chatTitle，如果为空则显示 "N/A"
+                    // 4. 构建聊天日志后缀
                     String chatLogSuffix = String.format(",Chat ID: %s(%s)",
                             chatId,
                             chatTitle != null ? chatTitle : "N/A");
 
-
-                    // 🚀 整合日志：在 Trace ID 确定后，记录 Handler 被接受和开始处理
                     log.info("{}✅ [Accepted] StartCommandHandler accepted and handling /start command from userId: {}{}{}",
                             logPrefix, userId, userLogSuffix, chatLogSuffix);
 
-                    // 3. 生成主菜单键盘
+                    // 5. 生成主菜单键盘
                     InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();
 
-                    // 4. 发送主菜单消息，并获取 messageId
+                    // 6. 发送主菜单消息，并获取 messageId
                     Mono<String> sendMenuResponseMono = botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, chatTitle);
 
                     return sendMenuResponseMono
                             .doOnNext(responseJson -> {
-                                // 此处的日志应能自动获取 MDC 中的 Trace ID (或者依赖上游手动设置的 logPrefix)
                                 log.debug("{}🔍 Received Telegram sendMessage response JSON: {}", logPrefix, responseJson);
 
                                 try {
@@ -105,24 +98,18 @@ public class StartCommandHandler implements UpdateHandler {
                                     Long messageId = resultNode.path("message_id").asLong();
 
                                     if (messageId != 0) {
-                                        log.info("{}⏳ Menu message sent with ID: {}. Scheduling auto-deletion in {}s.", logPrefix, messageId, DELETE_DELAY_SECONDS);
 
-                                        // 5. 安排自动删除任务
-                                        Disposable deletionTask = Mono.delay(Duration.ofSeconds(DELETE_DELAY_SECONDS))
-                                                .flatMap(aLong -> {
-                                                    // 这里的 log.warn 应该能够继承 MDC
-                                                    log.warn("{}⏰ Auto-deleting menu message {} after {}s timeout.", logPrefix, messageId, DELETE_DELAY_SECONDS);
-
-                                                    // 5.1 执行删除操作
-                                                    return botClientService.deleteMessage(token, chatId, messageId)
-                                                            // 5.2 清除存储的任务引用
-                                                            .then(userSessionService.cancelPendingDeletion(userId));
-                                                })
-                                                .subscribeOn(Schedulers.parallel())
-                                                .subscribe();
-
-                                        // 6. 存储任务引用
-                                        userSessionService.storePendingDeletion(userId, deletionTask).subscribe();
+                                        // ⭐ 关键修改：调用新的服务方法，并将 ContextView 传递过去
+                                        interactiveMessageService.scheduleMessageDeletion(
+                                                token,
+                                                userId,
+                                                chatId,
+                                                messageId,
+                                                DELETE_DELAY_SECONDS,
+                                                logPrefix, // 传递 Trace ID 前缀用于日志
+                                                finalContext // 传递捕获到的上下文
+                                        ).subscribe();
+                                        // 日志已经在 service 内部记录，这里不需要重复记录
                                     } else {
                                         log.warn("{}⚠️ Message ID extraction failed (messageId=0) or message was not sent correctly.", logPrefix);
                                     }

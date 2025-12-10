@@ -56,7 +56,7 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
 
         activeRequests.add(requestId);
 
-        log.debug("[traceId={}]💬 Request started: {}", getTraceId(exchange), requestId);
+        log.info("[traceId={}]💬 Request started: {}", getTraceId(exchange), requestId);
 
         // 1. 对所有请求应用 REQUEST_TIMEOUT
         return chain.filter(exchange)
@@ -75,7 +75,7 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
                     };
 
                     // 使用 INFO 级别记录请求的完成，便于追踪
-                    log.info("[traceId={}]✅ Request finished: {} | Status: {}", getTraceId(exchange), requestId, status);
+                    log.info("[traceId={}] 👌 Request finished: {} | Status: {}", getTraceId(exchange), requestId, status);
                 })
                 // 2. 统一处理所有超时相关的异常 (TimeoutException 和 AggressiveTimeoutException)
                 // 此处捕获 TimeoutException，并确保 Webhook 返回 200 OK
@@ -125,13 +125,10 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
      */
     private String createRequestId(ServerWebExchange exchange) {
         return String.format("[%s] %s from %s | ID: %s",
-//                exchange.getRequest().getMethod(),
                 getMethod(exchange),
-//                exchange.getRequest().getPath(),
                 getPath(exchange),
                 getClientIp(exchange),
-//                exchange.getRequest().getRemoteAddress() != null ? exchange.getRequest().getRemoteAddress().getHostString() : "unknown",
-                exchange.getRequest().getId()
+                getId(exchange)
         );
     }
 
