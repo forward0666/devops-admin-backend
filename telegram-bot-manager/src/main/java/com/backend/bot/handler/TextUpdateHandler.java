@@ -3,10 +3,10 @@ package com.backend.bot.handler;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.UserSessionEntity;
-import com.backend.bot.event.BotUpdateEvent;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
+import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -17,7 +17,6 @@ import java.util.regex.Pattern;
 
 // 导入 CallbackQueryHandler 中的状态常量
 import static com.backend.bot.constants.CallbackConstants.*;
-import static com.backend.bot.handler.CallbackQueryHandler.*;
 
 @Component
 @RequiredArgsConstructor
@@ -48,75 +47,81 @@ public class TextUpdateHandler implements UpdateHandler {
         String logText = text.isEmpty() ? "N/A" : text;
         int textLength = text.length();
 
-        // 【关键调试 - 级别改为 INFO】确认 support 方法被调用，并打印核心结构信息
-        log.info("🔍 TextUpdateHandler Check (INFO): Msg={}, Callback={}, TrimmedText='{}' (Length: {})",
+        // 【关键调试 - 级别改为 DEBUG】确认 support 方法被调用，并打印核心结构信息
+        log.debug("🔍 TextUpdateHandler Check (DEBUG): Msg={}, Callback={}, TrimmedText='{}' (Length: {})",
                 isMessagePresent, isCallbackPresent, logText.length() > 50 ? logText.substring(0, 50) + "..." : logText, textLength);
 
 
         // 【正式逻辑检查点】
         if (!isMessagePresent) {
-            // 【拒绝日志 - 级别改为 INFO】
-            log.info("⚠️ TextUpdateHandler rejected (INFO): No message object in update.");
+            // 【拒绝日志 - 级别改为 DEBUG】
+            log.debug("⚠️ TextUpdateHandler rejected (DEBUG): No message object in update.");
             return false;
         }
 
         // 检查文本是否为空 (包括只包含空格的情况)
         if (text.isEmpty()) {
-            // 【拒绝日志 - 级别改为 INFO】
-            log.info("⚠️ TextUpdateHandler rejected (INFO): Message object present, but text is empty after trimming (e.g., photo, sticker, or just spaces).");
+            // 【拒绝日志 - 级别改为 DEBUG】
+            log.debug("⚠️ TextUpdateHandler rejected (DEBUG): Message object present, but text is empty after trimming (e.g., photo, sticker, or just spaces).");
             return false;
         }
 
         // 确保不是以 '/' 开头的命令
         if (text.startsWith("/")) {
-            // 【拒绝日志 - 级别改为 INFO】
-            log.info("⚠️ TextUpdateHandler rejected (INFO): Starts with '/' (Command).");
+            // 【拒绝日志 - 级别改为 DEBUG】
+            log.debug("⚠️ TextUpdateHandler rejected (DEBUG): Starts with '/' (Command).");
             return false;
         }
 
         // 仅处理包含非命令文本内容的消息
-        // 【成功日志 - 级别改为 INFO】
-        log.info("✅ TextUpdateHandler accepted (INFO): Message is non-command text.");
+        // 【成功日志 - 级别改为 DEBUG】
+        log.debug("✅ TextUpdateHandler accepted (DEBUG): Message is non-command text.");
         return true;
     }
 
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
-        // 提取 Bot 配置信息
-        final String token = botEntity.getBotToken();
-        final String botName = botEntity.getBotName();
-        final String logIdentifier = String.format("[%s]", botName);
+        return Mono.deferContextual(contextView -> {
+            // 提取 Trace ID 并设置 MDC
+            final String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
-        // 【新增调试日志】确认进入 handle 方法
-        log.debug("✅ {} TextUpdateHandler successfully entered handle method.", logIdentifier);
+            // 提取 Bot 配置信息
+            final String token = botEntity.getBotToken();
+            final String botName = botEntity.getBotName();
+            final String logIdentifier = String.format("[%s]", botName); // Bot的标识符，不含 Trace ID
 
-        // 打印整个接收到的 BotUpdateDto，以便完整查看信息
-        log.info("📥 {} Full Update DTO received: {}", logIdentifier, botUpdate);
+            // 【新增调试日志】确认进入 handle 方法
+            log.debug("{}✅ {} TextUpdateHandler successfully entered handle method.", traceLogPrefix, logIdentifier);
 
-        // 🌟 优化：在方法开始处统一提取并声明为 final，使代码更具可读性和响应式安全
-        final String userText = botUpdate.message().text().trim();
-        final Long chatId = botUpdate.message().chat().id();
-        final Long userId = botUpdate.message().from().id();
-        final String finalOperatorName = getOperatorName(botUpdate, userId);
+            // 打印整个接收到的 BotUpdateDto，以便完整查看信息
+            log.info("{}📥 {} Full Update DTO received: {}", traceLogPrefix, logIdentifier, botUpdate);
 
-        // 1. 获取用户当前会话状态
-        return userSessionService.getUserSession(userId)
-                .flatMap(session -> {
-                    // 统一使用 session.getState()
-                    String state = session.getState();
-                    log.info("📝 {} User {} (Op: {}) current state is: {}", logIdentifier, userId, finalOperatorName, state);
+            // 🌟 优化：在方法开始处统一提取并声明为 final，使代码更具可读性和响应式安全
+            final String userText = botUpdate.message().text().trim();
+            final Long chatId = botUpdate.message().chat().id();
+            final Long userId = botUpdate.message().from().id();
+            final String finalOperatorName = getOperatorName(botUpdate, userId);
 
-                    // 2. 根据状态进行分发处理
-                    return switch (state) {
-                        case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
-                                handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName);
-                        default ->
-                            // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
-                                handleDefaultText(token, chatId, userText, logIdentifier);
-                    };
-                })
-                .switchIfEmpty(handleDefaultText(token, chatId, userText, logIdentifier)) // 用户没有会话
-                .then();
+            // 1. 获取用户当前会话状态
+            return userSessionService.getUserSession(userId)
+                    .flatMap(session -> {
+                        // 统一使用 session.getState()
+                        String state = session.getState();
+                        log.info("{}📝 {} User {} (Op: {}) current state is: {}", traceLogPrefix, logIdentifier, userId, finalOperatorName, state);
+
+                        // 2. 根据状态进行分发处理
+                        return switch (state) {
+                            case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
+                                    handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
+                            default ->
+                                // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
+                                    handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
+                        };
+                    })
+                    // 用户没有会话
+                    .switchIfEmpty(handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix))
+                    .then();
+        });
     }
 
     /**
@@ -147,8 +152,9 @@ public class TextUpdateHandler implements UpdateHandler {
 
     /**
      * 处理等待 IP 和目标标识输入的逻辑。
+     * 新增 traceLogPrefix 参数用于日志输出。
      */
-    private Mono<Void> handleAwaitingIpInput(String token, Long chatId, Long userId, String userText, UserSessionEntity session, String operatorName) {
+    private Mono<Void> handleAwaitingIpInput(String token, Long chatId, Long userId, String userText, UserSessionEntity session, String operatorName, String traceLogPrefix) {
         String state = session.getState();
         String domainType = getDomainType(state);
 
@@ -163,7 +169,8 @@ public class TextUpdateHandler implements UpdateHandler {
         String ip = matcher.group(1);
         String targetIdentifier = matcher.group(2);
 
-        log.info("✅ Parsed input for {}. IP: {}, Target ID: {}, Operator: {}", domainType, ip, targetIdentifier, operatorName);
+        // 打印 Trace ID 日志
+        log.info("{}✅ Parsed input for {}. IP: {}, Target ID: {}, Operator: {}", traceLogPrefix, domainType, ip, targetIdentifier, operatorName);
 
         // 3. 执行加白操作 (传入目标标识和操作人)
         // Mono<String> 包含最终发送给用户的消息
@@ -180,25 +187,28 @@ public class TextUpdateHandler implements UpdateHandler {
                 .onErrorReturn("❌ 系统错误！加白服务异常，请联系管理员。");
 
 
-        // 4. 【优化后的顺序】先等待加白操作结果，然后无论结果如何，都清除会话状态，最后发送结果。
+        // 4. 【修复后的顺序】先等待加白操作结果，然后执行**链式**清理会话，最后发送结果。
         return whitelistResultMono
-                // 使用 doFinally 确保在 Mono 终止时（无论成功还是失败）都清除会话
-                .doFinally(signalType -> {
-                    // 确保在 Mono 结束时执行清理操作，防止会话残留
-                    userSessionService.clearUserSession(userId).subscribe();
-                })
-                // 将最终的消息文本发送给用户
-                .flatMap(resultText -> botClientService.sendMessage(token, chatId, resultText, null))
+                // FIX: 使用 flatMap 接收结果文本
+                .flatMap(resultText ->
+                        // 1. **链式**执行会话清除操作。clearUserSession(userId)返回一个 Mono<Void>。
+                        userSessionService.clearUserSession(userId)
+                                // 2. 然后 (then) 链式执行发送消息操作。
+                                .then(botClientService.sendMessage(token, chatId, resultText, null))
+                )
+                // 确保整个流程最终返回 Mono<Void>
                 .then();
     }
 
     /**
      * 处理普通文本输入，例如 /start 或未处于会话状态时的消息。
+     * 新增 traceLogPrefix 参数用于日志输出。
      */
-    private Mono<Void> handleDefaultText(String token, Long chatId, String userText, String logIdentifier) {
+    private Mono<Void> handleDefaultText(String token, Long chatId, String userText, String logIdentifier, String traceLogPrefix) {
         if (userText.startsWith("/start")) {
             // 重新发送主菜单逻辑（假设您有 SendMainMenu 方法）
-            log.info("💬 {} Received /start command. Triggering main menu.", logIdentifier);
+            // 打印 Trace ID 日志
+            log.info("{}💬 {} Received /start command. Triggering main menu.", traceLogPrefix, logIdentifier);
             // 假设 main menu 逻辑在 BotClientService 或其他地方
             String welcomeText = "✨✨✨ 选择服务: \uD83D\uDC47\uD83D\uDC47";
             // 这里应该调用一个发送主菜单的方法，此处简化为发送文本
@@ -206,7 +216,8 @@ public class TextUpdateHandler implements UpdateHandler {
         }
 
         // 修复：忽略其他普通文本，不再回复任何提示。
-        log.debug("🤫 {} Ignoring non-session text: {}", logIdentifier, userText);
+        // 打印 Trace ID 日志
+        log.debug("{}🤫 {} Ignoring non-session text: {}", traceLogPrefix, logIdentifier, userText);
         return Mono.empty();
     }
 
