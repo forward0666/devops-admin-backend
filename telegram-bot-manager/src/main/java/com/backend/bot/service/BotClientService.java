@@ -1,9 +1,14 @@
 package com.backend.bot.service;
 
 import com.backend.bot.config.TelegramProperties;
+import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
+import com.backend.bot.util.DtoFieldExtractor;
+import com.backend.bot.util.ErrorHandlerUtils;
 import com.backend.bot.util.LogUtils;
+import com.backend.bot.util.ReactiveOperationTemplate;
 import com.backend.bot.util.RetryUtil;
+import com.backend.bot.util.TelegramApiRequestBuilder;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -70,32 +75,15 @@ public class BotClientService {
 
     /**
      * 注册/更新 Webhook URL。
+     * 
+     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
+     * 统一处理上下文传播、错误处理和日志记录。
      */
     public Mono<String> setWebhook(String token, String fullWebhookUrl, String secretToken) {
-
-        String path = "/bot" + token + "/setWebhook";
-
-        return telegramWebClient.get()
-                .uri(path, uriBuilder -> uriBuilder
-                        .queryParam("url", fullWebhookUrl)
-                        .queryParam("secret_token", secretToken)
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                // 🚀 应用重试策略
-                .retryWhen(telegramRetryPolicy)
-                // 使用 doOnSuccess 触发一个 context-aware 的 side effect 进行日志记录
-                .doOnSuccess(response -> Mono.deferContextual(contextView -> {
-                    String prefix = getTraceIdPrefix(contextView);
-                    log.info("{}setWebhook response received successfully.", prefix);
-                    return Mono.empty();
-                }).subscribe())
-                .onErrorResume(e -> Mono.deferContextual(contextView -> {
-                    String prefix = getTraceIdPrefix(contextView);
-                    // 🌟 显式打印 traceId
-                    log.error("{}❌Telegram setWebhook API call failed for token: {}", prefix, token, e);
-                    return Mono.just("{\"ok\":false, \"description\":\"Telegram API error: " + e.getMessage() + "\"}");
-                }));
+        return TelegramApiRequestBuilder.setWebhook(token, fullWebhookUrl, secretToken)
+                .retryPolicy(telegramRetryPolicy)
+                .executeWithResponse(telegramWebClient, telegramRetryPolicy)
+                .onErrorResume(e -> Mono.just("{\"ok\":false, \"description\":\"Telegram API error: " + e.getMessage() + "\"}"));
     }
 
     /**
@@ -134,88 +122,46 @@ public class BotClientService {
 
     /**
      * 响应用户的 Callback Query (按钮点击)，通常用于消除按钮上的加载动画。
+     * 
+     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
+     * 统一处理上下文传播、错误处理和日志记录。
      */
     public Mono<Void> answerCallbackQuery(String token, String callbackQueryId, String text) {
-        String path = "/bot" + token + "/answerCallbackQuery";
+        String path = String.format(TelegramConstants.API_PATH_TEMPLATE, token, "answerCallbackQuery");
 
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromPath(path)
-                .queryParam("callback_query_id", callbackQueryId)
-                .queryParam("text", text)
-                .queryParam("show_alert", false);
-
-        return telegramWebClient.get()
-                .uri(uriBuilder.build().encode().toUriString())
-                .retrieve()
-                .toBodilessEntity()
-                // 🚀 应用重试策略
-                .retryWhen(telegramRetryPolicy)
-                // Fix 1: 使用 .then() 转换类型，并确保内部 deferContextual 显式类型化
-                .then(
-                        Mono.<Void>deferContextual(contextView -> {
-                            String prefix = getTraceIdPrefix(contextView);
-                            log.debug("{}✅ Callback query answered successfully: {}", prefix, callbackQueryId);
-                            return Mono.empty();
-                        })
-                )
-                // Fix 2: 显式类型化 onErrorResume 的 fallback 函数，解决 Mono<Object> 错误
-                .onErrorResume(e ->
-                        Mono.<Void>deferContextual(contextView -> {
-                            String prefix = getTraceIdPrefix(contextView);
-                            log.error("{}❌ Failed to answer callback query: {}", prefix, callbackQueryId, e);
-                            return Mono.empty();
-                        })
-                );
+        return TelegramApiRequestBuilder.create()
+                .path(path)
+                .method(TelegramApiRequestBuilder.RequestMethod.GET)
+                .customParam("callback_query_id", callbackQueryId)
+                .customParam("text", text)
+                .customParam("show_alert", false)
+                .retryPolicy(telegramRetryPolicy)
+                .logTemplates("✅ Callback query answered successfully: " + callbackQueryId, 
+                             "Failed to answer callback query: " + callbackQueryId)
+                .executeWithoutResponse(telegramWebClient, telegramRetryPolicy);
     }
 
     /**
      * 发送消息给 Telegram 用户/群组。
+     * 
+     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
+     * 统一处理上下文传播、错误处理和日志记录。
+     * 
      * @param chatName 聊天的名称（可选，用于日志记录）
      */
     public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup, String chatName) {
-
-        String path = "/bot" + token + "/sendMessage";
-
-        Map<String, Object> bodyMap = new HashMap<>();
-        bodyMap.put("chat_id", chatId);
-        bodyMap.put("text", text);
-
-        if (replyMarkup != null) {
-            bodyMap.put("reply_markup", replyMarkup);
-        }
-
-        // 2. 执行 POST 请求
-        return telegramWebClient.post()
-                .uri(path)
-                .body(BodyInserters.fromValue(bodyMap))
-                .retrieve()
-                .toBodilessEntity()
-                // 🚀 应用重试策略
-                .retryWhen(telegramRetryPolicy)
-                // Fix 1: 使用 .then() 转换类型，并确保内部 deferContextual 显式类型化
-                .then(
-                        Mono.<Void>deferContextual(contextView -> {
-                            String prefix = getTraceIdPrefix(contextView);
-                            String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
-                            log.info("{}✅ Message sent successfully to Chat: {}", prefix, logIdentifier);
-                            return Mono.empty();
-                        })
-                )
-                // Fix 2: 显式类型化 onErrorResume 的 fallback 函数 (PrematureCloseException)
-                .onErrorResume(PrematureCloseException.class, e ->
-                        Mono.<Void>deferContextual(contextView -> {
-                            String prefix = getTraceIdPrefix(contextView);
-                            log.warn("{}⚠️ Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", prefix, chatId);
-                            return Mono.empty();
-                        })
-                )
-                // Fix 3: 显式类型化 onErrorResume 的 fallback 函数 (General Exception)
-                .onErrorResume(e ->
-                        Mono.<Void>deferContextual(contextView -> {
-                            String prefix = getTraceIdPrefix(contextView);
-                            log.error("{}❌ Failed to send message to chatId: {}, Error: {}", prefix, chatId, e.getMessage());
-                            return Mono.empty();
-                        })
-                );
+        String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
+        
+        return TelegramApiRequestBuilder.sendMessage(token)
+                .chatId(chatId)
+                .text(text)
+                .replyMarkup(replyMarkup)
+                .retryPolicy(telegramRetryPolicy)
+                .logTemplates("✅ Message sent successfully to Chat: " + logIdentifier, 
+                             "Failed to send message to Chat: " + logIdentifier)
+                .executeWithoutResponse(telegramWebClient, telegramRetryPolicy)
+                .onErrorResume(PrematureCloseException.class, 
+                              ErrorHandlerUtils.logAndWarn("asynchronous message send due to connection premature closure"));
     }
 
     // 重载方法：兼容不带键盘和群名称的调用
