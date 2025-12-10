@@ -1,5 +1,6 @@
 package com.backend.bot.handler;
 
+import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
@@ -31,9 +32,9 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
     private final UserSessionService userSessionService;
     private final InteractiveMessageService interactiveMessageService;
 
-    // 文本常量
-    private static final String IP_PROMPT_TEXT = "请提供IP及用户名，格式为：IP+用户名（e.g. 1.1.1.1+username）";
-    private static final int TIMEOUT_SECONDS = 20; // 自动删除超时时间：20秒
+    // 使用中央常量定义，确保配置统一
+    private static final String IP_PROMPT_TEXT = TelegramConstants.IP_INPUT_PROMPT;
+    private static final int TIMEOUT_SECONDS = TelegramConstants.IP_INPUT_TIMEOUT_SECONDS;
 
     @Override
     public boolean supports(String callbackData) {

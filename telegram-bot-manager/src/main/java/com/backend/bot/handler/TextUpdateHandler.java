@@ -1,5 +1,6 @@
 package com.backend.bot.handler;
 
+import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.UserDto; // 引入 User DTO
 import com.backend.bot.entity.BotConfigEntity;
@@ -109,6 +110,9 @@ public class TextUpdateHandler implements UpdateHandler {
                         return switch (state) {
                             case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
                                     handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
+                            case TelegramConstants.SESSION_STATE_PROCESSING_START ->
+                                    // 用户正在处理/start命令，忽略文本输入
+                                    handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
                             default ->
                                 // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
                                     handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
@@ -161,13 +165,23 @@ public class TextUpdateHandler implements UpdateHandler {
         return whitelistResultMono
                 // FIX: 使用 flatMap 接收结果文本
                 .flatMap(resultText ->
-                        // 1. **链式**执行会话清除操作。clearUserSession(userId)返回一个 Mono<Void>。
-                        userSessionService.clearUserSession(userId)
-                                // 2. 然后 (then) 链式执行发送消息操作。
+                        // 1. **链式**执行取消待删除任务操作
+                        userSessionService.cancelPendingDeletion(userId)
+                                // 2. 然后 (then) 执行会话清除操作。clearUserSession(userId)返回一个 Mono<Void>。
+                                .then(userSessionService.clearUserSession(userId))
+                                // 3. 然后 (then) 链式执行发送消息操作。
                                 .then(botClientService.sendMessage(token, chatId, resultText, null))
                 )
                 // 确保整个流程最终返回 Mono<Void>
                 .then();
+    }
+
+    /**
+     * 处理用户正在处理/start命令时的文本输入
+     */
+    private Mono<Void> handleProcessingStart(String token, Long chatId, String logIdentifier, String traceLogPrefix) {
+        log.debug("{}🤫 {} User text input ignored while processing /start command", traceLogPrefix, logIdentifier);
+        return Mono.empty();
     }
 
     /**
@@ -180,7 +194,7 @@ public class TextUpdateHandler implements UpdateHandler {
             // 打印 Trace ID 日志
             log.info("{}💬 {} Received /start command. Triggering main menu.", traceLogPrefix, logIdentifier);
             // 假设 main menu 逻辑在 BotClientService 或其他地方
-            String welcomeText = "✨✨✨ 选择服务: \uD83D\uDC47\uD83D\uDC47";
+            String welcomeText = TelegramConstants.WELCOME_MESSAGE;
             // 这里应该调用一个发送主菜单的方法，此处简化为发送文本
             return botClientService.sendMessage(token, chatId, welcomeText, null).then();
         }

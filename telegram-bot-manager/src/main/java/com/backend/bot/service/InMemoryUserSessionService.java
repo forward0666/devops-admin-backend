@@ -22,6 +22,7 @@ public class InMemoryUserSessionService implements UserSessionService {
     private final ConcurrentMap<Long, UserSessionEntity> userSessions = new ConcurrentHashMap<>();
 
     // 存储菜单自动销毁任务：Key=UserId, Value=Disposable
+    // 每个用户同时只能有一个待删除任务
     private final ConcurrentMap<Long, Disposable> pendingDeletions = new ConcurrentHashMap<>();
 
 

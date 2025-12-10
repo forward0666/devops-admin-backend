@@ -1,6 +1,7 @@
 package com.backend.bot.handler;
 
 import com.backend.bot.constants.CallbackConstants;
+import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
@@ -28,10 +29,8 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
 
-    // 自动销毁常量
-    private static final int SECONDARY_MENU_DELETE_DELAY_SECONDS = 10;
-    private static final int PRIMARY_MENU_DELETE_DELAY_SECONDS = 5;
-    private static final String MENU_PROMPT_TEXT = "请在 %d 秒内完成操作：";
+    // 使用中央常量定义，确保配置统一
+    private static final String MENU_PROMPT_TEXT = TelegramConstants.MENU_TIMEOUT_TEMPLATE;
 
     @Override
     public boolean supports(String callbackData) {
@@ -89,11 +88,12 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
     /**
      * 根据回调数据判断目标菜单的级别，返回对应的销毁延迟时间。
+     * 使用中央常量确保配置一致性
      */
     private int getDeletionDelay(String callbackData) {
         if (callbackData.equals(CallbackConstants.MAIN_MENU_BACK) || callbackData.startsWith(CallbackConstants.MAIN_MENU_CALLBACK)) {
-            return PRIMARY_MENU_DELETE_DELAY_SECONDS;
+            return TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
         }
-        return SECONDARY_MENU_DELETE_DELAY_SECONDS;
+        return TelegramConstants.SECONDARY_MENU_DELETE_DELAY_SECONDS;
     }
 }
