@@ -59,7 +59,7 @@ public class InteractiveMessageService {
                 .subscribeOn(Schedulers.parallel()) // 确保删除任务在并行调度器上运行
                 .flatMap(aLong -> {
                     // 延迟触发日志 (在并行线程上)
-                    log.warn("{}⏰Auto-deleting menu message {} after {}s timeout.", fullLogIdentifier, messageId, delaySeconds);
+                    log.warn("{}⏰ Auto-deleted message {} after {}s timeout.", fullLogIdentifier, messageId, delaySeconds);
 
                     // 尝试删除消息，然后清理会话中的 Disposable 引用
                     return botClientService.deleteMessage(token, chatId, messageId)
