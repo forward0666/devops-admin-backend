@@ -6,6 +6,7 @@ import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.template.MenuType;
+import com.backend.bot.util.BotUserUtils; // 引入新工具类
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,14 +19,13 @@ import reactor.util.context.ContextView;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(1) // 优先级最高
+@Order(1)
 public class StartCommandHandler extends AbstractUpdateHandler {
 
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
     private final ObjectMapper objectMapper;
 
-    // 菜单消息文本
     private static final String WELCOME_TEXT = "✨✨✨ 选择服务: 👇👇";
     private static final int DELETE_DELAY_SECONDS = 5;
 
@@ -41,60 +41,48 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         String token = context.token();
         Long chatId = context.chatId();
         Long userId = context.userId();
-        String chatTitle = context.chatTitle();
-        String firstName = context.firstName();
 
-        String userLogSuffix = firstName != null && !firstName.isEmpty()
-                ? String.format(" (%s)", firstName)
-                : "";
-        String chatLogSuffix = String.format(",Chat ID: %s(%s)",
-                chatId,
-                chatTitle != null ? chatTitle : "N/A");
+        // 🌟 优化点：直接调用工具类获取标准化的身份日志
+        String identityLog = BotUserUtils.formatIdentityLog(context);
 
-        log.info("{}✅ Handling /start command from userId: {}{}{}",
-                logPrefix, userId, userLogSuffix, chatLogSuffix);
+        log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
 
         InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();
 
-        Mono<String> sendMenuResponseMono = botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, chatTitle);
-
-        return sendMenuResponseMono
-                .doOnNext(responseJson -> {
-                    log.debug("{}🔍 Received Telegram sendMessage response JSON: {}", logPrefix, responseJson);
-
-                    try {
-                        JsonNode root = objectMapper.readTree(responseJson);
-                        JsonNode resultNode = root.path("result");
-                        boolean isOk = root.path("ok").asBoolean();
-
-                        if (!isOk || resultNode.isMissingNode()) {
-                            log.error("{}❌ Telegram API returned failure (ok=false) or missing 'result' node in response. JSON: {}", logPrefix, responseJson);
-                            return;
-                        }
-
-                        Long messageId = resultNode.path("message_id").asLong();
-
-                        if (messageId != 0) {
-                            interactiveMessageService.scheduleMessageDeletion(
-                                    token,
-                                    userId,
-                                    chatId,
-                                    messageId,
-                                    DELETE_DELAY_SECONDS,
-                                    logPrefix,
-                                    contextView
-                            ).subscribe();
-                        } else {
-                            log.warn("{}⚠️ Message ID extraction failed (messageId=0) or message was not sent correctly.", logPrefix);
-                        }
-                    } catch (Exception e) {
-                        log.error("{}❌ Failed to parse sendMessage response or schedule deletion. JSON: {}", logPrefix, responseJson, e);
-                    }
-                })
+        return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
+                .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView))
                 .onErrorResume(e -> {
                     log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
                     return Mono.empty();
                 })
                 .then();
+    }
+
+    /**
+     * 💡 额外建议：将解析 Response 的逻辑也提取为私有方法，让 handleUpdate 更清晰
+     */
+    private void handleSendResponse(String responseJson, String token, Long userId, Long chatId, String logPrefix, ContextView contextView) {
+        log.debug("{}🔍 Received Telegram sendMessage response JSON: {}", logPrefix, responseJson);
+        try {
+            JsonNode root = objectMapper.readTree(responseJson);
+            JsonNode resultNode = root.path("result");
+
+            if (!root.path("ok").asBoolean() || resultNode.isMissingNode()) {
+                log.error("{}❌ API failure. JSON: {}", logPrefix, responseJson);
+                return;
+            }
+
+            Long messageId = resultNode.path("message_id").asLong(0);
+            if (messageId != 0) {
+                interactiveMessageService.scheduleMessageDeletion(
+                        token, userId, chatId, messageId,
+                        DELETE_DELAY_SECONDS, logPrefix, contextView
+                ).subscribe();
+            } else {
+                log.warn("{}⚠️ Message ID is 0.", logPrefix);
+            }
+        } catch (Exception e) {
+            log.error("{}❌ JSON parse error: {}", logPrefix, responseJson, e);
+        }
     }
 }

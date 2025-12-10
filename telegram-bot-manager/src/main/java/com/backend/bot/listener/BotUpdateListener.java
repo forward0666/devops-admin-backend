@@ -14,7 +14,7 @@ import reactor.core.scheduler.Scheduler;
 
 import java.time.Duration;
 
-import static com.backend.bot.util.BotUpdateUtils.extractChatId;
+import static com.backend.bot.util.BotChatUtils.extractChatId;
 
 @Component
 @Slf4j

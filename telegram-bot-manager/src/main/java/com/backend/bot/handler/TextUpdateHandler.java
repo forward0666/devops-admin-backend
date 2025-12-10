@@ -1,17 +1,20 @@
 package com.backend.bot.handler;
 
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.dto.UserDto; // 引入 User DTO
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
+import com.backend.bot.util.BotUserUtils; // 引入新增的工具类
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.util.context.ContextView;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,38 +46,29 @@ public class TextUpdateHandler implements UpdateHandler {
         // 对文本进行修剪 (trim)
         String text = rawText.trim();
 
-        // 用于日志输出：如果修剪后文本为空，则显示 N/A，否则显示修剪后的文本
         String logText = text.isEmpty() ? "N/A" : text;
         int textLength = text.length();
 
-        // 【关键调试 - 级别改为 DEBUG】确认 support 方法被调用，并打印核心结构信息
         log.debug("🔍 TextUpdateHandler Check (DEBUG): Msg={}, Callback={}, TrimmedText='{}' (Length: {})",
                 isMessagePresent, isCallbackPresent, logText.length() > 50 ? logText.substring(0, 50) + "..." : logText, textLength);
 
 
-        // 【正式逻辑检查点】
         if (!isMessagePresent) {
-            // 【拒绝日志 - 级别改为 DEBUG】
             log.debug("⚠️ TextUpdateHandler rejected (DEBUG): No message object in update.");
             return false;
         }
 
-        // 检查文本是否为空 (包括只包含空格的情况)
         if (text.isEmpty()) {
-            // 【拒绝日志 - 级别改为 DEBUG】
             log.debug("⚠️ TextUpdateHandler rejected (DEBUG): Message object present, but text is empty after trimming (e.g., photo, sticker, or just spaces).");
             return false;
         }
 
         // 确保不是以 '/' 开头的命令
         if (text.startsWith("/")) {
-            // 【拒绝日志 - 级别改为 DEBUG】
             log.debug("⚠️ TextUpdateHandler rejected (DEBUG): Starts with '/' (Command).");
             return false;
         }
 
-        // 仅处理包含非命令文本内容的消息
-        // 【成功日志 - 级别改为 DEBUG】
         log.debug("✅ TextUpdateHandler accepted (DEBUG): Message is non-command text.");
         return true;
     }
@@ -88,19 +82,21 @@ public class TextUpdateHandler implements UpdateHandler {
             // 提取 Bot 配置信息
             final String token = botEntity.getBotToken();
             final String botName = botEntity.getBotName();
-            final String logIdentifier = String.format("[%s]", botName); // Bot的标识符，不含 Trace ID
+            final String logIdentifier = String.format("[%s]", botName);
 
-            // 【新增调试日志】确认进入 handle 方法
             log.debug("{}✅ {} TextUpdateHandler successfully entered handle method.", traceLogPrefix, logIdentifier);
-
-            // 打印整个接收到的 BotUpdateDto，以便完整查看信息
             log.info("{}📥 {} Full Update DTO received: {}", traceLogPrefix, logIdentifier, botUpdate);
 
             // 🌟 优化：在方法开始处统一提取并声明为 final，使代码更具可读性和响应式安全
             final String userText = botUpdate.message().text().trim();
             final Long chatId = botUpdate.message().chat().id();
-            final Long userId = botUpdate.message().from().id();
-            final String finalOperatorName = getOperatorName(botUpdate, userId);
+
+            // --- 优化点：使用 BotUserUtils 提取 User 和 OperatorName ---
+            final UserDto user = BotUserUtils.extractUser(botUpdate)
+                    .orElseThrow(() -> new IllegalStateException("User object is missing in a supported text update."));
+            final Long userId = user.id();
+            final String finalOperatorName = BotUserUtils.getOperatorName(user, userId);
+            // --------------------------------------------------------
 
             // 1. 获取用户当前会话状态
             return userSessionService.getUserSession(userId)
@@ -122,32 +118,6 @@ public class TextUpdateHandler implements UpdateHandler {
                     .switchIfEmpty(handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix))
                     .then();
         });
-    }
-
-    /**
-     * 辅助方法：格式化操作人名称 (firstName + (@username) 或 userId)
-     */
-    private static String getOperatorName(BotUpdateDto botUpdate, Long userId) {
-        String userFirstName = botUpdate.message().from().firstName();
-        String userUsername = botUpdate.message().from().username();
-        String operatorName;
-
-        if (userFirstName != null && !userFirstName.isEmpty()) {
-            // 优先使用 firstName
-            operatorName = userFirstName;
-            if (userUsername != null && !userUsername.isEmpty()) {
-                // 如果 username 存在，进行组合：firstName (@username)
-                operatorName += " (@" + userUsername + ")";
-            }
-        } else if (userUsername != null && !userUsername.isEmpty()) {
-            // 如果 firstName 缺失，仅使用 username
-            operatorName = "@" + userUsername;
-        } else {
-            // 如果两者都没有，使用 userId 作为后备
-            operatorName = String.valueOf(userId);
-        }
-
-        return operatorName;
     }
 
     /**
@@ -230,4 +200,6 @@ public class TextUpdateHandler implements UpdateHandler {
             default -> "未知";
         };
     }
+
+    // 原有的 getOperatorName 辅助方法已移除，移入 BotUserUtils 类中
 }

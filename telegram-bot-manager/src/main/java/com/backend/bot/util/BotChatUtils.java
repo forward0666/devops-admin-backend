@@ -1,4 +1,4 @@
-package com.backend.bot.util; // 假设您使用 .util 包
+package com.backend.bot.util;
 
 import com.backend.bot.dto.BotUpdateDto;
 import java.util.Optional;
@@ -7,10 +7,10 @@ import java.util.Optional;
  * 机器人更新（BotUpdateDto）的辅助工具类。
  * 负责从复杂的更新结构中安全地提取核心信息。
  */
-public class BotUpdateUtils {
+public class BotChatUtils {
 
     // 私有构造函数，防止实例化工具类
-    private BotUpdateUtils() {}
+    private BotChatUtils() {}
 
     /**
      * 尝试从 BotUpdateDto 中提取 chatId。

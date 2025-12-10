@@ -12,7 +12,7 @@ import reactor.util.context.ContextView;
 
 import java.util.Optional;
 
-import static com.backend.bot.util.BotUpdateUtils.extractChatId;
+import static com.backend.bot.util.BotChatUtils.extractChatId;
 
 /**
  * 日志工具类，专注于在 Reactor WebFlux 环境中处理 Trace ID (MDC) 同步和日志格式化。
