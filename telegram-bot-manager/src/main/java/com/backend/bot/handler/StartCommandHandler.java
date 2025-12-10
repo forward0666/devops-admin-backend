@@ -51,22 +51,36 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
 
-        // 检查用户是否已经在处理/start请求
-        return userSessionService.getUserSession(userId)
-                .flatMap(existingSession -> {
-                    // 如果用户正在处理/start请求，返回提示信息
-                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(existingSession.getState())) {
-                        log.info("{}⚠️ User {} is already processing /start command. Ignoring duplicate request.", logPrefix, userId);
-                        return botClientService.sendMessage(token, chatId, "⏳ 正在处理您的请求，请稍候...", null)
-                                .then(Mono.empty());
-                    }
-                    
-                    // 用户有其他会话，取消现有会话并继续处理/start
-                    return userSessionService.clearUserSession(userId)
-                            .then(processStartCommand(context, logPrefix, contextView));
+        // 使用 filterWhen 来检查用户是否已经在处理/start请求
+        return Mono.just(userId)
+                .filterWhen(id -> userSessionService.getUserSession(id)
+                        .map(session -> {
+                            // 如果用户没有会话或者会话状态不是PROCESSING_START，则允许处理
+                            String state = session.getState();
+                            boolean isProcessingStart = TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state);
+                            
+                            if (isProcessingStart) {
+                                log.info("{}⚠️ User {} is already processing /start command. Ignoring duplicate request.", logPrefix, id);
+                                // 异步发送提示信息
+                                botClientService.sendMessage(token, chatId, "⏳ 正在处理您的请求，请稍候...", null)
+                                        .subscribe();
+                            }
+                            
+                            return !isProcessingStart; // 返回true表示允许处理，false表示过滤掉
+                        })
+                        .defaultIfEmpty(true) // 如果用户没有会话，允许处理
+                )
+                .flatMap(allowedId -> {
+                    // 检查用户是否有其他会话需要清除
+                    return userSessionService.getUserSession(allowedId)
+                            .flatMap(session -> {
+                                // 用户有其他会话，取消现有会话并继续处理/start
+                                return userSessionService.clearUserSession(allowedId)
+                                        .then(processStartCommand(context, logPrefix, contextView));
+                            })
+                            .switchIfEmpty(processStartCommand(context, logPrefix, contextView)); // 用户没有会话，直接处理/start
                 })
-                // 如果用户没有会话，直接处理/start
-                .switchIfEmpty(processStartCommand(context, logPrefix, contextView));
+                .then(); // 确保返回Mono<Void>
     }
     
     /**
@@ -84,16 +98,12 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
                     return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
                             .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView))
-                            .doOnSuccess(responseJson -> {
-                                // 成功发送消息后，清除处理状态，允许用户再次点击/start
-                                userSessionService.clearUserSession(userId).subscribe();
-                            })
-                            .onErrorResume(e -> {
+                            .doOnError(e -> {
                                 log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
                                 // 出错时也要清除处理状态
                                 userSessionService.clearUserSession(userId).subscribe();
-                                return Mono.empty();
-                            });
+                            })
+                            .then(); // 转换为Mono<Void>
                 }));
     }
 

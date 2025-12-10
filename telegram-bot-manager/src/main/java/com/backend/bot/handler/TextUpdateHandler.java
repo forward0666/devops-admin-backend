@@ -109,13 +109,13 @@ public class TextUpdateHandler implements UpdateHandler {
                         // 2. 根据状态进行分发处理
                         return switch (state) {
                             case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
-                                    handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
+                                handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
                             case TelegramConstants.SESSION_STATE_PROCESSING_START ->
-                                    // 用户正在处理/start命令，忽略文本输入
-                                    handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
+                                // 用户正在处理/start命令，忽略文本输入
+                                handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
                             default ->
                                 // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
-                                    handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
+                                handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
                         };
                     })
                     // 用户没有会话
@@ -210,7 +210,6 @@ public class TextUpdateHandler implements UpdateHandler {
         return switch (state) {
             case STATE_AWAITING_FRONTEND_WEB_IP -> "前端前台域名";
             case STATE_AWAITING_FRONTEND_ADMIN_IP -> "前端后台域名";
-//            case STATE_AWAITING_MIDDLEWARE_IP -> "中间件域名";
             default -> "未知";
         };
     }
