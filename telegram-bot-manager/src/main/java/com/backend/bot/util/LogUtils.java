@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType; // 🌟 新增导入 SignalType
+import reactor.core.publisher.SignalType;
 import reactor.util.context.ContextView;
 
 import java.util.Optional;
@@ -34,12 +34,15 @@ public class LogUtils {
             ContextView contextView,
             ApplicationEventPublisher eventPublisher,
             String botName,
-            BotUpdateDto botUpdate) {
+            BotUpdateDto botUpdate
 
+    ) {
+        // 从 Context 中获取 Trace ID，这是最可靠的源头
         String traceId = contextView.hasKey(TraceIdFilter.CONTEXT_KEY_TRACE_ID)
                 ? contextView.get(TraceIdFilter.CONTEXT_KEY_TRACE_ID).toString()
                 : null;
 
+        // 立即同步到 MDC，以便当前 Webhook 线程的日志能捕获它
         LogUtils.syncTraceIdToMDC(traceId);
 
         String traceIdLog = LogUtils.buildTraceIdLogPrefix(traceId);
@@ -47,9 +50,10 @@ public class LogUtils {
         Optional<Long> chatIdOpt = extractChatId(botUpdate);
         String chatIdLog = LogUtils.buildChatIdLogSuffix(chatIdOpt);
 
-        log.info("{} ✅ [Webhook] Received update for bot: {}{}. Publishing event...",
-                traceIdLog, botName, chatIdLog);
+        log.info("{}✅ [Webhook] Received update for bot: {}{}. Publishing event...",
+                traceIdLog, botName,chatIdLog);
 
+        // 发布事件，将 Trace ID 一起传递给监听器
         eventPublisher.publishEvent(new BotUpdateEvent(botName, botUpdate, traceId));
 
         return Mono.empty();
@@ -58,29 +62,12 @@ public class LogUtils {
     // --- 辅助方法 (供其他 Controller/Service 使用) ---
 
     /**
-     * 辅助方法：从 Mono Context 中提取 traceId 并将其设置到 MDC 中。
-     * 应该在反应式流的开始处调用。
-     *
-     * @return 一个 Mono<Void>，用于在反应式链中执行设置操作。
-     */
-    public static Mono<Void> setMdcFromContext() {
-        return Mono.deferContextual(contextView -> {
-            Optional<Object> traceIdOpt = contextView.getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID);
-            if (traceIdOpt.isPresent()) {
-                String traceId = traceIdOpt.get().toString();
-                MDC.put("traceId", traceId);
-            }
-            return Mono.empty();
-        });
-    }
-
-    /**
      * 辅助方法：在反应式流结束时执行 MDC 清理操作。
      * 应该在 doFinally(LogUtils::clearMDC) 中调用。
      *
      * @param signalType 反应式流的结束信号类型 (ON_COMPLETE, ON_ERROR, CANCEL)。
      */
-    public static void clearMDC(SignalType signalType) { // 🌟 关键修正：使用 SignalType
+    public static void clearMDC(SignalType signalType) {
         MDC.clear();
     }
 
@@ -91,6 +78,9 @@ public class LogUtils {
     public static void syncTraceIdToMDC(String traceId) {
         if (traceId != null) {
             MDC.put(TRACE_ID_KEY, traceId);
+        } else {
+            // 如果 traceId 为空，确保 MDC 中该键不存在或清空，避免携带上一个请求的 traceId
+            MDC.remove(TRACE_ID_KEY);
         }
     }
 
@@ -100,19 +90,23 @@ public class LogUtils {
      */
     public static void syncTraceIdToMDC(ContextView contextView) {
         contextView.getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID)
-                .ifPresent(traceId -> MDC.put("traceId", traceId.toString()));
+                .ifPresentOrElse(
+                        traceId -> MDC.put("traceId", traceId.toString()),
+                        () -> MDC.remove("traceId") // 如果 Context 中没有，则清理 MDC
+                );
     }
 
 
     /**
      * 根据传入的 traceId 字符串构建日志前缀。
      * @param traceId 从 Reactor Context 或 MDC 中提取的 Trace ID 字符串
-     * @return 格式化后的日志前缀，例如 "[traceId=xyz]" 或 "[traceId=null]"
+     * @return 格式化后的日志前缀，例如 "[traceId=xyz]" 或 "[traceId=N/A]"
      */
     public static String buildTraceIdLogPrefix(String traceId) {
+        // 使用 "N/A" 替换 "null"，使其与原始日志中的错误格式一致，方便排查。
         return traceId != null
                 ? String.format("[%s=%s]", TRACE_ID_KEY, traceId)
-                : String.format("[%s=null]", TRACE_ID_KEY);
+                : String.format("[%s=N/A]", TRACE_ID_KEY);
     }
 
     /**

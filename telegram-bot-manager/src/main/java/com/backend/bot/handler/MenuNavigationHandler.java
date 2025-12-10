@@ -77,7 +77,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                 .onErrorResume(e -> {
                     log.error("❌ {} Failed to edit message (ID: {}) for navigation. Sending new /start prompt.", logIdentifier, messageId, e);
                     // 如果编辑失败（消息太旧），提示用户重新开始
-                    return botClientService.sendMessage(token, chatId, "菜单操作失败或消息过旧，请重新 /start。", null);
+                    return botClientService.sendMessage(token, chatId, "菜单操作失败或消息过时，请重新 /start。", null);
                 })
                 .then();
     }

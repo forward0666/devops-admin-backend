@@ -2,7 +2,6 @@ package com.backend.bot.listener;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.event.BotUpdateEvent;
-import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotUpdateService;
 import filter.TraceIdFilter;
@@ -41,16 +40,15 @@ public class BotUpdateListener {
     public void handleBotUpdateEvent(BotUpdateEvent event) {
         String botName = event.botName();
         BotUpdateDto botUpdate = event.botUpdate();
-        String traceId = event.traceId();
+        final String traceId = event.traceId(); // 使用 final 捕获 Trace ID
 
         // 提取 Chat ID...
-        // 假设 extractChatId 方法返回 Optional<Long>
         Long chatId = extractChatId(botUpdate).orElse(null);
 
-        // 1. 从 Mono.defer 开始，将 Trace ID 写入 Context
+        // 1. 从 Mono.defer 开始
         Mono<Void> processingPipeline = Mono.defer(() -> {
-                    // 2. 在 Context 写入后，在 Mono 链中打印日志
-                    log.info("{}📨 [AsyncListener] Processing event for bot: {} (ChatID: {})",traceId, botName, chatId);
+                    // 2. 在 Mono 链中打印日志 (这里仍然使用事件捕获的 traceId，因为它独立于 MDC)
+                    log.info("[traceId={}]📨 [AsyncListener] Processing event for bot: {} (ChatID: {})", traceId, botName, chatId);
 
                     return botCoreService.findByBotName(botName) // 🌟 重新从查找 Bot 实体开始
                             .timeout(Duration.ofSeconds(2), Mono.empty())
@@ -59,7 +57,7 @@ public class BotUpdateListener {
                                 return Mono.empty();
                             });
                 })
-                // 3. 校验 Bot 状态 (类型已经是 Mono<BotConfigEntity>)
+                // 3. 校验 Bot 状态
                 .filter(botConfigEntity -> {
                     if (botConfigEntity.getStatus() == null || botConfigEntity.getStatus() != 1) {
                         log.warn("⏸️ Bot {} is inactive. Ignoring update.", botName);
@@ -86,29 +84,35 @@ public class BotUpdateListener {
                 })
                 // 5. 核心：执行业务逻辑
                 .flatMap(botConfigEntity -> {
-                    // 【新增调试日志】确认 Update 成功通过所有前置校验，进入 handler service
+                    // 确认 Update 成功通过所有前置校验，进入 handler service
+                    String logMessage = "";
                     if (botUpdate.message() != null && botUpdate.message().text() != null) {
-                        log.info("✅ Update passed filters. Routing TEXT message (Length: {}) to BotUpdateHandlerService.",
-                                botUpdate.message().text().length());
+                        logMessage = String.format("Routing TEXT message (Length: %d)", botUpdate.message().text().length());
                     } else if (botUpdate.callbackQuery() != null) {
-                        log.info("✅ Update passed filters. Routing CALLBACK query to BotUpdateHandlerService.");
+                        logMessage = "Routing CALLBACK query";
                     } else {
-                        log.info("✅ Update passed filters. Routing OTHER update type to BotUpdateHandlerService.");
+                        logMessage = "Routing OTHER update type";
                     }
 
+                    // 修复：这里仍然使用事件捕获的 traceId
+                    log.info("[traceId={}]✅ Update passed filters. {} to BotUpdateHandlerService.",
+                            traceId, logMessage);
+
                     return botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate);
+                })
+                // 🌟 关键修正：将 contextWrite 放在 .then() 之前
+                // 这样才能将 traceId 传播给下游的 StartCommandHandler
+                .contextWrite(context -> {
+                    if (traceId != null) {
+                        // 将 Trace ID 写入 Reactor Context
+                        return context.put(TraceIdFilter.CONTEXT_KEY_TRACE_ID, traceId);
+                    }
+                    return context;
                 })
                 // 6. 错误处理
                 .doOnError(e -> log.error("❌ Error in async listener for bot {}", botName, e))
                 .onErrorResume(e -> Mono.empty())
-                .then() // 转换为 Mono<Void>
-                // 🌟 关键：将 Trace ID 写入 Context
-                .contextWrite(context -> {
-                    if (traceId != null) {
-                        return context.put(TraceIdFilter.CONTEXT_KEY_TRACE_ID, traceId);
-                    }
-                    return context;
-                });
+                .then(); // 转换为 Mono<Void>
 
         // 7. 手动订阅以触发执行 (Fire-and-Forget)
         processingPipeline

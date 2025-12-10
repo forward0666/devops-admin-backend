@@ -3,6 +3,7 @@ package com.backend.bot.handler;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.UserSessionEntity;
+import com.backend.bot.event.BotUpdateEvent;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
@@ -11,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -108,7 +108,7 @@ public class TextUpdateHandler implements UpdateHandler {
 
                     // 2. 根据状态进行分发处理
                     return switch (state) {
-                        case STATE_AWAITING_FRONTEND_IP, STATE_AWAITING_BACKEND_IP, STATE_AWAITING_MIDDLEWARE_IP ->
+                        case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
                                 handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName);
                         default ->
                             // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
@@ -200,7 +200,7 @@ public class TextUpdateHandler implements UpdateHandler {
             // 重新发送主菜单逻辑（假设您有 SendMainMenu 方法）
             log.info("💬 {} Received /start command. Triggering main menu.", logIdentifier);
             // 假设 main menu 逻辑在 BotClientService 或其他地方
-            String welcomeText = "欢迎使用域名加白工具。请选择服务类型：";
+            String welcomeText = "✨✨✨ 选择服务: \uD83D\uDC47\uD83D\uDC47";
             // 这里应该调用一个发送主菜单的方法，此处简化为发送文本
             return botClientService.sendMessage(token, chatId, welcomeText, null).then();
         }
@@ -213,9 +213,9 @@ public class TextUpdateHandler implements UpdateHandler {
     // 辅助方法：将状态映射回域名类型
     private String getDomainType(String state) {
         return switch (state) {
-            case STATE_AWAITING_FRONTEND_IP -> "前台域名";
-            case STATE_AWAITING_BACKEND_IP -> "后台域名";
-            case STATE_AWAITING_MIDDLEWARE_IP -> "中间件域名";
+            case STATE_AWAITING_FRONTEND_WEB_IP -> "前端前台域名";
+            case STATE_AWAITING_FRONTEND_ADMIN_IP -> "前端后台域名";
+//            case STATE_AWAITING_MIDDLEWARE_IP -> "中间件域名";
             default -> "未知";
         };
     }

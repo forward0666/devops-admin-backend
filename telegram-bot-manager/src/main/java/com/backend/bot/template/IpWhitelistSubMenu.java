@@ -9,17 +9,17 @@ public class IpWhitelistSubMenu implements MenuTemplate{
         String navigate = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + "👉👉";
         inlineKeyboard.addRow(
                 // 增加 🌐 图标
-                new InlineKeyboardButtonDto("1、前台域名" + navigate, "callback_data_FRONTEND_DOMAIN_ACTION") // 建议修改回调数据，避免与上级菜单冲突
+                new InlineKeyboardButtonDto("1、前端前台域名" + navigate, "callback_data_FRONTEND_WEB_DOMAIN_ACTION") // 建议修改回调数据，避免与上级菜单冲突
         );
         inlineKeyboard.addRow(
                 // 增加 🏢 图标
-                new InlineKeyboardButtonDto("2、后台域名" + navigate, "callback_data_BACKEND_DOMAIN_ACTION") // 建议修改回调数据
+                new InlineKeyboardButtonDto("2、前端后台域名" + navigate, "callback_data_FRONTEND_ADMIN_DOMAIN_ACTION") // 建议修改回调数据
         );
 
-        inlineKeyboard.addRow(
-                // 增加 🧑‍💻 图标
-                new InlineKeyboardButtonDto("3、中间件域名" + navigate, "callback_data_MIDDLEWARE_DOMAIN_ACTION") // 建议修改回调数据
-        );
+//        inlineKeyboard.addRow(
+//                // 增加 🧑‍💻 图标
+//                new InlineKeyboardButtonDto("3、中间件域名" + navigate, "callback_data_MIDDLEWARE_DOMAIN_ACTION") // 建议修改回调数据
+//        );
 
         // 分隔线
         inlineKeyboard.addRow();

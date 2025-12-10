@@ -6,6 +6,7 @@ import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InMemoryUserSessionService;
 import com.backend.bot.template.MenuType;
+import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,16 +18,17 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import org.slf4j.MDC;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(1) // 优先级改为最高，确保先于 MessageHandler (10) 执行
+@Order(1) // 优先级最高
 public class StartCommandHandler implements UpdateHandler {
 
     private final BotClientService botClientService;
     private final InMemoryUserSessionService userSessionService;
-    private final ObjectMapper objectMapper; // 用于解析 sendMessage 响应获取 messageId
+    private final ObjectMapper objectMapper;
 
     // 菜单消息文本
     private static final String WELCOME_TEXT = "✨✨✨ 选择服务: 👇👇";
@@ -39,6 +41,7 @@ public class StartCommandHandler implements UpdateHandler {
                 update.message().text().trim().startsWith("/start");
 
         if (isStartCommand) {
+            // 此处为同步方法，Trace ID 依赖于上游线程，通常不会自动打印前缀。
             log.info("✅ StartCommandHandler accepted: /start command.");
         }
         return isStartCommand;
@@ -50,68 +53,78 @@ public class StartCommandHandler implements UpdateHandler {
         String botName = botEntity.getBotName();
         Long chatId = botUpdate.message().chat().id();
         Long userId = botUpdate.message().from().id();
-        String logIdentifier = String.format("[%s]", botName);
 
-        log.info("🚀 {} Handling /start command from userId: {}", logIdentifier, userId);
+        String chatTitle = botUpdate.message().chat().title();
 
-        // 1. 生成主菜单键盘
-        InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();
+        return Mono.deferContextual(contextView -> {
+                    // 1. 关键修正：在执行业务逻辑前，将 Trace ID 从 Reactor Context 同步到 MDC
+                    LogUtils.syncTraceIdToMDC(contextView);
 
-        // 2. 发送主菜单消息，并获取 messageId
-        // 假设 botClientService.sendMenuMessageWithResponse 成功返回 JSON 字符串
-        Mono<String> sendMenuResponseMono = botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup);
+                    // 2. 🌟 强制打印 Trace ID: 从 MDC 获取 Trace ID 并构建日志前缀
+                    String traceId = MDC.get("traceId");
+                    String logPrefix = LogUtils.buildTraceIdLogPrefix(traceId);
 
-        return sendMenuResponseMono
-                .doOnNext(responseJson -> {
-                    // 🌟 诊断日志：打印完整的响应JSON，以便检查结构
-                    log.debug("🔍 {} Received Telegram sendMessage response JSON: {}", logIdentifier, responseJson);
+                    // 🌟 修正：将日志移入到 MDC 已设置的区域，并手动添加前缀
+                    log.info("{}🚀 Handling /start command from userId: {}", logPrefix, userId);
 
-                    try {
-                        // 尝试解析JSON
-                        JsonNode root = objectMapper.readTree(responseJson);
-                        JsonNode resultNode = root.path("result");
+                    // 3. 生成主菜单键盘
+                    InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();
 
-                        // 检查 'ok' 字段是否为 true (Telegram API标准)
-                        boolean isOk = root.path("ok").asBoolean();
+                    // 4. 发送主菜单消息，并获取 messageId
+                    Mono<String> sendMenuResponseMono = botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, chatTitle);
 
-                        if (!isOk || resultNode.isMissingNode()) {
-                            log.error("❌ {} Telegram API returned failure (ok=false) or missing 'result' node in response: {}", logIdentifier, responseJson);
-                            return; // 失败则退出
-                        }
+                    return sendMenuResponseMono
+                            .doOnNext(responseJson -> {
+                                // 此处的日志应能自动获取 MDC 中的 Trace ID (或者依赖上游手动设置的 logPrefix)
+                                log.debug("{}🔍 Received Telegram sendMessage response JSON: {}", logPrefix, responseJson);
 
-                        Long messageId = resultNode.path("message_id").asLong();
+                                try {
+                                    // 尝试解析JSON
+                                    JsonNode root = objectMapper.readTree(responseJson);
+                                    JsonNode resultNode = root.path("result");
+                                    boolean isOk = root.path("ok").asBoolean();
 
-                        if (messageId != 0) {
-                            // 🌟 成功启动计时器的日志
-                            log.info("⏳ {} Menu message sent with ID: {}. Scheduling auto-deletion in {}s.", logIdentifier, messageId, DELETE_DELAY_SECONDS);
+                                    if (!isOk || resultNode.isMissingNode()) {
+                                        log.error("{}❌ Telegram API returned failure (ok=false) or missing 'result' node in response. JSON: {}", logPrefix, responseJson);
+                                        return;
+                                    }
 
-                            // 3. 安排自动删除任务
-                            Disposable deletionTask = Mono.delay(Duration.ofSeconds(DELETE_DELAY_SECONDS))
-                                    .flatMap(aLong -> {
-                                        log.warn("⏰ {} Auto-deleting menu message {} after {}s timeout.", logIdentifier, messageId, DELETE_DELAY_SECONDS);
-                                        // 3.1 执行删除操作 (需要 BotClientService 中有 deleteMessage 方法)
-                                        return botClientService.deleteMessage(token, chatId, messageId)
-                                                // 3.2 清除存储的任务引用
-                                                .then(userSessionService.cancelPendingDeletion(userId));
-                                    })
-                                    .subscribeOn(Schedulers.parallel()) // 在单独的线程上执行延迟
-                                    .subscribe();
+                                    Long messageId = resultNode.path("message_id").asLong();
 
-                            // 4. 存储任务引用，以便用户点击按钮时可以取消
-                            userSessionService.storePendingDeletion(userId, deletionTask).subscribe();
-                        } else {
-                            log.warn("⚠️ {} Message ID extraction failed (messageId=0) or message was not sent correctly.", logIdentifier);
-                        }
-                    } catch (Exception e) {
-                        // 🌟 关键错误日志：如果 JSON 解析失败，必定会打印此行
-                        log.error("❌ {} Failed to parse sendMessage response or schedule deletion. JSON: {}", logIdentifier, responseJson, e);
-                    }
+                                    if (messageId != 0) {
+                                        log.info("{}⏳ Menu message sent with ID: {}. Scheduling auto-deletion in {}s.", logPrefix, messageId, DELETE_DELAY_SECONDS);
+
+                                        // 5. 安排自动删除任务
+                                        Disposable deletionTask = Mono.delay(Duration.ofSeconds(DELETE_DELAY_SECONDS))
+                                                .flatMap(aLong -> {
+                                                    // 这里的 log.warn 应该能够继承 MDC
+                                                    log.warn("{}⏰ Auto-deleting menu message {} after {}s timeout.", logPrefix, messageId, DELETE_DELAY_SECONDS);
+
+                                                    // 5.1 执行删除操作
+                                                    return botClientService.deleteMessage(token, chatId, messageId)
+                                                            // 5.2 清除存储的任务引用
+                                                            .then(userSessionService.cancelPendingDeletion(userId));
+                                                })
+                                                .subscribeOn(Schedulers.parallel())
+                                                .subscribe();
+
+                                        // 6. 存储任务引用
+                                        userSessionService.storePendingDeletion(userId, deletionTask).subscribe();
+                                    } else {
+                                        log.warn("{}⚠️ Message ID extraction failed (messageId=0) or message was not sent correctly.", logPrefix);
+                                    }
+                                } catch (Exception e) {
+                                    log.error("{}❌ Failed to parse sendMessage response or schedule deletion. JSON: {}", logPrefix, responseJson, e);
+                                }
+                            })
+                            .onErrorResume(e -> {
+                                log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
+                                return Mono.empty();
+                            });
                 })
-                .onErrorResume(e -> {
-                    // 2.3 发送消息本身失败 (例如网络错误)
-                    log.error("❌ {} Failed to send initial menu message.", logIdentifier, e);
-                    return Mono.empty(); // 忽略发送失败
-                })
-                .then();
+                .doOnError(e -> log.error("❌ Unhandled error in StartCommandHandler pipeline.", e))
+                .then()
+                // 确保在流结束时清理 MDC
+                .doFinally(LogUtils::clearMDC);
     }
 }

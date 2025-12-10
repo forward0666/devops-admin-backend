@@ -136,8 +136,9 @@ public class BotClientService {
     /**
      * 发送消息给 Telegram 用户/群组。
      * 【优化】：应用指数退避重试策略。
+     * @param chatName 聊天的名称（可选，用于日志记录）
      */
-    public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup) {
+    public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup, String chatName) {
 
         String path = "/bot" + token + "/sendMessage";
 
@@ -157,8 +158,11 @@ public class BotClientService {
                 .toBodilessEntity()
                 // 🚀 应用重试策略
                 .retryWhen(telegramRetryPolicy)
-                // 🌟 日志依赖 MDC 自动打印 traceId
-                .doOnSuccess(response -> log.info("✅ Message sent successfully to chatId: {}", chatId))
+                // 🌟 日志增强：打印群名称
+                .doOnSuccess(response -> {
+                    String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
+                    log.info("✅ Message sent successfully to Chat: {}", logIdentifier);
+                })
                 .onErrorResume(PrematureCloseException.class, e -> {
                     // 🌟 日志依赖 MDC 自动打印 traceId
                     log.warn("⚠️ Asynchronous message send failed due to connection premature closure during shutdown for chatId: {}", chatId);
@@ -172,10 +176,16 @@ public class BotClientService {
                 .then();
     }
 
-    // 重载方法：兼容不带键盘的调用
+    // 重载方法：兼容不带键盘和群名称的调用
     public Mono<Void> sendMessage(String token, Long chatId, String text) {
-        return sendMessage(token, chatId, text, null);
+        return sendMessage(token, chatId, text, null, null);
     }
+
+    // 重载方法：兼容不带群名称的调用
+    public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup) {
+        return sendMessage(token, chatId, text, replyMarkup, null);
+    }
+
 
     /**
      * 【新增】发送消息并返回完整的 JSON 响应字符串，用于提取 message_id。
@@ -183,9 +193,10 @@ public class BotClientService {
      * @param chatId 聊天 ID
      * @param text 消息文本
      * @param replyMarkup 内联键盘对象
+     * @param chatName 聊天的名称（可选，用于日志记录）
      * @return 包含 Telegram API 响应的 JSON 字符串 Mono
      */
-    public Mono<String> sendMenuMessageWithResponse(String token, Long chatId, String text, InlineKeyboardMarkupDto replyMarkup) {
+    public Mono<String> sendMenuMessageWithResponse(String token, Long chatId, String text, InlineKeyboardMarkupDto replyMarkup, String chatName) {
         String path = "/bot" + token + "/sendMessage";
 
         Map<String, Object> bodyMap = new HashMap<>();
@@ -204,11 +215,20 @@ public class BotClientService {
                 // 关键点：返回响应体为 String，以便 StartCommandHandler 可以解析
                 .bodyToMono(String.class)
                 .retryWhen(telegramRetryPolicy)
-                .doOnSuccess(response -> log.info("✅ Message sent successfully and full JSON response received for chatId: {}", chatId))
+                // 🌟 日志增强：打印群名称
+                .doOnSuccess(response -> {
+                    String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
+                    log.info("✅ Message sent successfully and full JSON response received for Chat: {}", logIdentifier);
+                })
                 .onErrorResume(e -> {
                     log.error("❌ Failed to send message with response to chatId: {}. Error: {}", chatId, e.getMessage());
                     return Mono.error(e); // 向上抛出错误
                 });
+    }
+
+    // 重载方法：兼容不带群名称的调用 (4个参数)
+    public Mono<String> sendMenuMessageWithResponse(String token, Long chatId, String text, InlineKeyboardMarkupDto replyMarkup) {
+        return sendMenuMessageWithResponse(token, chatId, text, replyMarkup, null);
     }
 
     /**

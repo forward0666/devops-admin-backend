@@ -3,9 +3,7 @@ package com.backend.bot.controller;
 import com.backend.bot.dto.SetWebhookDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
-// import filter.TraceIdFilter; // 🌟 移除：不再直接使用 TraceIdFilter
-// import org.slf4j.MDC; // 🌟 移除：不再直接操作 MDC.put/clear
-import com.backend.bot.util.LogUtils; // 🌟 导入 LogUtils
+import com.backend.bot.util.LogUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +15,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.Map;
-// import java.util.Optional; // 🌟 移除：不再直接使用 Optional
 
 @RestController
 @RequiredArgsConstructor
@@ -27,8 +24,6 @@ public class BotWebhookConfigController {
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
 
-    // ❌ 移除重复的私有辅助方法 setMdcFromContext()
-
     /**
      * 手动设置 Bot 的 Webhook URL。
      */
@@ -37,38 +32,41 @@ public class BotWebhookConfigController {
             @Valid @RequestBody Mono<SetWebhookDto> dtoMono,
             ServerWebExchange exchange) {
 
-        // 🌟 步骤 1: 使用 LogUtils 抽象的 MDC 设置方法
-        return LogUtils.setMdcFromContext()
-                .then(dtoMono)
-                .doOnNext(dto -> log.info("✅ Setting webhook for botName: {} to URL: {}", dto.getBotName(), dto.getUrl()))
-                .flatMap(dto -> {
-                    // ... (原有逻辑)
-                    return botCoreService.findByBotName(dto.getBotName())
-                            .flatMap(botEntity -> {
-                                if (botEntity.getBotToken() == null) {
-                                    return Mono.just(HttpResponseUtils.badRequest("❌ Bot Token 缺失"));
-                                }
-                                String token = botEntity.getBotToken();
-                                String url = dto.getUrl();
-                                String secretToken = dto.getSecretToken();
+        // 🌟 关键修正：使用 Mono.deferContextual 替代 LogUtils.setMdcFromContext()
+        return Mono.deferContextual(contextView -> {
+                    // 步骤 1: 将 Trace ID 从 Reactor Context 同步到 MDC
+                    LogUtils.syncTraceIdToMDC(contextView);
 
-                                return botClientService.setWebhook(token, url, secretToken)
-                                        .map(resultJson -> {
-                                            boolean success = resultJson != null && resultJson.contains("\"ok\":true");
-                                            if (success) {
-                                                return HttpResponseUtils.ok();
-                                            } else {
-                                                return HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误");
+                    return dtoMono
+                            .doOnNext(dto -> log.info("✅ Setting webhook for botName: {} to URL: {}", dto.getBotName(), dto.getUrl()))
+                            .flatMap(dto -> {
+                                return botCoreService.findByBotName(dto.getBotName())
+                                        .flatMap(botEntity -> {
+                                            if (botEntity.getBotToken() == null) {
+                                                return Mono.just(HttpResponseUtils.badRequest("❌ Bot Token 缺失"));
                                             }
+                                            String token = botEntity.getBotToken();
+                                            String url = dto.getUrl();
+                                            String secretToken = dto.getSecretToken();
+
+                                            return botClientService.setWebhook(token, url, secretToken)
+                                                    .map(resultJson -> {
+                                                        boolean success = resultJson != null && resultJson.contains("\"ok\":true");
+                                                        if (success) {
+                                                            return HttpResponseUtils.ok();
+                                                        } else {
+                                                            return HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误");
+                                                        }
+                                                    })
+                                                    .onErrorResume(e -> {
+                                                        log.error("❌setWebhook API call failed for {}", dto.getBotName(), e);
+                                                        return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置时发生内部错误"));
+                                                    });
                                         })
-                                        .onErrorResume(e -> {
-                                            log.error("❌setWebhook API call failed for {}", dto.getBotName(), e);
-                                            return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置时发生内部错误"));
-                                        });
-                            })
-                            .switchIfEmpty(Mono.just(HttpResponseUtils.notFound("❌ Bot 不存在")));
+                                        .switchIfEmpty(Mono.just(HttpResponseUtils.notFound("❌ Bot 不存在")));
+                            });
                 })
-                // 🌟 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
+                // 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
                 .doFinally(LogUtils::clearMDC);
     }
 
@@ -78,9 +76,11 @@ public class BotWebhookConfigController {
     @GetMapping("/getWebhookInfo")
     public Mono<ResponseEntity<Map<String, Object>>> getBotWebhookInfo(@RequestParam String botName) {
 
-        // 🌟 步骤 1: 使用 LogUtils 抽象的 MDC 设置方法
-        return LogUtils.setMdcFromContext()
-                .then(Mono.defer(() -> {
+        // 🌟 关键修正：使用 Mono.deferContextual 替代 LogUtils.setMdcFromContext()
+        return Mono.deferContextual(contextView -> {
+                    // 步骤 1: 将 Trace ID 从 Reactor Context 同步到 MDC
+                    LogUtils.syncTraceIdToMDC(contextView);
+
                     log.info("Getting webhook info for botName: {}", botName);
 
                     return botCoreService.findByBotName(botName)
@@ -110,8 +110,8 @@ public class BotWebhookConfigController {
                                 log.error("❌getWebhookInfo failed for {}", botName, e);
                                 return Mono.just(HttpResponseUtils.internalError("❌ 查询 Webhook 状态时发生内部错误"));
                             });
-                }))
-                // 🌟 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
+                })
+                // 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
                 .doFinally(LogUtils::clearMDC);
     }
 }

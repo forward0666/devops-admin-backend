@@ -33,9 +33,10 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
     @Override
     public boolean supports(String callbackData) {
         // 支持所有最终的加白操作
-        return callbackData.equals(FRONTEND_ACTION) ||
-                callbackData.equals(BACKEND_ACTION) ||
-                callbackData.equals(MIDDLEWARE_ACTION);
+        return callbackData.equals(FRONTEND_WEB_ACTION) ||
+                callbackData.equals(FRONTEND_ADMIN_ACTION);
+//                ||
+//                callbackData.equals(MIDDLEWARE_ACTION);
     }
 
     @Override
@@ -81,18 +82,18 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
 
     private String getActionName(String callbackData) {
         return switch (callbackData) {
-            case FRONTEND_ACTION -> "前台域名加白";
-            case BACKEND_ACTION -> "后台域名加白";
-            case MIDDLEWARE_ACTION -> "中间件域名加白";
+            case FRONTEND_WEB_ACTION -> "前端前台域名加白";
+            case FRONTEND_ADMIN_ACTION -> "前端后台域名加白";
+//            case MIDDLEWARE_ACTION -> "中间件域名加白";
             default -> "未知操作";
         };
     }
 
     private String getSessionState(String callbackData) {
         return switch (callbackData) {
-            case FRONTEND_ACTION -> STATE_AWAITING_FRONTEND_IP;
-            case BACKEND_ACTION -> STATE_AWAITING_BACKEND_IP;
-            case MIDDLEWARE_ACTION -> STATE_AWAITING_MIDDLEWARE_IP;
+            case FRONTEND_WEB_ACTION -> STATE_AWAITING_FRONTEND_WEB_IP;
+            case FRONTEND_ADMIN_ACTION -> STATE_AWAITING_FRONTEND_ADMIN_IP;
+//            case MIDDLEWARE_ACTION -> STATE_AWAITING_MIDDLEWARE_IP;
             default -> null;
         };
     }

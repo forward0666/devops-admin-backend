@@ -17,4 +17,5 @@ public interface WhitelistService {
      * @return Mono<Boolean> - 表示操作是否成功的异步结果。
      */
     Mono<Boolean> addIpToWhitelist(String ip, String username, String domainType);
+
 }
