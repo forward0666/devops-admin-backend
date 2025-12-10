@@ -11,20 +11,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.util.context.ContextView;
+
+import java.lang.reflect.Method;
 
 import static com.backend.bot.constants.CallbackConstants.*;
 
 /**
  * 专门处理最终的 IP 加白提示逻辑的处理器。
  * 职责：设置用户会话状态，编辑消息并移除键盘，提示用户输入 IP，并设置消息的自动销毁倒计时。
- * * 🚨 注意：为解决编译错误 ("位置: 类型为java.lang.Void的变量 message")，
- * 现假设 botClientService.editMessageText 返回 Mono<Void>，并使用 thenReturn() 传递原始 messageId。
+ * * 逻辑：无论用户后续是否回复，该提示消息（IP_PROMPT_TEXT）都会在 TIMEOUT_SECONDS 后尝试删除。
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(20) // 优先级低于菜单导航
+@Order(20)
 public class WhitelistPromptHandler implements CallbackActionHandler {
 
     private final BotClientService botClientService;
@@ -37,7 +37,6 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
 
     @Override
     public boolean supports(String callbackData) {
-        // 支持所有最终的加白操作
         return callbackData.equals(FRONTEND_WEB_ACTION) ||
                 callbackData.equals(FRONTEND_ADMIN_ACTION);
     }
@@ -49,7 +48,6 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
 
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
-        // 使用 deferContextual 捕获 Trace ID
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
@@ -57,78 +55,92 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
             String token = botEntity.getBotToken();
             Long chatId = botUpdate.callbackQuery().message().chat().id();
             Long userId = botUpdate.callbackQuery().from().id();
-            Long messageId = botUpdate.callbackQuery().message().messageId();
+            Long originalMessageId = botUpdate.callbackQuery().message().messageId();
             String callbackData = botUpdate.callbackQuery().data();
 
             String actionName = getActionName(callbackData);
             String sessionState = getSessionState(callbackData);
             String botLogIdentifier = String.format("[%s]", botEntity.getBotName());
 
+            // 1. 🌟 设置会话状态 (为了接收用户的后续回复)
+            Mono<Void> updateSessionMono = userSessionService.updateUserSession(userId, sessionState, originalMessageId);
 
-            // 1. 🌟 设置会话状态
-            Mono<Void> updateSessionMono = userSessionService.updateUserSession(userId, sessionState, messageId);
+            // 2. 🌟 准备响应文本 (包含倒计时提示)
+            String newText = String.format("您选择了 **%s**，\n请回复此消息，输入以下格式信息：\n\n`%s`\n\n*⏳ 此提示消息将在 %d 秒后自动销毁，请尽快操作。*", actionName, IP_PROMPT_TEXT, TIMEOUT_SECONDS);
 
-            // 2. 🌟 准备响应文本 (包含计时器提示)
-            String newText = String.format("您选择了 **%s**，\n请回复此消息，输入以下格式信息：\n\n`%s`\n\n*此消息将在 %d 秒后自动删除。*", actionName, IP_PROMPT_TEXT, TIMEOUT_SECONDS);
+            // 3. 🌟 编辑消息或发送新消息，并获取最终展示的消息ID
+            Mono<Long> displayMessageMono = editMessageTextAndRemoveMarkup(token, chatId, originalMessageId, newText, actionName, traceLogPrefix);
 
-            // 3. 🌟 编辑原始消息文本，并销毁键盘 (移除键盘)
-            // 辅助方法已更新为返回 Mono<Long> (消息 ID)，以支持定时删除
-            Mono<Long> messageIdToScheduleDeletionMono = editMessageTextAndRemoveMarkup(token, chatId, messageId, newText, actionName, traceLogPrefix);
-
-            // 4. 组合 Mono：先更新状态 -> 执行编辑/发送 -> 调度删除任务
+            // 4. 组合执行流
             return updateSessionMono
-                    .then(messageIdToScheduleDeletionMono)
-                    // 5. 调度自动删除任务
-                    .flatMap(editedMessageId -> {
-                        // 只有 ID 大于 0 才进行调度 (0L 表示提取 ID 失败)
-                        if (editedMessageId > 0) {
+                    .then(displayMessageMono)
+                    .flatMap(activeMessageId -> {
+                        // 如果获取到了有效的消息ID (无论是编辑旧的还是发送新的)
+                        if (activeMessageId != null && activeMessageId > 0) {
+                            log.info("{} ⏳ Scheduling deletion for messageId: {} in {} seconds.", traceLogPrefix, activeMessageId, TIMEOUT_SECONDS);
+
+                            // 5. 🌟 核心：调度自动删除任务
+                            // 这里的 scheduleMessageDeletion 应该是一个非阻塞的异步操作（例如内部使用 Mono.delay 或 ScheduledExecutor）
+                            // 它启动后，倒计时就开始了，不受用户是否回复的影响。
                             return interactiveMessageService.scheduleMessageDeletion(
                                     token,
                                     userId,
                                     chatId,
-                                    editedMessageId,
+                                    activeMessageId,
                                     TIMEOUT_SECONDS,
                                     botLogIdentifier,
                                     contextView
-                            );
+                            ).onErrorResume(e -> {
+                                // 即使调度器报错，也不要影响主流程
+                                log.warn("{} ⚠️ Failed to schedule message deletion: {}", traceLogPrefix, e.getMessage());
+                                return Mono.empty();
+                            });
                         }
-                        // 返回 Mono.empty() 结束链式调用
                         return Mono.empty();
                     })
-                    .then();
+                    .then(); // 最终返回 Mono<Void>
         });
     }
 
     /**
-     * 辅助方法：编辑消息文本，并显式销毁（移除）内联键盘。
-     * * 修复了之前编译错误（messageId() 找不到符号）的逻辑：
-     * 1. 假设 botClientService.editMessageText 返回 Mono<Void>，成功后返回原始 messageId。
-     * 2. 假设 botClientService.sendMessage 返回一个 DTO，需要使用反射来安全地提取 messageId。
-     * * @param traceLogPrefix 包含 MDC 追踪前缀，用于日志记录。
-     * @return 返回 Mono<Long>，其中包含需要被删除的消息ID。
+     * 编辑旧消息，如果编辑失败则发送新消息。
+     * @return 最终展示给用户的消息 ID
      */
-    private Mono<Long> editMessageTextAndRemoveMarkup(String token, Long chatId, Long messageId, String newText, String actionName, String traceLogPrefix) {
-        return botClientService.editMessageText(token, chatId, messageId, newText, null)
-                // 1. 编辑成功，但 botClientService 返回 Mono<Void>，
-                //    因此使用 thenReturn() 切换为返回原始消息ID (messageId) 进行删除调度。
-                .thenReturn(messageId)
+    private Mono<Long> editMessageTextAndRemoveMarkup(String token, Long chatId, Long originalMessageId, String newText, String actionName, String traceLogPrefix) {
+        // 尝试编辑
+        return botClientService.editMessageText(token, chatId, originalMessageId, newText, null)
+                // 如果编辑成功，直接返回原始 ID
+                .thenReturn(originalMessageId)
+                // 如果编辑失败（例如消息太旧），则回退到发送新消息
                 .onErrorResume(e -> {
-                    log.error("{}❌ Failed to edit message text for action: {}. Sending new message instead.", traceLogPrefix, actionName, e);
-                    // 2. 如果编辑失败，发送新消息，并尝试从返回的 DTO 中提取新消息的 ID
-                    //    🚨 使用反射来避免找不到符号的编译问题，但要求返回对象必须有 messageId() 方法
+                    log.warn("{} ⚠️ Could not edit message ({}). Sending new message instead.", traceLogPrefix, e.getMessage());
+
                     return botClientService.sendMessage(token, chatId, newText, null)
-                            .map(message -> {
-                                try {
-                                    // 尝试通过反射调用 messageId() 方法来提取 ID
-                                    return (Long) message.getClass().getMethod("messageId").invoke(message);
-                                } catch (Exception ex) {
-                                    log.error("{}🚨 Fatal: Cannot reflect messageId() from sendMessage result. Returning 0L.", traceLogPrefix, ex);
-                                    return 0L;
-                                }
-                            })
-                            // 再次处理发送新消息也失败的情况
-                            .onErrorReturn(0L);
+                            .map(this::extractMessageIdSafe) // 安全提取 ID
+                            .defaultIfEmpty(0L);
                 });
+    }
+
+    /**
+     * 安全地通过反射从返回对象中提取 messageId。
+     * 解决了编译期找不到符号的问题。
+     */
+    private Long extractMessageIdSafe(Object messageObj) {
+        if (messageObj == null) return 0L;
+        try {
+            // 假设对象中有 messageId() 方法 (Record类) 或 getMessageId() 方法 (JavaBean)
+            Method method;
+            try {
+                method = messageObj.getClass().getMethod("messageId");
+            } catch (NoSuchMethodException e) {
+                method = messageObj.getClass().getMethod("getMessageId");
+            }
+            Object result = method.invoke(messageObj);
+            return result instanceof Integer ? ((Integer) result).longValue() : (Long) result;
+        } catch (Exception ex) {
+            log.error("🚨 Fatal: Failed to reflect messageId from object: {}. Class: {}", messageObj, messageObj.getClass().getName(), ex);
+            return 0L;
+        }
     }
 
     private String getActionName(String callbackData) {
