@@ -16,9 +16,12 @@ import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import org.slf4j.MDC;
 
 import java.time.Duration;
-import org.slf4j.MDC;
+import java.util.Optional;
+
+import static com.backend.bot.util.BotUpdateUtils.extractChatId;
 
 @Component
 @RequiredArgsConstructor
@@ -36,14 +39,11 @@ public class StartCommandHandler implements UpdateHandler {
 
     @Override
     public boolean support(BotUpdateDto update) {
+        // support 是同步方法，不建议在此处依赖 MDC，以避免 Trace ID 错乱
         boolean isStartCommand = update.message() != null &&
                 update.message().text() != null &&
                 update.message().text().trim().startsWith("/start");
 
-        if (isStartCommand) {
-            // 此处为同步方法，Trace ID 依赖于上游线程，通常不会自动打印前缀。
-            log.info("✅ StartCommandHandler accepted: /start command.");
-        }
         return isStartCommand;
     }
 
@@ -56,16 +56,29 @@ public class StartCommandHandler implements UpdateHandler {
 
         String chatTitle = botUpdate.message().chat().title();
 
+        // 提取用户昵称
+        String firstName = botUpdate.message().from().firstName();
+
         return Mono.deferContextual(contextView -> {
-                    // 1. 关键修正：在执行业务逻辑前，将 Trace ID 从 Reactor Context 同步到 MDC
-                    LogUtils.syncTraceIdToMDC(contextView);
+                    // 🌟 关键修正：使用新的工具方法，一步完成 MDC 同步和日志前缀获取
+                    String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
-                    // 2. 🌟 强制打印 Trace ID: 从 MDC 获取 Trace ID 并构建日志前缀
-                    String traceId = MDC.get("traceId");
-                    String logPrefix = LogUtils.buildTraceIdLogPrefix(traceId);
+                    // 1. 构建用户日志后缀 (用户名称)
+                    // 如果 firstName 不为空，则显示 "(用户名称)"
+                    String userLogSuffix = firstName != null && !firstName.isEmpty()
+                            ? String.format(" (%s)", firstName)
+                            : "";
 
-                    // 🌟 修正：将日志移入到 MDC 已设置的区域，并手动添加前缀
-                    log.info("{}🚀 Handling /start command from userId: {}", logPrefix, userId);
+                    // 2. 构建聊天日志后缀 (Chat ID: xxx(群组名))
+                    // 使用提供的 chatTitle，如果为空则显示 "N/A"
+                    String chatLogSuffix = String.format(",Chat ID: %s(%s)",
+                            chatId,
+                            chatTitle != null ? chatTitle : "N/A");
+
+
+                    // 🚀 整合日志：在 Trace ID 确定后，记录 Handler 被接受和开始处理
+                    log.info("{}✅ [Accepted] StartCommandHandler accepted and handling /start command from userId: {}{}{}",
+                            logPrefix, userId, userLogSuffix, chatLogSuffix);
 
                     // 3. 生成主菜单键盘
                     InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();

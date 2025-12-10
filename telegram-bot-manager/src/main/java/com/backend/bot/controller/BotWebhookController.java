@@ -32,6 +32,7 @@ public class BotWebhookController {
     public Mono<Void> onUpdateReceived(
             @PathVariable String botName,
             @RequestBody BotUpdateDto botUpdate
+
     ) {
 
         // 🌟 关键修改：将日志记录、MDC同步和事件发布封装到 LogUtils 中执行
