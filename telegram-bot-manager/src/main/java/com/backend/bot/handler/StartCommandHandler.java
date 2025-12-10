@@ -47,7 +47,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
 
-        InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createMainMenu();
+        InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createDynamicKeyboard("IP_WHITE_LIST");
 
         return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
                 .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView))
