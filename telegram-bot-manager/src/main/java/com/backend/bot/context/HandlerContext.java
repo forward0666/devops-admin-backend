@@ -2,23 +2,23 @@ package com.backend.bot.context;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
-import lombok.AccessLevel;
-import lombok.Getter;
 
-/**
- * 处理器上下文，用于封装和提取所有 Handler 共同需要的核心信息。
- * 这样做可以避免在每个 Handler 的 handle 方法开头重复解析 token, userId, chatId 等。
- */
 public record HandlerContext(
+        BotConfigEntity botEntity,
+        BotUpdateDto update,
         String token,
         String botName,
         String logIdentifier,
         Long userId,
         Long chatId,
-        Long messageId
+        Long messageId,
+        String chatTitle,
+        String firstName
 ) {
     public HandlerContext(BotConfigEntity botEntity, BotUpdateDto update) {
         this(
+                botEntity,
+                update,
                 botEntity.getBotToken(),
                 botEntity.getBotName(),
                 String.format("[%s]", botEntity.getBotName()),
@@ -31,12 +31,25 @@ public record HandlerContext(
                 // 统一提取 chatId (可能来自 message 或 callbackQuery.message)
                 update.message() != null
                         ? update.message().chat().id()
-                        : (update.callbackQuery() != null ? update.callbackQuery().message().chat().id() : null),
+                        : (update.callbackQuery() != null && update.callbackQuery().message() != null
+                        ? update.callbackQuery().message().chat().id() : null),
 
                 // 统一提取 messageId (可能来自 message 或 callbackQuery.message)
                 update.message() != null
                         ? update.message().messageId()
-                        : (update.callbackQuery() != null ? update.callbackQuery().message().messageId() : null)
+                        : (update.callbackQuery() != null && update.callbackQuery().message() != null
+                        ? update.callbackQuery().message().messageId() : null),
+
+                // 统一提取 chatTitle
+                update.message() != null
+                        ? update.message().chat().title()
+                        : (update.callbackQuery() != null && update.callbackQuery().message() != null
+                        ? update.callbackQuery().message().chat().title() : null),
+
+                // 统一提取 firstName
+                update.message() != null
+                        ? update.message().from().firstName()
+                        : (update.callbackQuery() != null ? update.callbackQuery().from().firstName() : null)
         );
 
         // 确保关键信息不为空
