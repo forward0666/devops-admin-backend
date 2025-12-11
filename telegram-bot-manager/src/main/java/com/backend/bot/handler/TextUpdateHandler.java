@@ -109,13 +109,13 @@ public class TextUpdateHandler implements UpdateHandler {
                         // 2. 根据状态进行分发处理
                         return switch (state) {
                             case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
-                                handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
+                                    handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
                             case TelegramConstants.SESSION_STATE_PROCESSING_START ->
                                 // 用户正在处理/start命令，忽略文本输入
-                                handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
+                                    handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
                             default ->
                                 // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
-                                handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
+                                    handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
                         };
                     })
                     // 用户没有会话
@@ -131,6 +131,9 @@ public class TextUpdateHandler implements UpdateHandler {
     private Mono<Void> handleAwaitingIpInput(String token, Long chatId, Long userId, String userText, UserSessionEntity session, String operatorName, String traceLogPrefix) {
         String state = session.getState();
         String domainType = getDomainType(state);
+
+        // 假设 UserSessionEntity 有 getPromptMessageId() 方法来获取需要删除的消息ID
+        final Long promptMessageId = session.getPromptMessageId();
 
         // 1. 验证输入格式
         Matcher matcher = IP_USER_PATTERN.matcher(userText);
@@ -161,17 +164,33 @@ public class TextUpdateHandler implements UpdateHandler {
                 .onErrorReturn("❌ 系统错误！加白服务异常，请联系管理员。");
 
 
-        // 4. 【修复后的顺序】先等待加白操作结果，然后执行**链式**清理会话，最后发送结果。
+        // 4. 【修复后的顺序】先等待加白操作结果，然后执行**链式**清理旧消息和会话，最后发送结果。
         return whitelistResultMono
                 // FIX: 使用 flatMap 接收结果文本
-                .flatMap(resultText ->
-                        // 1. **链式**执行取消待删除任务操作
-                        userSessionService.cancelPendingDeletion(userId)
-                                // 2. 然后 (then) 执行会话清除操作。clearUserSession(userId)返回一个 Mono<Void>。
-                                .then(userSessionService.clearUserSession(userId))
-                                // 3. 然后 (then) 链式执行发送消息操作。
-                                .then(botClientService.sendMessage(token, chatId, resultText, null))
-                )
+                .flatMap(resultText -> {
+                    // 1. **链式**执行取消待删除任务操作
+                    Mono<Void> cleanupMono = userSessionService.cancelPendingDeletion(userId)
+
+                            // 2. (NEW) 立即删除原始的提示消息
+                            .then(
+                                    // 检查消息ID是否有效
+                                    promptMessageId != null && promptMessageId > 0
+                                            ? botClientService.deleteMessage(token, chatId, promptMessageId)
+                                            .onErrorResume(e -> {
+                                                // 删除失败时只记录警告，不中断主流程
+                                                log.warn("{}⚠️ Failed to delete prompt message {} after successful operation. Reason: {}",
+                                                        traceLogPrefix, promptMessageId, e.getMessage());
+                                                return Mono.empty();
+                                            })
+                                            : Mono.empty()
+                            )
+                            // 3. 然后 (then) 执行会话清除操作。
+                            .then(userSessionService.clearUserSession(userId));
+
+                    // 4. 然后 (then) 链式执行发送成功/失败消息操作。
+                    return cleanupMono
+                            .then(botClientService.sendMessage(token, chatId, resultText, null));
+                })
                 // 确保整个流程最终返回 Mono<Void>
                 .then();
     }
@@ -189,9 +208,6 @@ public class TextUpdateHandler implements UpdateHandler {
      * 新增 traceLogPrefix 参数用于日志输出。
      */
     private Mono<Void> handleDefaultText(String token, Long chatId, String userText, String logIdentifier, String traceLogPrefix) {
-        // 移除对 /start 命令的处理，统一由 StartCommandHandler 处理
-        // 这样可以确保在二级菜单时点击 /start 不会创建新菜单，而是提示用户先完成当前操作
-        
         // 修复：忽略其他普通文本，不再回复任何提示。
         // 打印 Trace ID 日志
         log.debug("{}🤫 {} Ignoring non-session text: {}", traceLogPrefix, logIdentifier, userText);

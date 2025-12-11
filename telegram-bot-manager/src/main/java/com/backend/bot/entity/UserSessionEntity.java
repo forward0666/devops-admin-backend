@@ -97,4 +97,8 @@ public class UserSessionEntity {
     public String getState() {
         return currentState;
     }
+
+    public Long getPromptMessageId() {
+        return referenceMessageId;
+    }
 }
