@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.util.context.ContextView; // 引入 ContextView
+import reactor.util.context.ContextView;
 
 /**
  * 专门处理菜单跳转（下钻和返回）逻辑的处理器。
@@ -29,7 +29,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
 
-    // 使用中央常量定义，确保配置统一
+    // 🌟 恢复到静态菜单文本模板，与 TelegramConstants 保持一致
     private static final String MENU_PROMPT_TEXT = TelegramConstants.MENU_TIMEOUT_TEMPLATE;
 
     @Override
@@ -59,11 +59,14 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
         // 确定计时器时间
         int delaySeconds = getDeletionDelay(callbackData);
+
+        // 🌟 恢复：使用静态模板和延迟时间格式化文本
         String menuText = String.format(MENU_PROMPT_TEXT, delaySeconds);
 
         // 1. 🌟 关键修复：使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
+
             // 2. 编辑当前消息，更新键盘
             return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
                     .doOnSuccess(response -> {
@@ -79,9 +82,21 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                         ).subscribe();
                     })
                     .onErrorResume(e -> { // 外部异常 e
-                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Not sending new message to avoid duplicate menus.", traceLogPrefix, messageId, e.getMessage());
-                        // 如果编辑失败（消息太旧或已被删除），只记录错误，不发送新消息
-                        // 这避免了创建重复菜单的问题
+                        String errorMessage = e.getMessage();
+
+                        // 保持关键修复：将 400 Bad Request 记录为 INFO
+                        if (errorMessage != null && errorMessage.contains("400 Bad Request")) {
+                            // 这是一个非致命错误，通常是消息未修改（最常见原因，例如双击）。
+                            log.info("{}💬 Could not edit message (ID: {}). Reason: {}. Likely no modification occurred.",
+                                    traceLogPrefix, messageId, errorMessage);
+
+                            // 确保返回空流，阻止错误继续传播，并避免发送新消息。
+                            return Mono.empty();
+                        }
+
+                        // 对于其他致命错误（如网络问题，鉴权失败等），继续记录 WARN
+                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Not sending new message to avoid duplicate menus.",
+                                traceLogPrefix, messageId, errorMessage);
                         return Mono.empty();
                     })
                     .then();

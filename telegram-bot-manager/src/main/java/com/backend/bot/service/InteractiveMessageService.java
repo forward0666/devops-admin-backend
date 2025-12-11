@@ -54,28 +54,33 @@ public class InteractiveMessageService {
                                         .doOnSuccess(v -> log.info("{}{}✅ Message {} successfully deleted", logPrefix, botLogIdentifier, messageId))
                                         .onErrorResume(e -> {
                                             log.warn("❌ {}{} Failed to delete message {}. Already deleted or error: {}", logPrefix, botLogIdentifier, messageId, e.getMessage());
-                                            return Mono.empty(); // 失败也继续执行清理
-                                        })
-                                        // 任务正常完成删除后，执行完整的清理操作 (取消 Disposable + 清理会话)
-                                        .then(userSessionService.cancelPendingDeletion(userId))
-                                        .doOnSuccess(v -> log.info("{}{}✅ Cancelled pending deletion task for user {}", logPrefix, botLogIdentifier, userId))
-                                        .then(userSessionService.clearUserSession(userId))
-                                        .doOnSuccess(v -> log.info("{}{}✅ Cleared session for user {}", logPrefix, botLogIdentifier, userId));
+                                            return Mono.empty(); // 失败也继续执行，让流正常完成
+                                        });
+                                // 移除：之前的会话清理逻辑，现在移到 doFinally(ON_COMPLETE) 确保执行
                             })
                             .doFinally(signalType -> {
-                                // **重点修改：避免在 CANCEL 信号时清理会话**
+                                // Resync MDC before logging in doFinally
+                                LogUtils.syncTraceIdToMDC(cv);
 
-                                if (signalType == reactor.core.publisher.SignalType.ON_ERROR) {
+                                if (signalType == reactor.core.publisher.SignalType.ON_COMPLETE) {
+                                    // 任务成功完成 (消息被删除或删除失败但计时器流程走完)，现在清理会话和 Disposable 引用
+                                    log.info("{}{}🔒 Auto-deletion task finished with signal: {}. Clearing session key.", logPrefix, botLogIdentifier, signalType);
+                                    // 无论删除是否成功，只要计时器流程完成，就清理会话和Disposable引用
+                                    userSessionService.cancelPendingDeletion(userId)
+                                            .then(userSessionService.clearUserSession(userId))
+                                            .doOnSuccess(v -> log.info("{}{}✅ Cleared session for user {}", logPrefix, botLogIdentifier, userId))
+                                            .doOnError(e -> log.error("{}{}❌ Failed to clear session after ON_COMPLETE: {}", logPrefix, botLogIdentifier, e.getMessage()))
+                                            .contextWrite(cv)
+                                            .subscribe();
+
+                                } else if (signalType == reactor.core.publisher.SignalType.ON_ERROR) {
                                     // 任务因错误终止时，强制清理会话
                                     log.error("{}{}🔒 Auto-deletion task failed with fatal error. Forcibly clearing user session.", logPrefix, botLogIdentifier);
                                     userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
                                 } else if (signalType == reactor.core.publisher.SignalType.CANCEL) {
-                                    // 任务被取消 (通常是新的用户交互触发的 dispose())。
-                                    // 此时只需要记录日志，Session 的清理和重建应由新的 Handler 负责。
+                                    // 任务被取消 (新的用户交互触发的 dispose())。
+                                    // 此时只需要记录日志，Session 的清理和重建由新的 Handler 负责。
                                     log.info("{}{}🔒 Auto-deletion task finished with signal: {}. Cancelling Disposable only, session cleanup deferred.", logPrefix, botLogIdentifier, signalType);
-                                } else if (signalType == reactor.core.publisher.SignalType.ON_COMPLETE) {
-                                    // ON_COMPLETE 表示流程已成功走完， session 已经在 flatMap 内部清理
-                                    log.debug("{}{}🔒 Auto-deletion task finished with signal: {}. Session already cleared.", logPrefix, botLogIdentifier, signalType);
                                 }
                             });
                 })
