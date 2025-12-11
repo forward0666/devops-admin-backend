@@ -37,7 +37,7 @@ public class InteractiveMessageService {
         // 创建组合的日志前缀，包含traceId和bot标识符
         final String combinedLogPrefix = logPrefix + botLogIdentifier;
 
-        log.info("{}⏳ Scheduling auto-deletion for message {} in {}s.", combinedLogPrefix, messageId, delaySeconds);
+        log.info("{}⏳ Scheduling auto-deletion for message {} in {}s. userId: {}", combinedLogPrefix, messageId, delaySeconds, userId);
 
         // 安排自动删除任务
         Disposable deletionTask = Mono.deferContextual(cv -> {
@@ -66,20 +66,38 @@ public class InteractiveMessageService {
                                 LogUtils.syncTraceIdToMDC(cv);
 
                                 if (signalType == reactor.core.publisher.SignalType.ON_COMPLETE) {
-                                    // 任务成功完成 (消息被删除或删除失败但计时器流程走完)，现在清理会话和 Disposable 引用
-                                    log.info("{}🔒 Auto-deletion task finished with signal: {}. Clearing session key.", combinedLogPrefix, signalType);
-                                    // 无论删除是否成功，只要计时器流程完成，就清理会话和Disposable引用
-                                    userSessionService.cancelPendingDeletion(userId)
-                                            .then(userSessionService.clearUserSession(userId))
-                                            .doOnSuccess(v -> log.info("{}✅ Cleared session for user {}", combinedLogPrefix, userId))
-                                            .doOnError(e -> log.error("{}❌ Failed to clear session after ON_COMPLETE: {}", combinedLogPrefix, e.getMessage()))
-                                            .contextWrite(cv)
-                                            .subscribe();
+                                    // 任务成功完成 (消息被删除或删除失败但计时器流程走完)，现在清理 Disposable 引用
+                                    log.info("{}🔒 Auto-deletion task finished with signal: {}. userId: {}", combinedLogPrefix, signalType, userId);
+                                    
+                                    // 只有当 userId 不为 0 时，才清理会话
+                                    if (userId != 0L) {
+                                        log.info("{}🗑️ Clearing session for user {} after message deletion.", combinedLogPrefix, userId);
+                                        userSessionService.cancelPendingDeletion(userId)
+                                                .then(userSessionService.clearUserSession(userId))
+                                                .doOnSuccess(v -> log.info("{}✅ Cleared session for user {}", combinedLogPrefix, userId))
+                                                .doOnError(e -> log.error("{}❌ Failed to clear session after ON_COMPLETE: {}", combinedLogPrefix, e.getMessage()))
+                                                .contextWrite(cv)
+                                                .subscribe();
+                                    } else {
+                                        // userId 为 0 表示这是系统消息，不需要清理会话
+                                        log.info("{}🔒 System message deletion completed, no session cleanup needed (userId=0).", combinedLogPrefix);
+                                        // 只需要取消待删除任务，不清理会话
+                                        userSessionService.cancelPendingDeletion(userId)
+                                                .contextWrite(cv)
+                                                .subscribe();
+                                    }
 
                                 } else if (signalType == reactor.core.publisher.SignalType.ON_ERROR) {
-                                    // 任务因错误终止时，强制清理会话
-                                    log.error("{}🔒 Auto-deletion task failed with fatal error. Forcibly clearing user session.", combinedLogPrefix);
-                                    userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
+                                    // 任务因错误终止时，可能需要清理会话
+                                    log.error("{}🔒 Auto-deletion task failed with signal: {}.", combinedLogPrefix, signalType);
+                                    
+                                    // 只有当 userId 不为 0 时，才清理会话
+                                    if (userId != 0L) {
+                                        log.error("{}🔒 Forcibly clearing user session due to error.", combinedLogPrefix);
+                                        userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
+                                    } else {
+                                        log.error("{}🔒 System message deletion failed, no session cleanup needed.", combinedLogPrefix);
+                                    }
                                 } else if (signalType == reactor.core.publisher.SignalType.CANCEL) {
                                     // 任务被取消 (新的用户交互触发的 dispose())。
                                     // 此时只需要记录日志，Session 的清理和重建由新的 Handler 负责。
