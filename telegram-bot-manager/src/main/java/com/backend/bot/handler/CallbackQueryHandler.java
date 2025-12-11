@@ -26,8 +26,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
     private final UserSessionService userSessionService;
     private final List<CallbackActionHandler> actionHandlers;
 
-    private static final int DEFAULT_ANSWER_DELAY_SECONDS = 10;
-    private static final String DEFAULT_ANSWER_TEXT = "加载菜单 (%d秒销毁)...";
+
 
     @Override
     public boolean support(BotUpdateDto update) {
@@ -108,8 +107,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                 .doOnSuccess(v -> log.debug("{}✅ User {} interaction detected. Canceled pending menu deletion timer.", logPrefix, userId))
                 .onErrorResume(e -> Mono.empty());
         
-        // 2. 回答回调查询
-        botClientService.answerCallbackQuery(token, callbackQueryId, String.format(DEFAULT_ANSWER_TEXT, DEFAULT_ANSWER_DELAY_SECONDS))
+        // 2. 回答回调查询 - 不显示加载提示，直接处理
+        botClientService.answerCallbackQuery(token, callbackQueryId)
                 .contextWrite(contextView)
                 .subscribe(
                         null,
@@ -141,8 +140,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         // 1. 不取消待删除任务，让各个消息独立销毁
         log.debug("{}⏭️ User {} clicked menu navigation: {}. Not canceling deletion timers.", logPrefix, userId, callbackData);
         
-        // 2. 回答回调查询
-        botClientService.answerCallbackQuery(token, callbackQueryId, String.format(DEFAULT_ANSWER_TEXT, DEFAULT_ANSWER_DELAY_SECONDS))
+        // 2. 回答回调查询 - 不显示加载提示，直接处理
+        botClientService.answerCallbackQuery(token, callbackQueryId)
                 .contextWrite(contextView)
                 .subscribe(
                         null,

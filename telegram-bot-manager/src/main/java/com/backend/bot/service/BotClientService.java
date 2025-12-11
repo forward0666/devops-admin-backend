@@ -129,6 +129,13 @@ public class BotClientService {
     }
 
     /**
+     * 重载方法：只接受 token 和 callbackQueryId，不显示任何文本
+     */
+    public Mono<Void> answerCallbackQuery(String token, String callbackQueryId) {
+        return answerCallbackQuery(token, callbackQueryId, "");
+    }
+
+    /**
      * 发送消息给 Telegram 用户/群组。
      */
     public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup, String chatName) {

@@ -2,10 +2,12 @@ package com.backend.bot.handler;
 
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.dto.UserDto; // 假设 UserDto 包含了用户信息
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.UserSessionService;
+import com.backend.bot.util.BotUserUtils; // <-- 引入 BotUserUtils
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +57,13 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
             // 提取关键信息
             String token = botEntity.getBotToken();
             Long chatId = botUpdate.callbackQuery().message().chat().id();
-            Long userId = botUpdate.callbackQuery().from().id();
+            UserDto operatorUser = botUpdate.callbackQuery().from();
+            Long userId = operatorUser.id();
+
+            // --- 提取操作人名称：使用 BotUserUtils 工具类 ---
+            final String finalOperatorName = BotUserUtils.getOperatorName(operatorUser, userId);
+            // ------------------------------------------------
+
             Long originalMessageId = botUpdate.callbackQuery().message().messageId();
             String callbackData = botUpdate.callbackQuery().data();
 
@@ -64,10 +72,12 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
             String botLogIdentifier = String.format("[%s]", botEntity.getBotName());
 
             // 1. 🌟 设置会话状态 (为了接收用户的后续回复)
+            // 这里将 originalMessageId 存入会话，以便后续 TextUpdateHandler 删除提示消息
             Mono<Void> updateSessionMono = userSessionService.updateUserSession(userId, sessionState, originalMessageId);
 
-            // 2. 🌟 准备响应文本 (包含倒计时提示)
-            String newText = String.format("您选择了 **%s**，\n请回复此消息，输入以下格式信息：\n\n`%s`\n\n*⏳ 此提示消息将在 %d 秒后自动销毁，请尽快操作。*", actionName, IP_PROMPT_TEXT, TIMEOUT_SECONDS);
+            // 2. 🌟 准备响应文本 (包含操作人信息和倒计时提示)
+            String newText = String.format(" **%s** 选择了 **%s**，\n请回复此消息，输入以下格式信息：\n\n`%s`\n\n*⏳ 此提示消息将在 %d 秒后自动销毁，请尽快操作。*",
+                    finalOperatorName, actionName, IP_PROMPT_TEXT, TIMEOUT_SECONDS); // <-- 使用 finalOperatorName
 
             // 3. 🌟 编辑消息或发送新消息，并获取最终展示的消息ID
             Mono<Long> displayMessageMono = editMessageTextAndRemoveMarkup(token, chatId, originalMessageId, newText, actionName, traceLogPrefix);
@@ -81,8 +91,6 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
                             log.info("{}⏳ Scheduling deletion for messageId: {} in {} seconds.", traceLogPrefix, activeMessageId, TIMEOUT_SECONDS);
 
                             // 5. 🌟 核心：调度自动删除任务
-                            // 这里的 scheduleMessageDeletion 应该是一个非阻塞的异步操作（例如内部使用 Mono.delay 或 ScheduledExecutor）
-                            // 它启动后，倒计时就开始了，不受用户是否回复的影响。
                             return interactiveMessageService.scheduleMessageDeletion(
                                     token,
                                     userId,
