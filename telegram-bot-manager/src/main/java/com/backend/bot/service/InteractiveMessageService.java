@@ -63,9 +63,11 @@ public class InteractiveMessageService {
                                 .doOnSuccess(v -> log.info("{}{}✅ Cleared session for user {}", logPrefix, botLogIdentifier, userId));
                     })
                     .doFinally(signalType -> {
-                        // 确保无论如何都会清除用户会话
-                        log.info("{}{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", logPrefix, botLogIdentifier, signalType);
-                        userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
+                        // 只有在非正常结束的情况下才记录并强制清理
+                        if (signalType != reactor.core.publisher.SignalType.ON_COMPLETE) {
+                            log.info("{}{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", logPrefix, botLogIdentifier, signalType);
+                            userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
+                        }
                     });
         })
         // 将外部捕获的上下文写入这个响应式流

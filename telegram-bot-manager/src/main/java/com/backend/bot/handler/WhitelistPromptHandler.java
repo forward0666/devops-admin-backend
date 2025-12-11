@@ -78,7 +78,7 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
                     .flatMap(activeMessageId -> {
                         // 如果获取到了有效的消息ID (无论是编辑旧的还是发送新的)
                         if (activeMessageId != null && activeMessageId > 0) {
-                            log.info("{} ⏳ Scheduling deletion for messageId: {} in {} seconds.", traceLogPrefix, activeMessageId, TIMEOUT_SECONDS);
+                            log.info("{}⏳ Scheduling deletion for messageId: {} in {} seconds.", traceLogPrefix, activeMessageId, TIMEOUT_SECONDS);
 
                             // 5. 🌟 核心：调度自动删除任务
                             // 这里的 scheduleMessageDeletion 应该是一个非阻塞的异步操作（例如内部使用 Mono.delay 或 ScheduledExecutor）
