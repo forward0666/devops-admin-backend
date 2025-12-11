@@ -3,10 +3,8 @@ package com.backend.bot.service;
 import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
-import com.backend.bot.util.DtoFieldExtractor;
 import com.backend.bot.util.ErrorHandlerUtils;
 import com.backend.bot.util.LogUtils;
-import com.backend.bot.util.ReactiveOperationTemplate;
 import com.backend.bot.util.RetryUtil;
 import com.backend.bot.util.TelegramApiRequestBuilder;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -17,7 +15,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.PrematureCloseException;
 import reactor.util.context.ContextView;
@@ -75,9 +73,6 @@ public class BotClientService {
 
     /**
      * 注册/更新 Webhook URL。
-     * 
-     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
-     * 统一处理上下文传播、错误处理和日志记录。
      */
     public Mono<String> setWebhook(String token, String fullWebhookUrl, String secretToken) {
         return TelegramApiRequestBuilder.setWebhook(token, fullWebhookUrl, secretToken)
@@ -97,24 +92,19 @@ public class BotClientService {
                 .retrieve()
                 .bodyToMono(String.class)
                 .retryWhen(telegramRetryPolicy)
-                // 🌟 关键修改：使用注入的自定义 Scheduler
                 .publishOn(blockingTaskScheduler)
-                // 关键修正：使用 flatMap 结合 deferContextual 来处理阻塞操作和日志
                 .flatMap(jsonResponse -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
                     try {
-                        // 阻塞操作：ObjectMapper.readValue()
                         Map<String, Object> map = objectMapper.readValue(jsonResponse, new TypeReference<Map<String, Object>>() {});
                         return Mono.just(map);
                     } catch (Exception e) {
-                        // 🌟 显式打印 traceId
                         log.error("{}❌ JSON mapping failed for getWebhookInfo response", prefix, e);
                         return Mono.error(new RuntimeException("JSON 解析失败", e));
                     }
                 }))
                 .onErrorResume(e -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
-                    // 🌟 显式打印 traceId
                     log.error("{}❌ Telegram getWebhookInfo API call failed for token: {}", prefix, token, e);
                     return Mono.just(Map.of("ok", false, "description", "Telegram API call failed: " + e.getMessage()));
                 }));
@@ -122,9 +112,6 @@ public class BotClientService {
 
     /**
      * 响应用户的 Callback Query (按钮点击)，通常用于消除按钮上的加载动画。
-     * 
-     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
-     * 统一处理上下文传播、错误处理和日志记录。
      */
     public Mono<Void> answerCallbackQuery(String token, String callbackQueryId, String text) {
         String path = String.format(TelegramConstants.API_PATH_TEMPLATE, token, "answerCallbackQuery");
@@ -136,32 +123,27 @@ public class BotClientService {
                 .customParam("text", text)
                 .customParam("show_alert", false)
                 .retryPolicy(telegramRetryPolicy)
-                .logTemplates("✅ Callback query answered successfully: " + callbackQueryId, 
-                             "Failed to answer callback query: " + callbackQueryId)
+                .logTemplates("✅ Callback query answered successfully: " + callbackQueryId,
+                        "Failed to answer callback query: " + callbackQueryId)
                 .executeWithoutResponse(telegramWebClient, telegramRetryPolicy);
     }
 
     /**
      * 发送消息给 Telegram 用户/群组。
-     * 
-     * 使用 TelegramApiRequestBuilder 构建请求，遵循 DRY 原则。
-     * 统一处理上下文传播、错误处理和日志记录。
-     * 
-     * @param chatName 聊天的名称（可选，用于日志记录）
      */
     public Mono<Void> sendMessage(String token, Long chatId, String text, Object replyMarkup, String chatName) {
         String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
-        
+
         return TelegramApiRequestBuilder.sendMessage(token)
                 .chatId(chatId)
                 .text(text)
                 .replyMarkup(replyMarkup)
                 .retryPolicy(telegramRetryPolicy)
-                .logTemplates("✅ Message sent successfully to Chat: " + logIdentifier, 
-                             "Failed to send message to Chat: " + logIdentifier)
+                .logTemplates("✅ Message sent successfully to Chat: " + logIdentifier,
+                        "Failed to send message to Chat: " + logIdentifier)
                 .executeWithoutResponse(telegramWebClient, telegramRetryPolicy)
-                .onErrorResume(PrematureCloseException.class, 
-                              ErrorHandlerUtils.logAndWarn("asynchronous message send due to connection premature closure"));
+                .onErrorResume(PrematureCloseException.class,
+                        ErrorHandlerUtils.logAndWarn("asynchronous message send due to connection premature closure"));
     }
 
     // 重载方法：兼容不带键盘和群名称的调用
@@ -177,12 +159,6 @@ public class BotClientService {
 
     /**
      * 【新增】发送消息并返回完整的 JSON 响应字符串，用于提取 message_id。
-     * @param token 机器人 Token
-     * @param chatId 聊天 ID
-     * @param text 消息文本
-     * @param replyMarkup 内联键盘对象
-     * @param chatName 聊天的名称（可选，用于日志记录）
-     * @return 包含 Telegram API 响应的 JSON 字符串 Mono
      */
     public Mono<String> sendMenuMessageWithResponse(String token, Long chatId, String text, InlineKeyboardMarkupDto replyMarkup, String chatName) {
         String path = "/bot" + token + "/sendMessage";
@@ -200,20 +176,18 @@ public class BotClientService {
                 .uri(path)
                 .body(BodyInserters.fromValue(bodyMap))
                 .retrieve()
-                // 关键点：返回响应体为 String，以便 StartCommandHandler 可以解析
                 .bodyToMono(String.class)
                 .retryWhen(telegramRetryPolicy)
-                // 关键修正：使用 flatMap 结合 deferContextual 替代 doOnSuccess，确保上下文在记录日志时不会丢失
                 .flatMap(response -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
                     String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
                     log.info("{}✅ Message sent successfully and full JSON response received for Chat: {}", prefix, logIdentifier);
-                    return Mono.just(response); // 必须返回原始响应体
+                    return Mono.just(response);
                 }))
                 .onErrorResume(e -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
                     log.error("{}❌ Failed to send message with response to chatId: {}. Error: {}", prefix, chatId, e.getMessage());
-                    return Mono.error(e); // 向上抛出错误
+                    return Mono.error(e);
                 }));
     }
 
@@ -231,8 +205,6 @@ public class BotClientService {
         Map<String, Object> bodyMap = new HashMap<>();
         bodyMap.put("chat_id", chatId);
         bodyMap.put("message_id", messageId);
-
-        // Telegram 要求 reply_markup 是一个 JSON 对象
         bodyMap.put("reply_markup", replyMarkup);
 
         return telegramWebClient.post()
@@ -241,7 +213,6 @@ public class BotClientService {
                 .retrieve()
                 .toBodilessEntity()
                 .retryWhen(telegramRetryPolicy)
-                // Fix 1: 使用 .then() 转换类型，并确保内部 deferContextual 显式类型化
                 .then(
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);
@@ -249,7 +220,6 @@ public class BotClientService {
                             return Mono.empty();
                         })
                 )
-                // Fix 2: 显式类型化 onErrorResume 的 fallback 函数
                 .onErrorResume(e ->
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);
@@ -263,31 +233,27 @@ public class BotClientService {
     /**
      * 编辑已发送消息的文本内容和/或键盘。
      * 如果 replyMarkup 为 null，则移除键盘。
+     * * 🌟 关键修改：在 API 层处理 400 Bad Request 错误，防止日志污染。
      */
     public Mono<Void> editMessageText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto replyMarkup) {
         String path = "/bot" + token + "/editMessageText";
 
-        Map<String, Object> bodyMap = new HashMap<>(); // 假设你使用了 HashMap 来构建请求体
+        Map<String, Object> bodyMap = new HashMap<>();
         bodyMap.put("chat_id", chatId);
         bodyMap.put("message_id", messageId);
         bodyMap.put("text", text);
-        // 启用 Markdown 解析，确保 IP 提示格式正确
         bodyMap.put("parse_mode", "Markdown");
 
-        // 如果提供了键盘，则添加
         if (replyMarkup != null) {
             bodyMap.put("reply_markup", replyMarkup);
         }
-        // 如果 replyMarkup 为 null，则不发送该字段，API会移除旧键盘
 
-        return telegramWebClient.post() // 假设你的 WebClient 实例名为 telegramWebClient
+        return telegramWebClient.post()
                 .uri(path)
                 .body(BodyInserters.fromValue(bodyMap))
                 .retrieve()
-                .toBodilessEntity() // 因为这个 API 通常只返回状态
-                // 🌟 重要的：添加你的重试策略和错误处理
-                .retryWhen(telegramRetryPolicy) // 假设你的重试策略实例名为 telegramRetryPolicy
-                // Fix 1: 使用 .then() 转换类型，并确保内部 deferContextual 显式类型化
+                .toBodilessEntity()
+                .retryWhen(telegramRetryPolicy)
                 .then(
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);
@@ -295,12 +261,31 @@ public class BotClientService {
                             return Mono.empty();
                         })
                 )
-                // Fix 2: 显式类型化 onErrorResume 的 fallback 函数
+                // 🌟 关键修改：在 BotClientService 中捕获 WebClientResponseException
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    // 如果是 400 Bad Request，通常是因为消息内容未修改，或者消息不存在
+                    if (e.getStatusCode().value() == 400) {
+                        return Mono.<Void>deferContextual(contextView -> {
+                            String prefix = getTraceIdPrefix(contextView);
+                            // 降级为 INFO 日志，并说明原因
+                            log.info("{}💬 Could not edit message text for chatId: {}, messageId: {}. Reason: 400 Bad Request (Likely no modification occurred).",
+                                    prefix, chatId, messageId);
+                            // 返回 Mono.empty() 阻止错误向上游传播
+                            return Mono.empty();
+                        });
+                    }
+
+                    // 对于其他 WebClient 错误，继续打印 WARN/ERROR 并抛出
+                    return Mono.<Void>deferContextual(contextView -> {
+                        String prefix = getTraceIdPrefix(contextView);
+                        log.error("{}❌ Failed to edit message text for chatId: {}, messageId: {}. Error: {}", prefix, chatId, messageId, e.getMessage());
+                        return Mono.<Void>error(e);
+                    });
+                })
                 .onErrorResume(e ->
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);
                             log.error("{}❌ Failed to edit message text for chatId: {}, messageId: {}. Error: {}", prefix, chatId, messageId, e.getMessage());
-                            // 必须返回 Mono<Void> 类型的错误
                             return Mono.<Void>error(e);
                         })
                 );
@@ -308,10 +293,6 @@ public class BotClientService {
 
     /**
      * 【新增】删除指定消息。用于菜单超时自动销毁。
-     * @param token 机器人 Token
-     * @param chatId 聊天 ID
-     * @param messageId 消息 ID
-     * @return Mono<Void>
      */
     public Mono<Void> deleteMessage(String token, Long chatId, Long messageId) {
         String path = "/bot" + token + "/deleteMessage";
@@ -326,7 +307,6 @@ public class BotClientService {
                 .retrieve()
                 .toBodilessEntity()
                 .retryWhen(telegramRetryPolicy)
-                // Fix 1: 使用 .then() 转换类型，并确保内部 deferContextual 显式类型化
                 .then(
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);
@@ -334,7 +314,6 @@ public class BotClientService {
                             return Mono.empty();
                         })
                 )
-                // Fix 2: 显式类型化 onErrorResume 的 fallback 函数
                 .onErrorResume(e ->
                         Mono.<Void>deferContextual(contextView -> {
                             String prefix = getTraceIdPrefix(contextView);

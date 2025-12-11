@@ -29,11 +29,14 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
 
-    // 🌟 恢复到静态菜单文本模板，与 TelegramConstants 保持一致
-    private static final String MENU_PROMPT_TEXT = TelegramConstants.MENU_TIMEOUT_TEMPLATE;
+    // 修复: 将秒数占位符从 %d 更改为 %s，以避免 java.util.IllegalFormatConversionException
+    // 优化: 缩短菜单提示文本，移除“当前菜单:”前缀、菜单名称及其周围的方括号【】，只保留计时器信息
+    // 注意: 菜单名称 (%s) 现已移除，只保留计时器 (%s)
+    private static final String MENU_PROMPT_TEXT_TEMPLATE = "请在%s秒内选择操作";
 
     @Override
     public boolean supports(String callbackData) {
+        // 只有当 MenuType 能返回键盘时才支持
         return MenuType.createDynamicKeyboard(callbackData) != null;
     }
 
@@ -44,7 +47,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
     @Override
     public Mono<Void> handle(BotConfigEntity botEntity, BotUpdateDto botUpdate) {
-        // 🌟 使用 HandlerContext 简化数据提取
+        // 使用 HandlerContext 简化数据提取
         HandlerContext context = new HandlerContext(botEntity, botUpdate);
 
         String token = context.token();
@@ -55,22 +58,30 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
         String callbackData = botUpdate.callbackQuery().data();
 
+        // 1. 获取新的键盘
         InlineKeyboardMarkupDto newMarkup = MenuType.createDynamicKeyboard(callbackData);
 
-        // 确定计时器时间
+        // 2. 确定计时器时间 (int)
         int delaySeconds = getDeletionDelay(callbackData);
 
-        // 🌟 恢复：使用静态模板和延迟时间格式化文本
-        String menuText = String.format(MENU_PROMPT_TEXT, delaySeconds);
+        // 3. 动态生成菜单文本
+        // 由于模板中已移除菜单标题，这里不再使用 getMenuTitle() 的结果
 
-        // 1. 🌟 关键修复：使用 Mono.deferContextual 捕获 ContextView
+        // 🌟 FIX: 将 delaySeconds 显式转换为 String，以匹配 MENU_PROMPT_TEXT_TEMPLATE 中的 %s 占位符
+        String menuText = String.format(
+                MENU_PROMPT_TEXT_TEMPLATE,
+                String.valueOf(delaySeconds) // 转换为 String 解决 IllegalFormatConversionException
+        );
+
+        // 使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            // 2. 编辑当前消息，更新键盘
+            // 4. 编辑当前消息，更新键盘和文本
+            // BotClientService.editMessageText 已经在 API 层处理了 400 Bad Request
             return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
                     .doOnSuccess(response -> {
-                        // 3. 🌟 调用 InteractiveMessageService 封装的逻辑，并传入 ContextView
+                        // 5. 重新调度删除任务
                         interactiveMessageService.scheduleMessageDeletion(
                                 token,
                                 userId,
@@ -78,25 +89,13 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                                 messageId,
                                 delaySeconds,
                                 logIdentifier,
-                                contextView // <-- 传入 ContextView 以保证 traceId 传播
+                                contextView
                         ).subscribe();
                     })
-                    .onErrorResume(e -> { // 外部异常 e
-                        String errorMessage = e.getMessage();
-
-                        // 保持关键修复：将 400 Bad Request 记录为 INFO
-                        if (errorMessage != null && errorMessage.contains("400 Bad Request")) {
-                            // 这是一个非致命错误，通常是消息未修改（最常见原因，例如双击）。
-                            log.info("{}💬 Could not edit message (ID: {}). Reason: {}. Likely no modification occurred.",
-                                    traceLogPrefix, messageId, errorMessage);
-
-                            // 确保返回空流，阻止错误继续传播，并避免发送新消息。
-                            return Mono.empty();
-                        }
-
-                        // 对于其他致命错误（如网络问题，鉴权失败等），继续记录 WARN
-                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Not sending new message to avoid duplicate menus.",
-                                traceLogPrefix, messageId, errorMessage);
+                    // 只需要处理编辑失败时的致命错误 (如网络、鉴权等)
+                    .onErrorResume(e -> {
+                        log.warn("{}⚠️ Non-400 error occurred during message edit (ID: {}). Reason: {}. Not sending new message.",
+                                traceLogPrefix, messageId, e.getMessage());
                         return Mono.empty();
                     })
                     .then();
@@ -104,8 +103,29 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     }
 
     /**
+     * 根据回调数据返回菜单的标题。
+     */
+    private String getMenuTitle(String callbackData) {
+        // 检查是否是进入二级菜单
+        if (callbackData.equals(CallbackConstants.DOMAIN_WHITELIST_ACTION)) {
+            return "域名加白";
+        }
+
+        // 检查是否是返回操作，并尝试返回主菜单标题
+        // 假设 IP_WHITE_LIST 是主菜单的导航标识
+        if (callbackData.contains("IP_WHITE_LIST")) {
+            return "主菜单";
+        }
+
+        // 尝试从回调数据中提取一个有意义的部分作为标题
+        String keyword = callbackData.replace("callback_data_", "").replace("_ACTION", "");
+        // 优化：替换下划线为空格并首字母大写，使其更具可读性
+        return keyword.replace('_', ' ').toLowerCase();
+    }
+
+    /**
      * 统一返回菜单的销毁延迟时间。
-     * 一级菜单和二级菜单都使用相同的销毁时间
+     * 假设 TelegramConstants.MENU_DELETE_DELAY_SECONDS 是一个 int 类型的常量。
      */
     private int getDeletionDelay(String callbackData) {
         // 使用统一的菜单删除延迟常量
