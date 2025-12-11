@@ -79,35 +79,10 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                         ).subscribe();
                     })
                     .onErrorResume(e -> { // 外部异常 e
-                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Sending new message instead.", traceLogPrefix, messageId, e.getMessage());
-                        // 如果编辑失败（消息太旧或已被删除），发送新消息
-                        return botClientService.sendMenuMessageWithResponse(token, chatId, menuText, newMarkup)
-                                .flatMap(responseJson -> {
-                                    try {
-                                        // 从响应中提取消息ID
-                                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                                        com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(responseJson);
-                                        com.fasterxml.jackson.databind.JsonNode resultNode = rootNode.path("result");
-                                        Long newMessageId = resultNode.path("message_id").asLong(0L);
-
-                                        if (newMessageId > 0) {
-                                            // 为新消息设置自动删除
-                                            interactiveMessageService.scheduleMessageDeletion(
-                                                    token,
-                                                    userId,
-                                                    chatId,
-                                                    newMessageId,
-                                                    delaySeconds,
-                                                    logIdentifier,
-                                                    contextView
-                                            ).subscribe();
-                                        }
-                                        return Mono.empty();
-                                    } catch (Exception parseException) { // 修复：将内部 catch 变量 e 改名为 parseException
-                                        log.error("{}❌ Failed to parse message ID from response: {}", traceLogPrefix, responseJson, parseException);
-                                        return Mono.empty();
-                                    }
-                                });
+                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Not sending new message to avoid duplicate menus.", traceLogPrefix, messageId, e.getMessage());
+                        // 如果编辑失败（消息太旧或已被删除），只记录错误，不发送新消息
+                        // 这避免了创建重复菜单的问题
+                        return Mono.empty();
                     })
                     .then();
         });

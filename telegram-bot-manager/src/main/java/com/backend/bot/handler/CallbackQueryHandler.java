@@ -50,50 +50,52 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         boolean isMenuNavigation = actionHandlers.stream()
                 .anyMatch(handler -> handler instanceof MenuNavigationHandler && handler.supports(callbackData));
         
-        // 获取用户会话状态
-        Mono<UserSessionEntity> sessionMono = userSessionService.getUserSession(userId);
-        
-        // 先检查会话状态
-        return sessionMono.flatMap(session -> {
-            String state = session.getState();
-            
-            // 如果用户正在处理/start命令，但点击的是菜单导航操作，允许执行
-            if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
-                if (isMenuNavigation) {
-                    log.info("{}⚠️ User {} is processing /start command but clicked menu navigation: {}. Allowing operation.", logPrefix, userId, callbackData);
-                    // 允许菜单导航操作，继续执行后续流程，但不取消删除任务
-                    return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
-                } else {
-                    // 非菜单导航操作，忽略并返回提示
-                    log.info("{}⚠️ User {} is processing /start command. Ignoring callback action: {}", logPrefix, userId, callbackData);
-                    // 只回答回调查询，不取消待删除任务，也不执行任何其他操作
-                    return botClientService.answerCallbackQuery(token, callbackQueryId, "⏳ 正在处理您的请求，请稍候...")
-                            .then(); // 返回提示并结束流程
-                }
-            }
-            
-            // 正常流程：根据操作类型决定是否取消计时器
-            if (isMenuNavigation) {
-                // 菜单导航，不取消删除任务
-                return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
-            } else {
-                // 其他操作，取消删除任务
-                return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
-            }
-        })
-        .switchIfEmpty(Mono.defer(() -> {
-            // 没有会话，检查是否是菜单导航操作
-            if (isMenuNavigation) {
-                // 创建临时会话并处理菜单导航
-                log.info("{}⚠️ User {} has no session, but clicked menu navigation: {}. Creating temporary session.", logPrefix, userId, callbackData);
-                return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
-                        .then(processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId));
-            } else {
-                // 非菜单导航操作，提示用户
-                return botClientService.answerCallbackQuery(token, callbackQueryId, "⚠️ 没有活跃会话，请使用 /start 开始")
-                        .then();
-            }
-        }));
+        // 使用原子性检查和处理，避免重复处理
+        return userSessionService.getUserSession(userId)
+                .flatMap(session -> {
+                    // 有会话的情况
+                    String state = session.getState();
+                    
+                    // 如果用户正在处理/start命令，但点击的是菜单导航操作，允许执行
+                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
+                        if (isMenuNavigation) {
+                            log.info("{}⚠️ User {} is processing /start command but clicked menu navigation: {}. Allowing operation.", logPrefix, userId, callbackData);
+                            // 允许菜单导航操作，继续执行后续流程，但不取消删除任务
+                            return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                        } else {
+                            // 非菜单导航操作，忽略并返回提示
+                            log.info("{}⚠️ User {} is processing /start command. Ignoring callback action: {}", logPrefix, userId, callbackData);
+                            // 只回答回调查询，不取消待删除任务，也不执行任何其他操作
+                            return botClientService.answerCallbackQuery(token, callbackQueryId, "⏳ 正在处理您的请求，请稍候...")
+                                    .then(); // 返回提示并结束流程
+                        }
+                    }
+                    
+                    // 正常流程：根据操作类型决定是否取消计时器
+                    if (isMenuNavigation) {
+                        // 菜单导航，不取消删除任务
+                        return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                    } else {
+                        // 其他操作，取消删除任务
+                        return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    // 没有会话的情况
+                    if (isMenuNavigation) {
+                        // 创建临时会话并处理菜单导航
+                        log.info("{}⚠️ User {} has no session, but clicked menu navigation: {}. Creating temporary session.", logPrefix, userId, callbackData);
+                        return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
+                                .contextWrite(contextView)
+                                .then(processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId))
+                                // 临时会话需要保持一段时间以便消息自动删除，不立即清除
+                                .then();
+                    } else {
+                        // 非菜单导航操作，提示用户
+                        return botClientService.answerCallbackQuery(token, callbackQueryId, "⚠️ 没有活跃会话，请使用 /start 开始")
+                                .then();
+                    }
+                }));
     }
 
     private Mono<Void> processCallbackNormally(HandlerContext context, String logPrefix, ContextView contextView, 

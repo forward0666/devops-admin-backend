@@ -33,9 +33,8 @@ public class InteractiveMessageService {
             ContextView contextView) {
 
         final String logPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
-        final String fullLogIdentifier = logPrefix + botLogIdentifier;
 
-        log.info("{}⏳ Scheduling auto-deletion for message {} in {}s.", fullLogIdentifier, messageId, delaySeconds);
+        log.info("{}{}⏳ Scheduling auto-deletion for message {} in {}s.", logPrefix, botLogIdentifier, messageId, delaySeconds);
 
         // 安排自动删除任务
         Disposable deletionTask = Mono.delay(Duration.ofSeconds(delaySeconds), Schedulers.parallel())
@@ -67,7 +66,10 @@ public class InteractiveMessageService {
                 .doFinally(signalType -> {
                     // 确保无论如何都会清除用户会话
                     log.info("{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", fullLogIdentifier, signalType);
-                    userSessionService.clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
+                    // 修复：确保在 doFinally 中使用 contextWrite 来传播上下文
+                    Mono.deferContextual(cv -> userSessionService.clearUserSession(userId))
+                        .contextWrite(Context.of(contextView))
+                        .subscribe();
                 })
                 .subscribe(
                         v -> log.info("{}✅ Auto-deletion task completed successfully", fullLogIdentifier),
