@@ -3,7 +3,6 @@ package com.backend.bot.service;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.util.LogUtils; // 假设存在 LogUtils
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -16,7 +15,6 @@ import java.util.concurrent.ConcurrentMap;
  * 注意：在分布式或生产环境中，需要替换为持久化存储（如 Redis）。
  */
 @Service
-@Profile("dev")
 @Slf4j
 public class InMemoryUserSessionService implements UserSessionService {
 
@@ -59,6 +57,18 @@ public class InMemoryUserSessionService implements UserSessionService {
                 return Mono.empty();
             });
         });
+    }
+
+    /**
+     * 检查用户是否拥有任何活跃的会话。
+     * 用于防止在进行操作时重复触发 /start。
+     * @param userId 用户ID
+     * @return 包含 Boolean 结果的 Mono
+     */
+    @Override
+    public Mono<Boolean> hasAnySession(Long userId) {
+        // FIX: 实现缺失的 hasAnySession 抽象方法
+        return Mono.fromSupplier(() -> userSessions.containsKey(userId));
     }
 
     @Override
