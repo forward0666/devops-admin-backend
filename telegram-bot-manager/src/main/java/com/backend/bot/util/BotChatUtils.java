@@ -1,6 +1,7 @@
 package com.backend.bot.util;
 
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.dto.ChatDto;
 import java.util.Optional;
 
 /**
@@ -47,5 +48,18 @@ public class BotChatUtils {
             return Optional.ofNullable(update.callbackQuery().message().chat().type());
         }
         return Optional.empty();
+    }
+
+    /**
+     * 检查聊天是否是群聊（group 或 supergroup）
+     *
+     * @param chat 聊天对象
+     * @return 如果是群聊返回 true，否则返回 false
+     */
+    public static boolean isGroupChat(ChatDto chat) {
+        if (chat == null || chat.type() == null) {
+            return false;
+        }
+        return "group".equals(chat.type()) || "supergroup".equals(chat.type());
     }
 }

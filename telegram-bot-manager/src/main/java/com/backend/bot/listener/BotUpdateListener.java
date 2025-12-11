@@ -2,6 +2,7 @@ package com.backend.bot.listener;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.event.BotUpdateEvent;
+import com.backend.bot.filter.GroupMessageFilter;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotUpdateService;
 import filter.TraceIdFilter;
@@ -22,14 +23,17 @@ public class BotUpdateListener {
 
     private final BotCoreService botCoreService;
     private final BotUpdateService botUpdateHandlerService;
+    private final GroupMessageFilter groupMessageFilter;
     private final Scheduler blockingTaskScheduler;
 
     public BotUpdateListener(
             BotCoreService botCoreService,
             BotUpdateService botUpdateHandlerService,
+            GroupMessageFilter groupMessageFilter,
             @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) {
         this.botCoreService = botCoreService;
         this.botUpdateHandlerService = botUpdateHandlerService;
+        this.groupMessageFilter = groupMessageFilter;
         this.blockingTaskScheduler = blockingTaskScheduler;
     }
 
@@ -57,7 +61,13 @@ public class BotUpdateListener {
                                 return Mono.empty();
                             });
                 })
-                // 3. 校验 Bot 状态
+                // 3. 先通过群消息过滤器处理群聊中的命令消息
+                .flatMap(botConfigEntity -> {
+                    // 过滤群聊消息，标记命令消息为待清理
+                    return groupMessageFilter.filter(botUpdate, botConfigEntity.getBotToken())
+                            .then(Mono.just(botConfigEntity));
+                })
+                // 4. 校验 Bot 状态
                 .filter(botConfigEntity -> {
                     if (botConfigEntity.getStatus() == null || botConfigEntity.getStatus() != 1) {
                         log.warn("⏸️ Bot {} is inactive. Ignoring update.", botName);
@@ -65,7 +75,7 @@ public class BotUpdateListener {
                     }
                     return true;
                 })
-                // 4. 异步校验 Chat ID 白名单
+                // 5. 异步校验 Chat ID 白名单
                 .flatMap(botConfigEntity -> {
                     if (chatId == null) {
                         log.debug("⚠️ No Chat ID found, skipping whitelist check for bot {}", botName);
@@ -82,7 +92,7 @@ public class BotUpdateListener {
                                 }
                             });
                 })
-                // 5. 核心：执行业务逻辑
+                // 6. 核心：执行业务逻辑
                 .flatMap(botConfigEntity -> {
                     // 确认 Update 成功通过所有前置校验，进入 handler service
                     String logMessage = "";
@@ -109,12 +119,12 @@ public class BotUpdateListener {
                     }
                     return context;
                 })
-                // 6. 错误处理
+                // 7. 错误处理
                 .doOnError(e -> log.error("❌ Error in async listener for bot {}", botName, e))
                 .onErrorResume(e -> Mono.empty())
                 .then(); // 转换为 Mono<Void>
 
-        // 7. 手动订阅以触发执行 (Fire-and-Forget)
+        // 8. 手动订阅以触发执行 (Fire-and-Forget)
         processingPipeline
                 .subscribeOn(blockingTaskScheduler)
                 .subscribe();
