@@ -37,50 +37,51 @@ public class InteractiveMessageService {
         log.info("{}{}⏳ Scheduling auto-deletion for message {} in {}s.", logPrefix, botLogIdentifier, messageId, delaySeconds);
 
         // 安排自动删除任务
-        Disposable deletionTask = Mono.delay(Duration.ofSeconds(delaySeconds), Schedulers.parallel())
-                .flatMap(aLong -> {
-                    log.info("{}🕒 Auto-deletion task triggered for message {} after {}s", fullLogIdentifier, messageId, delaySeconds);
-                    
-                    // 🌟 关键修复：在 flatMap 内部，我们创建一个新的 Mono 链，
-                    // 并使用 .contextWrite() 将捕获的 contextView 注入进去。
-                    // 这样，后续的 botClientService.deleteMessage() 就能访问到正确的上下文。
-                    return Mono.fromRunnable(() -> {
-                                log.warn("{}⏰ Auto-deleted message {} after {}s timeout.", fullLogIdentifier, messageId, delaySeconds);
-                            })
-                            .then(botClientService.deleteMessage(token, chatId, messageId))
-                            .doOnSuccess(v -> log.info("{}✅ Message {} successfully deleted", fullLogIdentifier, messageId))
-                            .onErrorResume(e -> {
-                                log.warn("❌ {} Failed to delete message {}. Already deleted or error: {}", fullLogIdentifier, messageId, e.getMessage());
-                                return Mono.empty(); // 失败也继续执行清理
-                            })
-                            // 无论消息删除是否成功，都执行清理操作
-                            .then(userSessionService.cancelPendingDeletion(userId))
-                            .doOnSuccess(v -> log.info("{}✅ Cancelled pending deletion task for user {}", fullLogIdentifier, userId))
-                            .then(userSessionService.clearUserSession(userId))
-                            .doOnSuccess(v -> log.info("{}✅ Cleared session for user {}", fullLogIdentifier, userId))
-                            // 🌟 将捕获的外部上下文写入到这个新的内部响应式链中
-                            .contextWrite(Context.of(contextView))
-                            // 确保最终返回Mono<Void>
-                            .then();
-                })
-                .doFinally(signalType -> {
-                    // 确保无论如何都会清除用户会话
-                    log.info("{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", fullLogIdentifier, signalType);
-                    // 修复：确保在 doFinally 中使用 contextWrite 来传播上下文
-                    Mono.deferContextual(cv -> userSessionService.clearUserSession(userId))
-                        .contextWrite(Context.of(contextView))
-                        .subscribe();
-                })
-                .subscribe(
-                        v -> log.info("{}✅ Auto-deletion task completed successfully", fullLogIdentifier),
-                        e -> {
-                            log.error("{}❌ Message deletion task failed for user {}: {}", fullLogIdentifier, userId, e.getMessage());
-                            // 确保即使在任务失败的情况下也清除用户会话
-                            userSessionService.clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
-                        }
-                );
+        Disposable deletionTask = Mono.deferContextual(cv -> {
+            // 确保上下文正确传播到延迟任务
+            return Mono.delay(Duration.ofSeconds(delaySeconds), Schedulers.parallel())
+                    .flatMap(aLong -> {
+                        // 在每个操作前同步上下文到MDC
+                        LogUtils.syncTraceIdToMDC(cv);
+                        
+                        log.info("{}{}🕒 Auto-deletion task triggered for message {} after {}s", logPrefix, botLogIdentifier, messageId, delaySeconds);
+                        
+                        // 创建删除消息的操作链，确保每个步骤都传播上下文
+                        return Mono.fromRunnable(() -> {
+                                    log.warn("{}{}⏰ Auto-deleted message {} after {}s timeout.", logPrefix, botLogIdentifier, messageId, delaySeconds);
+                                })
+                                .then(botClientService.deleteMessage(token, chatId, messageId))
+                                .doOnSuccess(v -> log.info("{}{}✅ Message {} successfully deleted", logPrefix, botLogIdentifier, messageId))
+                                .onErrorResume(e -> {
+                                    log.warn("❌ {}{} Failed to delete message {}. Already deleted or error: {}", logPrefix, botLogIdentifier, messageId, e.getMessage());
+                                    return Mono.empty(); // 失败也继续执行清理
+                                })
+                                // 无论消息删除是否成功，都执行清理操作
+                                .then(userSessionService.cancelPendingDeletion(userId))
+                                .doOnSuccess(v -> log.info("{}{}✅ Cancelled pending deletion task for user {}", logPrefix, botLogIdentifier, userId))
+                                .then(userSessionService.clearUserSession(userId))
+                                .doOnSuccess(v -> log.info("{}{}✅ Cleared session for user {}", logPrefix, botLogIdentifier, userId));
+                    })
+                    .doFinally(signalType -> {
+                        // 确保无论如何都会清除用户会话
+                        log.info("{}{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", logPrefix, botLogIdentifier, signalType);
+                        userSessionService.clearUserSession(userId).contextWrite(cv).subscribe();
+                    });
+        })
+        // 将外部捕获的上下文写入这个响应式流
+        .contextWrite(Context.of(contextView))
+        .subscribe(
+                v -> log.info("{}{}✅ Auto-deletion task completed successfully", logPrefix, botLogIdentifier),
+                e -> {
+                    log.error("{}{}❌ Message deletion task failed for user {}: {}", logPrefix, botLogIdentifier, userId, e.getMessage());
+                    // 确保即使在任务失败的情况下也清除用户会话
+                    userSessionService.clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
+                }
+        );
 
         // 存储任务引用，以便用户交互时可以取消
-        return userSessionService.storePendingDeletion(userId, deletionTask).then();
+        return userSessionService.storePendingDeletion(userId, deletionTask)
+                .contextWrite(Context.of(contextView))
+                .then();
     }
 }
