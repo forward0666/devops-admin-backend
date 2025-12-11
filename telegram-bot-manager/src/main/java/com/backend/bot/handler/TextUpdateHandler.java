@@ -189,16 +189,9 @@ public class TextUpdateHandler implements UpdateHandler {
      * 新增 traceLogPrefix 参数用于日志输出。
      */
     private Mono<Void> handleDefaultText(String token, Long chatId, String userText, String logIdentifier, String traceLogPrefix) {
-        if (userText.startsWith("/start")) {
-            // 重新发送主菜单逻辑（假设您有 SendMainMenu 方法）
-            // 打印 Trace ID 日志
-            log.info("{}💬 {} Received /start command. Triggering main menu.", traceLogPrefix, logIdentifier);
-            // 假设 main menu 逻辑在 BotClientService 或其他地方
-            String welcomeText = TelegramConstants.WELCOME_MESSAGE;
-            // 这里应该调用一个发送主菜单的方法，此处简化为发送文本
-            return botClientService.sendMessage(token, chatId, welcomeText, null).then();
-        }
-
+        // 移除对 /start 命令的处理，统一由 StartCommandHandler 处理
+        // 这样可以确保在二级菜单时点击 /start 不会创建新菜单，而是提示用户先完成当前操作
+        
         // 修复：忽略其他普通文本，不再回复任何提示。
         // 打印 Trace ID 日志
         log.debug("{}🤫 {} Ignoring non-session text: {}", traceLogPrefix, logIdentifier, userText);

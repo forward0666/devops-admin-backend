@@ -57,30 +57,12 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         return redisUserSessionService.hasAnySession(userId)
                 .flatMap(hasSession -> {
                     if (hasSession) {
-                        // 用户有会话标记，检查具体会话状态
-                        return userSessionService.getUserSession(userId)
-                                .flatMap(session -> {
-                                    String state = session.getState();
-                                    
-                                    // 如果用户正在处理/start请求，只返回提示信息，不执行任何其他操作
-                                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
-                                        log.info("{}⚠️ User {} is already processing /start command. Ignoring duplicate request.", logPrefix, userId);
-                                        return botClientService.sendMessage(token, chatId, "⏳ 您的菜单正在处理中，请稍候...", null)
-                                                .then(Mono.empty());
-                                    }
-                                    
-                                    // 用户有其他活跃会话（如在二级菜单中），通知用户当前状态
-                                    log.info("{}⚠️ User {} has an active session with state {}. Notifying user instead of creating new menu.", 
-                                            logPrefix, userId, state);
-                                    
-                                    // 根据状态返回不同的提示消息
-                                    String stateMessage = getStateMessage(state);
-                                    return botClientService.sendMessage(token, chatId, stateMessage, null)
-                                            .then();
-                                })
-                                // 如果没有具体的会话数据，但有会话标记，也提示用户
-                                .switchIfEmpty(botClientService.sendMessage(token, chatId, 
-                                        "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。", null).then());
+                        // 用户有会话标记，说明用户当前正在进行操作
+                        // 无论是什么状态（包括正在处理/start），都应该提示用户而不是创建新菜单
+                        log.info("{}⚠️ User {} has an active session. Notifying user to complete current operation first.", logPrefix, userId);
+                        return botClientService.sendMessage(token, chatId, 
+                                "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。", null)
+                                .then();
                     } else {
                         // 用户没有会话标记，创建新会话
                         log.info("{}✅ User {} has no session markers. Creating new menu.", logPrefix, userId);
@@ -92,17 +74,8 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     /**
      * 根据会话状态返回相应的提示消息
      */
-    private String getStateMessage(String state) {
-        if (TelegramConstants.SESSION_STATE_AWAITING_FRONTEND_IP.equals(state)) {
-            return "⚠️ 您正在输入前端前台域名IP，请完成当前操作或发送 /cancel 取消。";
-        } else if (TelegramConstants.SESSION_STATE_AWAITING_BACKEND_IP.equals(state)) {
-            return "⚠️ 您正在输入前端后台域名IP，请完成当前操作或发送 /cancel 取消。";
-        } else if (state.startsWith(TelegramConstants.SESSION_STATE_PREFIX)) {
-            return "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。";
-        } else {
-            return "⚠️ 您有一个正在进行的操作，请完成当前操作。";
-        }
-    }
+    // getStateMessage 方法不再需要，因为我们简化了逻辑
+    // 移除了这个方法，因为现在无论用户处于什么状态，只要 Redis 中有会话标记，就返回相同的消息
     
     /**
      * 处理/start命令的实际逻辑
@@ -122,7 +95,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                             .doOnError(e -> {
                                 log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
                                 // 出错时也要清除处理状态
-                                userSessionService.clearUserSession(userId).subscribe();
+                                userSessionService.clearUserSession(userId).contextWrite(reactor.util.context.Context.of(contextView)).subscribe();
                             })
                             .then(); // 转换为Mono<Void>
                 }));

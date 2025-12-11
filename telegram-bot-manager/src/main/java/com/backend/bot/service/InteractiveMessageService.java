@@ -67,14 +67,14 @@ public class InteractiveMessageService {
                 .doFinally(signalType -> {
                     // 确保无论如何都会清除用户会话
                     log.info("{}🔒 Auto-deletion task finished with signal: {}. Forcibly clearing user session.", fullLogIdentifier, signalType);
-                    userSessionService.clearUserSession(userId).subscribe();
+                    userSessionService.clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
                 })
                 .subscribe(
                         v -> log.info("{}✅ Auto-deletion task completed successfully", fullLogIdentifier),
                         e -> {
                             log.error("{}❌ Message deletion task failed for user {}: {}", fullLogIdentifier, userId, e.getMessage());
                             // 确保即使在任务失败的情况下也清除用户会话
-                            userSessionService.clearUserSession(userId).subscribe();
+                            userSessionService.clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
                         }
                 );
 

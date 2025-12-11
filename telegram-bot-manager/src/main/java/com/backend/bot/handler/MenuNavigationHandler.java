@@ -63,6 +63,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
         // 1. 🌟 关键修复：使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
+            final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
             // 2. 编辑当前消息，更新键盘
             return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
                     .doOnSuccess(response -> {
@@ -77,23 +78,47 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                                 contextView // <-- 传入 ContextView 以保证 traceId 传播
                         ).subscribe();
                     })
-                    .onErrorResume(e -> {
-                        log.error("❌ {} Failed to edit message (ID: {}) for navigation. Sending new /start prompt.", logIdentifier, messageId, e);
-                        // 如果编辑失败（消息太旧），提示用户重新开始
-                        return botClientService.sendMessage(token, chatId, "菜单操作失败或消息过时，请重新 /start。", null);
+                    .onErrorResume(e -> { // 外部异常 e
+                        log.warn("{}⚠️ Could not edit message (ID: {}). Reason: {}. Sending new message instead.", traceLogPrefix, messageId, e.getMessage());
+                        // 如果编辑失败（消息太旧或已被删除），发送新消息
+                        return botClientService.sendMenuMessageWithResponse(token, chatId, menuText, newMarkup)
+                                .flatMap(responseJson -> {
+                                    try {
+                                        // 从响应中提取消息ID
+                                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                                        com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(responseJson);
+                                        com.fasterxml.jackson.databind.JsonNode resultNode = rootNode.path("result");
+                                        Long newMessageId = resultNode.path("message_id").asLong(0L);
+
+                                        if (newMessageId > 0) {
+                                            // 为新消息设置自动删除
+                                            interactiveMessageService.scheduleMessageDeletion(
+                                                    token,
+                                                    userId,
+                                                    chatId,
+                                                    newMessageId,
+                                                    delaySeconds,
+                                                    logIdentifier,
+                                                    contextView
+                                            ).subscribe();
+                                        }
+                                        return Mono.empty();
+                                    } catch (Exception parseException) { // 修复：将内部 catch 变量 e 改名为 parseException
+                                        log.error("{}❌ Failed to parse message ID from response: {}", traceLogPrefix, responseJson, parseException);
+                                        return Mono.empty();
+                                    }
+                                });
                     })
                     .then();
         });
     }
 
     /**
-     * 根据回调数据判断目标菜单的级别，返回对应的销毁延迟时间。
-     * 使用中央常量确保配置一致性
+     * 统一返回菜单的销毁延迟时间。
+     * 一级菜单和二级菜单都使用相同的销毁时间
      */
     private int getDeletionDelay(String callbackData) {
-        if (callbackData.equals(CallbackConstants.MAIN_MENU_BACK) || callbackData.startsWith(CallbackConstants.MAIN_MENU_CALLBACK)) {
-            return TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
-        }
-        return TelegramConstants.SECONDARY_MENU_DELETE_DELAY_SECONDS;
+        // 使用统一的菜单删除延迟常量
+        return TelegramConstants.MENU_DELETE_DELAY_SECONDS;
     }
 }
