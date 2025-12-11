@@ -91,7 +91,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                     InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createDynamicKeyboard("IP_WHITE_LIST");
 
                     return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
-                            .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView))
+                            .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
                             .doOnError(e -> {
                                 log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
                                 // 出错时也要清除处理状态
@@ -104,7 +104,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     /**
      * 💡 额外建议：将解析 Response 的逻辑也提取为私有方法，让 handleUpdate 更清晰
      */
-    private void handleSendResponse(String responseJson, String token, Long userId, Long chatId, String logPrefix, ContextView contextView) {
+    private void handleSendResponse(String responseJson, String token, Long userId, Long chatId, String logPrefix, ContextView contextView, HandlerContext context) {
         log.debug("{}🔍 Received Telegram sendMessage response JSON: {}", logPrefix, responseJson);
         try {
             JsonNode root = objectMapper.readTree(responseJson);
@@ -119,7 +119,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
             if (messageId != 0) {
                 interactiveMessageService.scheduleMessageDeletion(
                         token, userId, chatId, messageId,
-                        DELETE_DELAY_SECONDS, logPrefix, contextView
+                        DELETE_DELAY_SECONDS, context.logIdentifier(), contextView
                 ).subscribe();
             } else {
                 log.warn("{}⚠️ Message ID is 0.", logPrefix);

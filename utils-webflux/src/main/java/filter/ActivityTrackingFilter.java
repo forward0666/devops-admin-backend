@@ -75,7 +75,7 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
                     };
 
                     // 使用 INFO 级别记录请求的完成，便于追踪
-                    log.info("[traceId={}] 👌 Request finished: {} | Status: {}", getTraceId(exchange), requestId, status);
+                    log.info("[traceId={}]👌 Request finished: {} | Status: {}", getTraceId(exchange), requestId, status);
                 })
                 // 2. 统一处理所有超时相关的异常 (TimeoutException 和 AggressiveTimeoutException)
                 // 此处捕获 TimeoutException，并确保 Webhook 返回 200 OK
