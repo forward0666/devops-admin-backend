@@ -3,6 +3,7 @@ package com.backend.bot.service;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.util.LogUtils; // 假设存在 LogUtils
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentMap;
  * 注意：在分布式或生产环境中，需要替换为持久化存储（如 Redis）。
  */
 @Service
+@Profile("dev")
 @Slf4j
 public class InMemoryUserSessionService implements UserSessionService {
 

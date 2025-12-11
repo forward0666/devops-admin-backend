@@ -7,6 +7,7 @@ import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
+import com.backend.bot.service.RedisUserSessionService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.template.MenuType;
 import com.backend.bot.util.BotUserUtils; // 引入新工具类
@@ -28,6 +29,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
     private final UserSessionService userSessionService;
+    private final RedisUserSessionService redisUserSessionService;
     private final ObjectMapper objectMapper;
 
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
@@ -51,36 +53,55 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
 
-        // 使用 filterWhen 来检查用户是否已经在处理/start请求
-        return Mono.just(userId)
-                .filterWhen(id -> userSessionService.getUserSession(id)
-                        .map(session -> {
-                            // 如果用户没有会话或者会话状态不是PROCESSING_START，则允许处理
-                            String state = session.getState();
-                            boolean isProcessingStart = TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state);
-                            
-                            if (isProcessingStart) {
-                                log.info("{}⚠️ User {} is already processing /start command. Ignoring duplicate request.", logPrefix, id);
-                                // 异步发送提示信息
-                                botClientService.sendMessage(token, chatId, "⏳ 正在处理您的请求，请稍候...", null)
-                                        .subscribe();
-                            }
-                            
-                            return !isProcessingStart; // 返回true表示允许处理，false表示过滤掉
-                        })
-                        .defaultIfEmpty(true) // 如果用户没有会话，允许处理
-                )
-                .flatMap(allowedId -> {
-                    // 检查用户是否有其他会话需要清除
-                    return userSessionService.getUserSession(allowedId)
-                            .flatMap(session -> {
-                                // 用户有其他会话，取消现有会话并继续处理/start
-                                return userSessionService.clearUserSession(allowedId)
-                                        .then(processStartCommand(context, logPrefix, contextView));
-                            })
-                            .switchIfEmpty(processStartCommand(context, logPrefix, contextView)); // 用户没有会话，直接处理/start
-                })
-                .then(); // 确保返回Mono<Void>
+        // 检查 Redis 中是否存在用户会话标记（UserSession:1 或 UserSession:0）
+        return redisUserSessionService.hasAnySession(userId)
+                .flatMap(hasSession -> {
+                    if (hasSession) {
+                        // 用户有会话标记，检查具体会话状态
+                        return userSessionService.getUserSession(userId)
+                                .flatMap(session -> {
+                                    String state = session.getState();
+                                    
+                                    // 如果用户正在处理/start请求，只返回提示信息，不执行任何其他操作
+                                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
+                                        log.info("{}⚠️ User {} is already processing /start command. Ignoring duplicate request.", logPrefix, userId);
+                                        return botClientService.sendMessage(token, chatId, "⏳ 您的菜单正在处理中，请稍候...", null)
+                                                .then(Mono.empty());
+                                    }
+                                    
+                                    // 用户有其他活跃会话（如在二级菜单中），通知用户当前状态
+                                    log.info("{}⚠️ User {} has an active session with state {}. Notifying user instead of creating new menu.", 
+                                            logPrefix, userId, state);
+                                    
+                                    // 根据状态返回不同的提示消息
+                                    String stateMessage = getStateMessage(state);
+                                    return botClientService.sendMessage(token, chatId, stateMessage, null)
+                                            .then();
+                                })
+                                // 如果没有具体的会话数据，但有会话标记，也提示用户
+                                .switchIfEmpty(botClientService.sendMessage(token, chatId, 
+                                        "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。", null).then());
+                    } else {
+                        // 用户没有会话标记，创建新会话
+                        log.info("{}✅ User {} has no session markers. Creating new menu.", logPrefix, userId);
+                        return processStartCommand(context, logPrefix, contextView);
+                    }
+                });
+    }
+    
+    /**
+     * 根据会话状态返回相应的提示消息
+     */
+    private String getStateMessage(String state) {
+        if (TelegramConstants.SESSION_STATE_AWAITING_FRONTEND_IP.equals(state)) {
+            return "⚠️ 您正在输入前端前台域名IP，请完成当前操作或发送 /cancel 取消。";
+        } else if (TelegramConstants.SESSION_STATE_AWAITING_BACKEND_IP.equals(state)) {
+            return "⚠️ 您正在输入前端后台域名IP，请完成当前操作或发送 /cancel 取消。";
+        } else if (state.startsWith(TelegramConstants.SESSION_STATE_PREFIX)) {
+            return "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。";
+        } else {
+            return "⚠️ 您有一个正在进行的操作，请完成当前操作。";
+        }
     }
     
     /**
