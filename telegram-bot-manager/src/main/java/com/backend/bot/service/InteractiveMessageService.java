@@ -79,12 +79,9 @@ public class InteractiveMessageService {
                                                 .contextWrite(cv)
                                                 .subscribe();
                                     } else {
-                                        // userId 为 0 表示这是系统消息，不需要清理会话
-                                        log.info("{}🔒 System message deletion completed, no session cleanup needed (userId=0).", combinedLogPrefix);
-                                        // 只需要取消待删除任务，不清理会话
-                                        userSessionService.cancelPendingDeletion(userId)
-                                                .contextWrite(cv)
-                                                .subscribe();
+                                        // userId 为 0 表示这是系统消息，不需要清理会话或待删除任务
+                                        // 系统消息应该独立完成，不互相影响
+                                        log.info("{}🔒 System message deletion completed, no session or task cleanup needed (userId=0).", combinedLogPrefix);
                                     }
 
                                 } else if (signalType == reactor.core.publisher.SignalType.ON_ERROR) {
