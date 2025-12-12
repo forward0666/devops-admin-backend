@@ -5,7 +5,7 @@ import com.backend.bot.service.RedisUserSessionService;
 import com.backend.bot.service.UserSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import network.HttpResponseUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -42,10 +42,9 @@ public class UserSessionController {
         return userSessionService.getUserSession(userId)
                 .map(session -> {
                     Map<String, Object> sessionData = convertSessionToMap(session);
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", sessionData));
+                    return HttpResponseUtils.ok(sessionData);
                 })
-                .defaultIfEmpty(ResponseEntity.ok(buildResponse(HttpStatus.OK, "用户无活跃会话", 
-                        Map.of("userId", userId, "hasSession", false))));
+                .defaultIfEmpty(HttpResponseUtils.ok(Map.of("userId", userId, "hasSession", false)));
     }
 
     /**
@@ -62,7 +61,7 @@ public class UserSessionController {
                     Map<String, Object> data = new HashMap<>();
                     data.put("userId", userId);
                     data.put("cleared", true);
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "用户会话清除成功", data));
+                    return HttpResponseUtils.ok(data);
                 });
     }
 
@@ -81,7 +80,7 @@ public class UserSessionController {
         stats.put("expiredSessions", 0);
         stats.put("averageSessionDuration", "0 minutes");
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "统计信息获取成功", stats)));
+        return Mono.just(HttpResponseUtils.ok(stats));
     }
 
     /**
@@ -95,8 +94,8 @@ public class UserSessionController {
             @RequestParam(defaultValue = "100") Integer limit) {
         // 注意：这里需要实现一个获取所有活跃会话的方法
         // 暂时返回空列表
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", 
-                Map.of("sessions", new Object[0], "limit", limit))));
+        return Mono.just(HttpResponseUtils.ok(
+                Map.of("sessions", new Object[0], "limit", limit)));
     }
 
     /**
@@ -118,17 +117,4 @@ public class UserSessionController {
         return sessionData;
     }
 
-    /**
-     * 构建统一响应结构
-     */
-    private Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", status.is2xxSuccessful() ? "ok" : "error");
-        result.put("code", status.value());
-        result.put("message", msg);
-        if (data != null) {
-            result.put("data", data);
-        }
-        return result;
-    }
 }

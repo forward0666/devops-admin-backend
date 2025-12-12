@@ -3,6 +3,7 @@ package com.backend.bot.controller;
 import com.backend.bot.service.WhitelistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import network.HttpResponseUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,7 @@ public class WhitelistManagementController {
         data.put("ips", new Object[0]);
         data.put("domainType", domainType);
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -67,16 +68,14 @@ public class WhitelistManagementController {
                     
                     if (Boolean.TRUE.equals(success)) {
                         data.put("requestId", UUID.randomUUID().toString());
-                        return ResponseEntity.ok(buildResponse(HttpStatus.OK, "IP添加到白名单成功", data));
+                        return HttpResponseUtils.ok(data);
                     } else {
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "IP添加到白名单失败", data));
+                        return HttpResponseUtils.internalError("IP添加到白名单失败");
                     }
                 })
                 .onErrorResume(e -> {
                     log.error("添加IP到白名单时发生错误", e);
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "操作失败: " + e.getMessage(), null)));
+                    return Mono.just(HttpResponseUtils.internalError("操作失败: " + e.getMessage()));
                 });
     }
 
@@ -97,7 +96,7 @@ public class WhitelistManagementController {
         data.put("ip", ip);
         data.put("domainType", domainType);
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "IP从白名单删除成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -121,7 +120,7 @@ public class WhitelistManagementController {
                 "total", 0
         ));
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -141,7 +140,7 @@ public class WhitelistManagementController {
         data.put("successCount", 0);
         data.put("failureCount", 0);
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "批量添加完成", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -193,17 +192,4 @@ public class WhitelistManagementController {
         }
     }
 
-    /**
-     * 构建统一响应结构
-     */
-    private Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", status.is2xxSuccessful() ? "ok" : "error");
-        result.put("code", status.value());
-        result.put("message", msg);
-        if (data != null) {
-            result.put("data", data);
-        }
-        return result;
-    }
 }

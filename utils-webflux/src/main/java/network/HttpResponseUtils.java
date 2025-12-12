@@ -96,6 +96,30 @@ public class HttpResponseUtils {
                 .body(buildResponse(HttpStatus.NOT_FOUND, msg, null));
     }
 
+    /** 409 Conflict */
+    public static ResponseEntity<Map<String, Object>> conflict(String msg) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(buildResponse(HttpStatus.CONFLICT, msg, null));
+    }
+
+    /** 409 Conflict with data */
+    public static ResponseEntity<Map<String, Object>> conflict(String msg, Map<String, Object> data) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(buildResponse(HttpStatus.CONFLICT, msg, data));
+    }
+
+    /** 503 Service Unavailable */
+    public static ResponseEntity<Map<String, Object>> serviceUnavailable(String msg) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, msg, null));
+    }
+
+    /** 503 Service Unavailable with data */
+    public static ResponseEntity<Map<String, Object>> serviceUnavailable(String msg, Map<String, Object> data) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, msg, data));
+    }
+
     /** 429 Too Many Requests (限流常用) */
     public static ResponseEntity<Map<String, Object>> tooManyRequests(String msg) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

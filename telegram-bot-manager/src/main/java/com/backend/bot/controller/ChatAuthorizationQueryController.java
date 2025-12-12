@@ -6,7 +6,7 @@ import com.backend.bot.repository.BotAuthorizedChatRepository;
 import com.backend.bot.service.BotCoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import network.HttpResponseUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -48,11 +48,10 @@ public class ChatAuthorizationQueryController {
                                 data.put("botName", botName);
                                 data.put("botId", bot.getId());
                                 data.put("authorizedChats", chats);
-                                return ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", data));
+                                return HttpResponseUtils.ok(data);
                             });
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定名称的Bot", null)));
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
     }
 
     /**
@@ -84,7 +83,7 @@ public class ChatAuthorizationQueryController {
                     Map<String, Object> data = new HashMap<>();
                     data.put("chatId", chatId);
                     data.put("authorizedBots", bots);
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", data));
+                    return HttpResponseUtils.ok(data);
                 });
     }
 
@@ -107,10 +106,9 @@ public class ChatAuthorizationQueryController {
                     data.put("id", id);
                     data.put("botConfigId", auth.getBotConfigId());
                     data.put("chatId", auth.getChatId());
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "授权删除成功", data));
+                    return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定的授权记录", null)));
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定的授权记录"));
     }
 
     /**
@@ -157,24 +155,9 @@ public class ChatAuthorizationQueryController {
                                         .orElse(null);
                                 stats.put("latestAuthorization", latestAuth);
                                 
-                                return ResponseEntity.ok(buildResponse(HttpStatus.OK, "统计信息获取成功", stats));
+                                return HttpResponseUtils.ok(stats);
                             });
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定名称的Bot", null)));
-    }
-
-    /**
-     * 构建统一响应结构
-     */
-    private Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", status.is2xxSuccessful() ? "ok" : "error");
-        result.put("code", status.value());
-        result.put("message", msg);
-        if (data != null) {
-            result.put("data", data);
-        }
-        return result;
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
     }
 }

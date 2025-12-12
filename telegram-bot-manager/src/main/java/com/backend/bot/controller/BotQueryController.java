@@ -1,14 +1,12 @@
 package com.backend.bot.controller;
 
-import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.vo.BotVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import network.HttpResponseUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -37,7 +35,9 @@ public class BotQueryController {
     public Mono<ResponseEntity<Map<String, Object>>> getAllBots() {
         // 注意：这里需要添加一个获取所有Bot的方法到BotCoreService
         // 暂时返回空列表
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", List.of())));
+        Map<String, Object> data = new HashMap<>();
+        data.put("bots", List.of());
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -53,10 +53,9 @@ public class BotQueryController {
                     BotVo botVo = botCoreService.convertToVo(entity);
                     Map<String, Object> data = new HashMap<>();
                     data.put("bot", botVo);
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "查询成功", data));
+                    return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定名称的Bot", null)));
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
     }
 
     /**
@@ -72,8 +71,7 @@ public class BotQueryController {
             @RequestParam Integer status) {
 
         if (status != 0 && status != 1) {
-            return Mono.just(ResponseEntity.badRequest()
-                    .body(buildResponse(HttpStatus.BAD_REQUEST, "状态值只能是 0 (禁用) 或 1 (启用)", null)));
+            return Mono.just(HttpResponseUtils.badRequest("状态值只能是 0 (禁用) 或 1 (启用)"));
         }
 
         return botCoreService.updateBotStatusByName(name, status)
@@ -81,10 +79,9 @@ public class BotQueryController {
                     Map<String, Object> data = new HashMap<>();
                     data.put("botName", name);
                     data.put("status", status);
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "状态更新成功", data));
+                    return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定名称的Bot", null)));
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
     }
     
     /**
@@ -100,10 +97,9 @@ public class BotQueryController {
                     Map<String, Object> data = new HashMap<>();
                     data.put("botName", name);
                     data.put("status", entity.getStatus());
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "状态查询成功", data));
+                    return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(buildResponse(HttpStatus.NOT_FOUND, "未找到指定名称的Bot", null)));
+                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
     }
 
     /**
@@ -119,22 +115,9 @@ public class BotQueryController {
         Map<String, Object> data = new HashMap<>();
         data.put("botName", name);
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "Bot删除成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
 
 
-    /**
-     * 构建统一响应结构
-     */
-    private Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", status.is2xxSuccessful() ? "ok" : "error");
-        result.put("code", status.value());
-        result.put("message", msg);
-        if (data != null) {
-            result.put("data", data);
-        }
-        return result;
-    }
 }

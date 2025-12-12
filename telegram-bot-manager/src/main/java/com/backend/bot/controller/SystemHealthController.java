@@ -4,6 +4,7 @@ import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.CacheTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import network.HttpResponseUtils;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -63,7 +64,7 @@ public class SystemHealthController {
                 );
             
             // 立即返回成功响应
-            return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "缓存状态正常", data)));
+            return Mono.just(HttpResponseUtils.ok(data));
         } catch (Exception e) {
             log.error("Redis连接检查失败", e);
             Map<String, Object> data = new HashMap<>();
@@ -72,8 +73,7 @@ public class SystemHealthController {
             data.put("error", e.getMessage());
             data.put("timestamp", Instant.now());
             
-            return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "缓存服务不可用", data)));
+            return Mono.just(HttpResponseUtils.serviceUnavailable("缓存服务不可用", data));
         }
     }
 
@@ -95,7 +95,7 @@ public class SystemHealthController {
                     data.put("database", "connected");
                     data.put("queryResult", result);
                     data.put("timestamp", Instant.now());
-                    return ResponseEntity.ok(buildResponse(HttpStatus.OK, "数据库状态正常", data));
+                    return HttpResponseUtils.ok(data);
                 })
                 .onErrorResume(e -> {
                     log.error("数据库连接检查失败", e);
@@ -105,8 +105,7 @@ public class SystemHealthController {
                     data.put("error", e.getMessage());
                     data.put("timestamp", Instant.now());
                     
-                    return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                            .body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "数据库服务不可用", data)));
+                    return Mono.just(HttpResponseUtils.serviceUnavailable("数据库服务不可用", data));
                 });
     }
 
@@ -127,7 +126,7 @@ public class SystemHealthController {
         data.put("botName", botName);
         data.put("timestamp", Instant.now());
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "Telegram API状态正常", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -150,7 +149,7 @@ public class SystemHealthController {
         ));
         data.put("timestamp", Instant.now());
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "Bot使用统计获取成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -178,7 +177,7 @@ public class SystemHealthController {
         ));
         data.put("timestamp", Instant.now());
         
-        return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "消息处理统计获取成功", data)));
+        return Mono.just(HttpResponseUtils.ok(data));
     }
 
     /**
@@ -214,7 +213,7 @@ public class SystemHealthController {
             
             data.put("timestamp", Instant.now());
             
-            return Mono.just(ResponseEntity.ok(buildResponse(HttpStatus.OK, "系统运行正常", data)));
+            return Mono.just(HttpResponseUtils.ok(data));
         } catch (Exception e) {
             log.error("健康检查失败", e);
             Map<String, Object> data = new HashMap<>();
@@ -222,22 +221,8 @@ public class SystemHealthController {
             data.put("error", e.getMessage());
             data.put("timestamp", Instant.now());
             
-            return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "健康检查失败", data)));
+            return Mono.just(HttpResponseUtils.serviceUnavailable("健康检查失败", data));
         }
     }
 
-    /**
-     * 构建统一响应结构
-     */
-    private Map<String, Object> buildResponse(HttpStatus status, String msg, Object data) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", status.is2xxSuccessful() ? "ok" : "error");
-        result.put("code", status.value());
-        result.put("message", msg);
-        if (data != null) {
-            result.put("data", data);
-        }
-        return result;
-    }
 }
