@@ -1,6 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.dto.BotRegisterDto;
+import com.backend.bot.entity.BotAuthorizedChatEntity;
 import com.backend.bot.entity.BotConfigEntity; // 统一使用 BotConfigEntity
 import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
@@ -174,7 +175,8 @@ public class BotCoreService {
 
         // 2. 定义数据库查询逻辑
         Mono<Boolean> dbFetcher = authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
-                .hasElement(); // 将 Mono<Entity> 转换为 Mono<Boolean>
+                .map(BotAuthorizedChatEntity::isAuthorized) // 检查记录是否存在且status=1(已授权)
+                .defaultIfEmpty(false); // 如果记录不存在，返回false
 
         // 3. 调用通用的 Set 旁路缓存模板
         return cacheTemplateService.checkSetMembershipOrFetch(
@@ -199,6 +201,97 @@ public class BotCoreService {
         return CACHE_WHITELIST_PREFIX + sanitizedBotName + CACHE_KEY_SEPARATOR + botConfigId;
     }
 
+    /**
+     * 更新授权聊天状态并更新缓存
+     * 
+     * @param botName Bot 名称
+     * @param botConfigId Bot 配置 ID
+     * @param chatId 聊天ID
+     * @param status 新状态 (0=禁用, 1=启用)
+     * @return Mono<Boolean> - true 如果更新成功，false 如果记录不存在
+     */
+    public Mono<Boolean> updateChatAuthorizationStatus(String botName, Long botConfigId, Long chatId, Integer status) {
+        log.info("📝 Updating authorization for bot {} (ID: {}), chat {} to status: {}", botName, botConfigId, chatId, status);
+        
+        // 1. 查询并更新数据库中的记录
+        return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
+                .flatMap(entity -> {
+                    entity.setStatus(status);
+                    return authorizedChatRepository.save(entity);
+                })
+                .flatMap(savedEntity -> {
+                    // 2. 更新缓存
+                    String cacheKey = getWhitelistCacheKey(botName, botConfigId);
+                    String chatIdStr = String.valueOf(chatId);
+                    
+                    if (status == 1) {
+                        // 启用授权：添加到缓存
+                        return redisTemplate.opsForSet().add(cacheKey, chatIdStr)
+                                .flatMap(count -> redisTemplate.expire(cacheKey, CACHE_VALID_DURATION))
+                                .thenReturn(true)
+                                .doOnSuccess(v -> log.info("✅ Chat {} authorization enabled and cached for bot {}", chatId, botName));
+                    } else {
+                        // 禁用授权：从缓存中移除
+                        return redisTemplate.opsForSet().remove(cacheKey, chatIdStr)
+                                .thenReturn(true)
+                                .doOnSuccess(v -> log.info("✅ Chat {} authorization disabled and removed from cache for bot {}", chatId, botName));
+                    }
+                })
+                .defaultIfEmpty(false) // 记录不存在返回false
+                .doOnSuccess(success -> {
+                    if (!success) {
+                        log.warn("⚠️ Failed to update authorization status for bot {}, chat {} - record not found", botName, chatId);
+                    }
+                })
+                .doOnError(e -> log.error("❌ Error updating authorization status for bot {}, chat {}", botName, chatId, e));
+    }
+    
+    /**
+     * 添加新的授权聊天
+     * 
+     * @param botName Bot 名称
+     * @param botConfigId Bot 配置 ID
+     * @param chatId 聊天ID
+     * @param chatName 聊天名称（可选）
+     * @param type 聊天类型（private, group, supergroup等）
+     * @return Mono<Boolean> - true 如果添加成功，false 如果已存在
+     */
+    public Mono<Boolean> addAuthorizedChat(String botName, Long botConfigId, Long chatId, String chatName, String type) {
+        log.info("📝 Adding authorized chat {} for bot {} (ID: {})", chatId, botName, botConfigId);
+        
+        // 1. 检查是否已存在
+        return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
+                .hasElement()
+                .flatMap(exists -> {
+                    if (exists) {
+                        log.warn("⚠️ Chat {} already authorized for bot {}", chatId, botName);
+                        return Mono.just(false);
+                    }
+                    
+                    // 2. 创建新记录
+                    BotAuthorizedChatEntity entity = new BotAuthorizedChatEntity();
+                    entity.setBotConfigId(botConfigId);
+                    entity.setChatId(chatId);
+                    entity.setChatName(chatName);
+                    entity.setType(type);
+                    entity.setStatus(1); // 默认启用
+                    
+                    // 3. 保存到数据库
+                    return authorizedChatRepository.save(entity)
+                            .flatMap(savedEntity -> {
+                                // 4. 更新缓存
+                                String cacheKey = getWhitelistCacheKey(botName, botConfigId);
+                                String chatIdStr = String.valueOf(chatId);
+                                
+                                return redisTemplate.opsForSet().add(cacheKey, chatIdStr)
+                                        .flatMap(count -> redisTemplate.expire(cacheKey, CACHE_VALID_DURATION))
+                                        .thenReturn(true)
+                                        .doOnSuccess(v -> log.info("✅ Chat {} authorized and cached for bot {}", chatId, botName));
+                            });
+                })
+                .doOnError(e -> log.error("❌ Error adding authorized chat {} for bot {}", chatId, botName, e));
+    }
+    
     // ❌ 移除未使用的 getCacheEntityKey(String botName, String botId)
     // ❌ 移除未使用的 getCacheWhitelistKey(String botName)
 }

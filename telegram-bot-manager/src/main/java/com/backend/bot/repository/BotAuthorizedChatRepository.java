@@ -20,4 +20,14 @@ public interface BotAuthorizedChatRepository extends R2dbcRepository<BotAuthoriz
      * @return Mono<BotAuthorizedChatEntity> 如果找到记录，则返回 Mono，否则返回 Mono.empty()
      */
     Mono<BotAuthorizedChatEntity> findByBotConfigIdAndChatId(Long botConfigId, Long chatId);
+    
+    /**
+     * 根据 botConfigId 和 chatId 查询并更新授权状态。
+     *
+     * @param botConfigId 关联的机器人配置ID
+     * @param chatId 要更新状态的聊天ID
+     * @param status 新的状态 (0=禁用, 1=启用)
+     * @return Mono<BotAuthorizedChatEntity> 更新后的实体，如果记录不存在则返回 Mono.empty()
+     */
+    Mono<BotAuthorizedChatEntity> findByBotConfigIdAndChatIdAndStatus(Long botConfigId, Long chatId, Integer status);
 }
