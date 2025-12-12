@@ -144,13 +144,14 @@ public class BotCoreService {
      * @param botEntity BotConfigEntity 实体
      * @return 转换后的 BotVo
      */
-    private BotVo convertToVo(BotConfigEntity botEntity) {
-        // 占位符，实现 Entity 到 VO 的转换逻辑
+    public BotVo convertToVo(BotConfigEntity botEntity) {
         BotVo vo = new BotVo();
         if (botEntity != null) {
+            vo.setId(botEntity.getId());
             vo.setBotName(botEntity.getBotName());
             vo.setBotUsername(botEntity.getBotUsername());
-            // conversion logic
+            vo.setStatus(botEntity.getStatus());
+            vo.setCreatedAt(botEntity.getCreatedAt());
         }
         return vo;
     }
@@ -292,6 +293,51 @@ public class BotCoreService {
                 .doOnError(e -> log.error("❌ Error adding authorized chat {} for bot {}", chatId, botName, e));
     }
     
+    /**
+     * 根据Bot名称更新Bot状态并清除缓存
+     * 
+     * @param botName Bot名称
+     * @param status 新状态
+     * @return Mono<BotConfigEntity> 更新后的实体，如果记录不存在则返回 Mono.empty()
+     */
+    public Mono<BotConfigEntity> updateBotStatusByName(String botName, Integer status) {
+        log.info("📝 Updating bot {} status to: {}", botName, status);
+        return botRepository.findByBotName(botName)
+                .flatMap(entity -> {
+                    entity.setStatus(status);
+                    return botRepository.save(entity);
+                })
+                .flatMap(savedEntity -> {
+                    // 清除缓存，确保下次查询获取最新状态
+                    return clearBotCache(savedEntity.getBotName()).thenReturn(savedEntity);
+                })
+                .doOnSuccess(v -> log.info("✅ Successfully updated bot {} status to: {}", botName, status))
+                .doOnError(e -> log.error("❌ Failed to update bot {} status: {}", botName, e.getMessage(), e));
+    }
+
+    /**
+     * 根据Bot ID查询Bot实体
+     * 
+     * @param id Bot ID
+     * @return BotConfigEntity 或空 Mono
+     */
+    public Mono<BotConfigEntity> findByBotId(Long id) {
+        return botRepository.findById(id);
+    }
+
+    /**
+     * 清除指定Bot的缓存
+     * 
+     * @param botName Bot名称
+     * @return Mono<Void>
+     */
+    private Mono<Void> clearBotCache(String botName) {
+        String cacheKey = getBotEntityCacheKey(botName);
+        return redisTemplate.delete(cacheKey).then()
+                .doOnSuccess(v -> log.debug("✅ Cleared cache for bot: {}", botName))
+                .doOnError(e -> log.error("❌ Failed to clear cache for bot {}: {}", botName, e.getMessage(), e));
+    }
+
     // ❌ 移除未使用的 getCacheEntityKey(String botName, String botId)
     // ❌ 移除未使用的 getCacheWhitelistKey(String botName)
 }

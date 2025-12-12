@@ -3,6 +3,7 @@ package com.backend.bot.repository;
 import com.backend.bot.entity.BotAuthorizedChatEntity;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -30,4 +31,20 @@ public interface BotAuthorizedChatRepository extends R2dbcRepository<BotAuthoriz
      * @return Mono<BotAuthorizedChatEntity> 更新后的实体，如果记录不存在则返回 Mono.empty()
      */
     Mono<BotAuthorizedChatEntity> findByBotConfigIdAndChatIdAndStatus(Long botConfigId, Long chatId, Integer status);
+    
+    /**
+     * 根据 botConfigId 查询所有授权聊天记录
+     *
+     * @param botConfigId 关联的机器人配置ID
+     * @return Flux<BotAuthorizedChatEntity> 授权聊天列表
+     */
+    Flux<BotAuthorizedChatEntity> findAllByBotConfigId(Long botConfigId);
+    
+    /**
+     * 根据 chatId 查询所有包含该聊天ID的授权记录
+     *
+     * @param chatId 聊天ID
+     * @return Flux<BotAuthorizedChatEntity> 授权记录列表
+     */
+    Flux<BotAuthorizedChatEntity> findAllByChatId(Long chatId);
 }

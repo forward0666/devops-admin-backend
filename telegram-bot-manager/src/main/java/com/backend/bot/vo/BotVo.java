@@ -9,7 +9,8 @@ public class BotVo {
     private Long id;
     private String botName;
     private String botUsername;
-    private Boolean active;
     private LocalDateTime createdAt;
+    private Integer status;
+
     // 不包含 botToken
 }
