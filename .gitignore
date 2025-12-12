@@ -1,13 +1,35 @@
-/utils-core/target/
-/gateway/target/
-/cloudflare-logs-producer/target/
-/utils-core/target/
-/utils-webflux/target/
-/.idea/
-/.idea/
-/.idea/*
-/.idea/compiler.xml
-/.idea/encodings.xml
-/.idea/dataSources.xml
-/.idea/jarRepositories.xml
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
 /.idea/
