@@ -34,7 +34,7 @@ public class BotCoreService {
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
-    private static final String CACHE_WHITELIST_PREFIX = "bot:whitelist:set:";
+    private static final String CACHE_WHITELIST_PREFIX = "bot:authorizedchat:set:";
     private static final String CACHE_KEY_SEPARATOR = ":"; // 统一键分隔符
 
     // 🌟 显式构造函数，注入所有依赖，包括自定义 Scheduler 和 CacheTemplateService
