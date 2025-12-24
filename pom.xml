@@ -25,7 +25,9 @@
         <module>gateway</module>                    <!-- 网关模块：负责请求路由和过滤 -->
         <module>cloudflare-logs-producer</module>    <!-- Cloudflare日志生成者 -->
         <module>cloudflare-logs-consumer</module>   <!-- Cloudflare日志消费者：处理日志数据 -->
-        <module>telegram-bot-manager</module>
+        <module>telegram-bot-manager</module>       <!-- Telegram机器人管理器 -->
+        <module>security</module>                    <!-- 安全模块：负责用户认证和授权 -->
+        <module>manage</module>                       <!-- 管理服务模块 -->
     </modules>
 
     <!-- 全局属性配置 -->
