@@ -52,6 +52,7 @@
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
     </properties>
 
     <!-- 依赖管理：统一管理所有子模块的依赖版本 -->
