@@ -23,8 +23,9 @@ import static network.TraceIdUtils.getTraceId;
 import static webflux.WebExchangeUtils.*;
 
 /**
- * 活动追踪过滤器：用于记录请求活动和强制超时。
- * 对所有请求应用超时限制，并对 Webhook 接口进行特殊处理（超时返回 200 OK）。
+ * 活动追踪过滤器：用于记录请求活动。
+ * 仅对 telegram-bot-manager 服务应用 2 秒超时限制，对 Webhook 接口进行特殊处理（超时返回 200 OK）。
+ * 其他服务不设置超时限制。
  * 使用 JVM Shutdown Hook 机制，确保在应用强制关闭时，仍能输出当前活跃的请求列表。
  */
 @Component
@@ -34,8 +35,11 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
 
     // Webhook 路径前缀，用于特殊处理
     private static final String WEBHOOK_PATH_PREFIX = "/bot/callback/";
+    
+    // Telegram Bot Manager 服务名称
+    private static final String TELEGRAM_BOT_MANAGER_ROUTE = "telegram-bot-manager";
 
-    // 全局请求超时时间（沿用您的 5 秒设定）
+    // 仅对 telegram-bot-manager 应用 2 秒超时
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
 
     // 存储当前活跃请求的标识符
@@ -53,15 +57,22 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
         String path = exchange.getRequest().getURI().getPath();
         boolean isWebhook = path.startsWith(WEBHOOK_PATH_PREFIX);
         String requestId = createRequestId(exchange);
+        String routeId = getRouteId(exchange); // 获取路由 ID
+        boolean isTelegramBotManager = TELEGRAM_BOT_MANAGER_ROUTE.equals(routeId); // 判断是否为 telegram-bot-manager 服务
 
         activeRequests.add(requestId);
 
         log.info("[traceId={}]💬 Request started: {}", getTraceId(exchange), requestId);
 
-        // 1. 对所有请求应用 REQUEST_TIMEOUT
-        return chain.filter(exchange)
-                // 使用原生的 timeout()，它在超时时会抛出 TimeoutException
-                .timeout(REQUEST_TIMEOUT)
+        // 根据服务决定是否应用超时
+        Mono<Void> filterChain = chain.filter(exchange);
+        
+        // 仅对 telegram-bot-manager 服务应用 2 秒超时
+        if (isTelegramBotManager) {
+            filterChain = filterChain.timeout(REQUEST_TIMEOUT);
+        }
+        
+        return filterChain
                 .doFinally(signalType -> {
                     // 1. 移除记录
                     activeRequests.remove(requestId);
@@ -80,28 +91,40 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
                 // 2. 统一处理所有超时相关的异常 (TimeoutException 和 AggressiveTimeoutException)
                 // 此处捕获 TimeoutException，并确保 Webhook 返回 200 OK
                 .onErrorResume(TimeoutException.class, ex -> {
-                    if (isWebhook) {
-                        // Webhook 超时：记录警告，返回 200 OK，防止 Telegram 重试
-                        log.warn("🚨 Aggressive timeout triggered for Webhook ({}s) via Exception: {}",
-                                REQUEST_TIMEOUT.getSeconds(), path);
-                        return handleWebhookTimeout(exchange);
-                    }
+                    // 只有 telegram-bot-manager 服务才会触发超时异常
+                    if (isTelegramBotManager) {
+                        if (isWebhook) {
+                            // Webhook 超时：记录警告，返回 200 OK，防止 Telegram 重试
+                            log.warn("🚨 Aggressive timeout triggered for Webhook ({}s) via Exception: {}",
+                                    REQUEST_TIMEOUT.getSeconds(), path);
+                            return handleWebhookTimeout(exchange);
+                        }
 
-                    // 普通 API 超时：重新抛出 AggressiveTimeoutException，由 GlobalExceptionHandler 捕获并返回 504
-                    // 即使 ex 是标准的 TimeoutException，我们也将其包装以统一处理
-                    return Mono.error(new AggressiveTimeoutException(
-                            "API request timed out after " + REQUEST_TIMEOUT.getSeconds() + " seconds."
-                    ));
+                        // 普通 API 超时：重新抛出 AggressiveTimeoutException，由 GlobalExceptionHandler 捕获并返回 504
+                        // 即使 ex 是标准的 TimeoutException，我们也将其包装以统一处理
+                        return Mono.error(new AggressiveTimeoutException(
+                                "API request timed out after " + REQUEST_TIMEOUT.getSeconds() + " seconds."
+                        ));
+                    }
+                    
+                    // 如果不是 telegram-bot-manager 服务，继续传播原始异常
+                    return Mono.error(ex);
                 })
                 // 3. 捕获在处理链中其他地方手动抛出的 AggressiveTimeoutException
                 .onErrorResume(AggressiveTimeoutException.class, ex -> {
-                    if (isWebhook) {
-                        // Webhook 路径：捕获并返回 200 OK
-                        log.error("⚠️ Caught AggressiveTimeoutException in Webhook path, returning 200 OK: {}", ex.getMessage());
-                        return handleWebhookTimeout(exchange);
-                    }
+                    // 只有 telegram-bot-manager 服务才会处理 AggressiveTimeoutException
+                    if (isTelegramBotManager) {
+                        if (isWebhook) {
+                            // Webhook 路径：捕获并返回 200 OK
+                            log.error("⚠️ Caught AggressiveTimeoutException in Webhook path, returning 200 OK: {}", ex.getMessage());
+                            return handleWebhookTimeout(exchange);
+                        }
 
-                    // 普通 API 路径：继续抛出，由 GlobalExceptionHandler 捕获并返回 504
+                        // 普通 API 路径：继续抛出，由 GlobalExceptionHandler 捕获并返回 504
+                        return Mono.error(ex);
+                    }
+                    
+                    // 如果不是 telegram-bot-manager 服务，继续传播原始异常
                     return Mono.error(ex);
                 });
     }
