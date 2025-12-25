@@ -1,66 +1,34 @@
 package com.admin.manage.model;
 
+import com.admin.manage.model.User;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
-// 使用Java 21的record特性，简化不可变数据载体
-// 对于可变实体类，保留原有的类结构但添加Java 21的特性
 public class Department {
     private Long id;
     private String name;
     private String description;
     private Long managerId;
-    private Integer userCount;
-    private Integer activeProjects;
-    private Integer completedProjects;
+    private Integer userCount = 0;
+    private Integer activeProjects = 0;
+    private Integer completedProjects = 0;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<String> users;  // 简化类型，避免依赖Spring Security
-    private List<String> recentUsers; // 简化类型，避免依赖Spring Security
+    private List<User> users;
+    private List<User> recentUsers;
 
-    // 使用Java 21的简洁构造器
-    public Department() {
-        this.userCount = 0;
-        this.activeProjects = 0;
-        this.completedProjects = 0;
-        var now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
+    // Constructors
+    public Department() {}
 
     public Department(String name, String description) {
-        this();
         this.name = name;
         this.description = description;
-    }
-    
-    // 全参数构造器，用于创建不可变副本
-    public Department(Long id, String name, String description, Long managerId, 
-                  LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.managerId = managerId;
         this.userCount = 0;
         this.activeProjects = 0;
         this.completedProjects = 0;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
-    
-    // 使用Java 21的便利方法创建副本
-    public Department withId(Long id) {
-        var copy = new Department(this.name, this.description);
-        copy.id = id;
-        copy.managerId = this.managerId;
-        copy.userCount = this.userCount;
-        copy.activeProjects = this.activeProjects;
-        copy.completedProjects = this.completedProjects;
-        copy.createdAt = this.createdAt;
-        copy.updatedAt = this.updatedAt;
-        copy.users = this.users;
-        copy.recentUsers = this.recentUsers;
-        return copy;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     // Getters and Setters
@@ -136,19 +104,19 @@ public class Department {
         this.updatedAt = updatedAt;
     }
 
-    public List<String> getUsers() {
+    public List<User> getUsers() {
         return users;
     }
 
-    public void setUsers(List<String> users) {
+    public void setUsers(List<User> users) {
         this.users = users;
     }
 
-    public List<String> getRecentUsers() {
+    public List<User> getRecentUsers() {
         return recentUsers;
     }
 
-    public void setRecentUsers(List<String> recentUsers) {
+    public void setRecentUsers(List<User> recentUsers) {
         this.recentUsers = recentUsers;
     }
 }

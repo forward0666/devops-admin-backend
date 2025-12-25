@@ -27,6 +27,8 @@ public class VerificationCodeService {
     // 存储验证码的内存缓存 (生产环境建议使用Redis)
     // 使用Java 21的特性，更简洁的初始化
     private final Map<String, String> codeCache = new ConcurrentHashMap<>();
+    // 存储验证码的过期时间
+    private final Map<String, Long> codeExpireTime = new ConcurrentHashMap<>();
     
     public VerificationCodeService(Producer kaptchaProducer) {
         this.kaptchaProducer = kaptchaProducer;
@@ -47,18 +49,9 @@ public class VerificationCodeService {
             // 生成唯一ID
             var codeId = UUID.randomUUID().toString();
             
-            // 将验证码存储到缓存中 (5分钟过期)
+            // 将验证码存储到缓存中 (10分钟过期)
             codeCache.put(codeId, codeText.toLowerCase());
-            
-            // 使用Java 21的特性，简化线程创建
-            Thread.startVirtualThread(() -> {
-                try {
-                    Thread.sleep(5 * 60 * 1000); // 5分钟
-                    codeCache.remove(codeId);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            });
+            codeExpireTime.put(codeId, System.currentTimeMillis() + 10 * 60 * 1000); // 10分钟过期
             
             // 将图片转换为Base64
             var imageBase64 = imageToBase64(codeImage);
@@ -90,18 +83,32 @@ public class VerificationCodeService {
             return false;
         }
         
+        // 检查验证码是否存在
         var cachedCode = codeCache.get(codeId);
         if (cachedCode == null) {
-            logger.warn("Verification code not found or expired for ID: {}", codeId);
+            logger.warn("Verification code not found for ID: {}", codeId);
+            return false;
+        }
+        
+        // 检查是否过期
+        Long expireTime = codeExpireTime.get(codeId);
+        if (expireTime == null || System.currentTimeMillis() > expireTime) {
+            logger.warn("Verification code expired for ID: {}", codeId);
+            // 清除过期的验证码
+            codeCache.remove(codeId);
+            codeExpireTime.remove(codeId);
             return false;
         }
         
         // 验证后立即删除验证码
-        codeCache.remove(codeId);
-        
-        // 使用Java 21的特性，简化字符串比较
         var isValid = cachedCode.equals(inputCode.toLowerCase());
         logger.info("Verification code validation result for ID {}: {}", codeId, isValid);
+        
+        // 只有验证成功时才删除验证码，失败时保留以便重试
+        if (isValid) {
+            codeCache.remove(codeId);
+            codeExpireTime.remove(codeId);
+        }
         
         return isValid;
     }
