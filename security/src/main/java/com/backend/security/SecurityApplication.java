@@ -15,7 +15,6 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
                 "filter"
         },
         exclude = {
-                org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
