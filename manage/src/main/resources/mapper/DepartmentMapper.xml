@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.admin.manage.mapper.DepartmentMapper">
+
+    <resultMap id="DepartmentResultMap" type="com.admin.manage.model.Department">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="managerId" column="manager_id"/>
+        <result property="userCount" column="user_count"/>
+        <result property="activeProjects" column="active_projects"/>
+        <result property="completedProjects" column="completed_projects"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="DepartmentResultMap">
+        SELECT id, name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at
+        FROM departments
+        WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="DepartmentResultMap">
+        SELECT id, name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at
+        FROM departments
+        ORDER BY name ASC
+    </select>
+
+    <select id="findByName" parameterType="string" resultMap="DepartmentResultMap">
+        SELECT id, name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at
+        FROM departments
+        WHERE name = #{name}
+    </select>
+
+    <select id="findByParentId" parameterType="long" resultMap="DepartmentResultMap">
+        SELECT id, name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at
+        FROM departments
+        WHERE parent_id = #{parentId}
+        ORDER BY name ASC
+    </select>
+
+    <select id="findByManagerId" parameterType="long" resultMap="DepartmentResultMap">
+        SELECT id, name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at
+        FROM departments
+        WHERE manager_id = #{managerId}
+    </select>
+
+    <insert id="insert" parameterType="com.admin.manage.model.Department" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO departments (name, description, manager_id, user_count, active_projects, completed_projects, created_at, updated_at)
+        VALUES (#{name}, #{description}, #{managerId}, #{userCount}, #{activeProjects}, #{completedProjects}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.admin.manage.model.Department">
+        UPDATE departments
+        SET name = #{name}, description = #{description}, manager_id = #{managerId}, 
+            user_count = #{userCount}, active_projects = #{activeProjects}, completed_projects = #{completedProjects}, updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM departments
+        WHERE id = #{id}
+    </delete>
+
+    <select id="existsById" parameterType="long" resultType="int">
+        SELECT COUNT(*)
+        FROM departments
+        WHERE id = #{id}
+    </select>
+
+    <select id="existsByName" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+        FROM departments
+        WHERE name = #{name}
+    </select>
+
+    <select id="countByParentId" parameterType="long" resultType="int">
+        SELECT COUNT(*)
+        FROM departments
+        WHERE parent_id = #{parentId}
+    </select>
+
+    <select id="existsByNameExcludingId" resultType="int">
+        SELECT COUNT(*)
+        FROM departments
+        WHERE name = #{name} AND id != #{id}
+    </select>
+
+    <select id="findUsersByDepartmentId" parameterType="long" resultType="com.admin.manage.model.User">
+        SELECT id, username, password, email, full_name, department_id, role, created_at, updated_at
+        FROM users
+        WHERE department_id = #{departmentId}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="findRecentUsersByDepartmentId" parameterType="long" resultType="com.admin.manage.model.User">
+        SELECT id, username, password, email, full_name, department_id, role, created_at, updated_at
+        FROM users
+        WHERE department_id = #{departmentId}
+        ORDER BY created_at DESC
+        LIMIT 10
+    </select>
+
+    <update id="updateUserCount" parameterType="long">
+        UPDATE departments
+        SET user_count = (SELECT COUNT(*) FROM users WHERE department_id = #{departmentId}),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{departmentId}
+    </update>
+
+    <update id="updateProjectCounts">
+        UPDATE departments
+        SET active_projects = #{activeProjects}, completed_projects = #{completedProjects},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{departmentId}
+    </update>
+
+</mapper>

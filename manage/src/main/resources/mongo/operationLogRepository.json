@@ -1,0 +1,7 @@
+{
+  "findOperationLogs": {
+    "filter": {},
+    "sort": { "createdAt": -1 }
+  }
+
+}
