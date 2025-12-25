@@ -8,7 +8,6 @@ import org.springframework.data.redis.core.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -22,7 +21,6 @@ public class CacheService {
     }
 
     /* ================= key 前缀 ================= */
-
     private static final String USER_PREFIX = "user:";
     private static final String USERS_LIST = "users:list";
 
@@ -34,12 +32,11 @@ public class CacheService {
     private static final String TOKEN_PREFIX = "token:validation:";
     private static final String SETTINGS_PREFIX = "settings:";
 
-    private static final long CACHE_MIN = 30;
-    private static final long TOKEN_MIN = 1440;
-    private static final long SETTINGS_MIN = 60;
+    private static final long CACHE_MIN = 30;      // 通用缓存分钟
+    private static final long TOKEN_MIN = 1440;    // Token缓存分钟
+    private static final long SETTINGS_MIN = 60;   // 系统设置缓存分钟
 
     /* ================= Redis 健康检查 ================= */
-
     private volatile boolean redisAvailable = true;
     private volatile long lastCheck = 0;
 
@@ -52,6 +49,7 @@ public class CacheService {
             redisAvailable = true;
         } catch (Exception e) {
             redisAvailable = false;
+            log.warn("Redis不可用: {}", e.getMessage());
         }
         lastCheck = now;
         return redisAvailable;
@@ -62,15 +60,9 @@ public class CacheService {
     }
 
     /* ================= 用户缓存 ================= */
-
     public void cacheUser(User user) {
         if (!redisOk() || user == null || user.getId() == null) return;
-        redisTemplate.opsForValue().set(
-                USER_PREFIX + user.getId(),
-                user,
-                CACHE_MIN,
-                TimeUnit.MINUTES
-        );
+        redisTemplate.opsForValue().set(USER_PREFIX + user.getId(), user, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     public User getCachedUser(Long userId) {
@@ -102,15 +94,9 @@ public class CacheService {
     }
 
     /* ================= 部门缓存 ================= */
-
     public void cacheDepartment(Department dept) {
         if (!redisOk() || dept == null || dept.getId() == null) return;
-        redisTemplate.opsForValue().set(
-                DEPT_PREFIX + dept.getId(),
-                dept,
-                CACHE_MIN,
-                TimeUnit.MINUTES
-        );
+        redisTemplate.opsForValue().set(DEPT_PREFIX + dept.getId(), dept, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     public Department getCachedDepartment(Long id) {
@@ -142,15 +128,9 @@ public class CacheService {
     }
 
     /* ================= 部门用户缓存 ================= */
-
     public void cacheDepartmentUsers(Long deptId, List<User> users) {
         if (!redisOk() || deptId == null) return;
-        redisTemplate.opsForValue().set(
-                DEPT_USERS + deptId,
-                users,
-                CACHE_MIN,
-                TimeUnit.MINUTES
-        );
+        redisTemplate.opsForValue().set(DEPT_USERS + deptId, users, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
@@ -161,35 +141,21 @@ public class CacheService {
     }
 
     /* ================= Token 缓存 ================= */
-
     public void cacheTokenValidation(String token, boolean valid) {
         if (!redisOk() || token == null) return;
-        redisTemplate.opsForValue().set(
-                TOKEN_PREFIX + DigestUtils.sha256Hex(token),
-                valid,
-                TOKEN_MIN,
-                TimeUnit.MINUTES
-        );
+        redisTemplate.opsForValue().set(TOKEN_PREFIX + DigestUtils.sha256Hex(token), valid, TOKEN_MIN, TimeUnit.MINUTES);
     }
 
     public Boolean getCachedTokenValidation(String token) {
         if (!redisOk() || token == null) return null;
-        Object v = redisTemplate.opsForValue().get(
-                TOKEN_PREFIX + DigestUtils.sha256Hex(token)
-        );
+        Object v = redisTemplate.opsForValue().get(TOKEN_PREFIX + DigestUtils.sha256Hex(token));
         return (v instanceof Boolean b) ? b : null;
     }
 
     /* ================= 系统设置 ================= */
-
     public void cacheSystemSettings(String key, Object value) {
         if (!redisOk() || key == null) return;
-        redisTemplate.opsForValue().set(
-                SETTINGS_PREFIX + key,
-                value,
-                SETTINGS_MIN,
-                TimeUnit.MINUTES
-        );
+        redisTemplate.opsForValue().set(SETTINGS_PREFIX + key, value, SETTINGS_MIN, TimeUnit.MINUTES);
     }
 
     public Object getCachedSystemSettings(String key) {
@@ -197,8 +163,12 @@ public class CacheService {
         return redisTemplate.opsForValue().get(SETTINGS_PREFIX + key);
     }
 
-    /* ================= prefix 清理（SCAN） ================= */
+    public void clearSystemSettingsCache(String key) {
+        if (!redisOk() || key == null || key.isBlank()) return;
+        redisTemplate.delete(SETTINGS_PREFIX + key);
+    }
 
+    /* ================= prefix 清理（SCAN） ================= */
     public void clearByPrefix(String prefix) {
         if (!redisOk()) return;
 
@@ -221,16 +191,5 @@ public class CacheService {
         clearByPrefix(DEPT_USERS);
         clearByPrefix(TOKEN_PREFIX);
         clearByPrefix(SETTINGS_PREFIX);
-    }
-
-    /**
-     * 清理指定系统配置缓存
-     * key 为 null 或 empty 时，不做任何操作
-     */
-    public void clearSystemSettingsCache(String key) {
-        if (!redisOk() || key == null || key.isBlank()) {
-            return;
-        }
-        redisTemplate.delete(SETTINGS_PREFIX + key);
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Primary;
@@ -18,6 +19,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -39,7 +41,14 @@ import java.util.concurrent.ThreadPoolExecutor;
  * @MapperScan - 启用 MyBatis Mapper 接口扫描
  */
 @Slf4j
-@SpringBootApplication
+@SpringBootApplication(
+        scanBasePackages = {
+                "com.backend.manage", // 主工程包
+                "shutdown",
+                "config",
+                "monitor",
+                "filter"
+        })
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.backend.manage.client")
 @EnableAspectJAutoProxy
@@ -58,26 +67,47 @@ public class ManageApplication {
      *
      * @param args 命令行参数
      */
+//    public static void main(String[] args) {
+//        SpringApplication app = new SpringApplication(ManageApplication.class);
+//
+//        // 配置优雅关闭，确保应用程序关闭时注册关闭钩子
+//        app.setRegisterShutdownHook(true);
+//
+//        app.run(args);
+//    }
     public static void main(String[] args) {
-        SpringApplication app = new SpringApplication(ManageApplication.class);
 
-        // 配置优雅关闭，确保应用程序关闭时注册关闭钩子
-        app.setRegisterShutdownHook(true);
-
-        app.run(args);
+//        SpringApplication.run(CloudflareLogsConsumerApplication.class, args);
+        ApplicationContext ctx = SpringApplication.run(ManageApplication.class, args);
+        // 启动后执行额外逻辑（如异步任务、Kafka 检查、线程池预热等）
+        initAfterStartup(ctx);
     }
 
+    private static void initAfterStartup(ApplicationContext ctx) {
+        log.info("✅ CloudflareLogsProducerApplication started successfully!");
+
+        ExecutorService executor = ctx.getBean(ExecutorService.class);
+        log.info("🧵 ThreadPool initialized: {}", executor);
+
+        // ✅ 线程池预热（提前创建核心线程）
+        if (executor instanceof ThreadPoolExecutor) {
+            ((ThreadPoolExecutor) executor).prestartAllCoreThreads();
+            log.info("🔥 ThreadPool pre-started {} core threads",
+                    ((ThreadPoolExecutor) executor).getPoolSize());
+        }
+
+    }
     /**
      * 应用程序启动时清除所有缓存，以避免包名变更导致的序列化问题
      */
-    @Bean
-    public ApplicationRunner clearCacheRunner(CacheService cacheService) {
-        return args -> {
-            log.info("正在清除所有缓存以避免包名变更导致的序列化问题...");
-            cacheService.clearAllCache();
-            log.info("所有缓存已清除");
-        };
-    }
+//    @Bean
+//    public ApplicationRunner clearCacheRunner(CacheService cacheService) {
+//        return args -> {
+//            log.info("正在清除所有缓存以避免包名变更导致的序列化问题...");
+//            cacheService.clearAllCache();
+//            log.info("所有缓存已清除");
+//        };
+//    }
 
     /**
      * 创建 RestTemplate bean 用于 HTTP 请求
@@ -89,10 +119,10 @@ public class ManageApplication {
      *
      * @return RestTemplate 实例
      */
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
+//    @Bean
+//    public RestTemplate restTemplate() {
+//        return new RestTemplate();
+//    }
 
     /**
      * 配置任务执行器用于异步操作
@@ -113,53 +143,53 @@ public class ManageApplication {
      *
      * @return 配置好的任务执行器
      */
-    @Bean("taskExecutor")
-    @Primary
-    public Executor taskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor() {
-            @Override
-            public void execute(Runnable task) {
-                log.debug("➡️ 提交任务到线程池");
-                super.execute(task);
-            }
-        };
-
-        executor.setCorePoolSize(4);
-        executor.setMaxPoolSize(10);
-        executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("async-operation-log-");
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(60);
-
-        // 增加日志装饰器，打印执行情况
-        executor.setTaskDecorator(runnable -> () -> {
-            log.debug("▶️ 任务开始执行，线程 = {}", Thread.currentThread().getName());
-            try {
-                runnable.run();
-                log.debug("✅ 任务执行完成，线程 = {}", Thread.currentThread().getName());
-            } catch (Exception e) {
-                log.error("❌ 任务执行异常，线程 = {}", Thread.currentThread().getName(), e);
-                throw e;
-            }
-        });
-
-        // 拒绝策略日志
-        executor.setRejectedExecutionHandler((r, exec) -> {
-            log.error("🚨 任务被拒绝: ActiveCount={}, QueueSize={}, PoolSize={}",
-                    exec.getActiveCount(),
-                    exec.getQueue().size(),
-                    exec.getPoolSize());
-            new ThreadPoolExecutor.AbortPolicy().rejectedExecution(r, exec);
-        });
-
-
-        executor.initialize();
-        log.info("✅ 异步任务线程池初始化完成: corePoolSize={}, maxPoolSize={}, queueCapacity={}",
-                executor.getCorePoolSize(),
-                executor.getMaxPoolSize(),
-                executor.getThreadPoolExecutor().getQueue().remainingCapacity());
-        return executor;
-    }
+//    @Bean("taskExecutor")
+//    @Primary
+//    public Executor taskExecutor() {
+//        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor() {
+//            @Override
+//            public void execute(Runnable task) {
+//                log.debug("➡️ 提交任务到线程池");
+//                super.execute(task);
+//            }
+//        };
+//
+//        executor.setCorePoolSize(4);
+//        executor.setMaxPoolSize(10);
+//        executor.setQueueCapacity(500);
+//        executor.setThreadNamePrefix("async-operation-log-");
+//        executor.setWaitForTasksToCompleteOnShutdown(true);
+//        executor.setAwaitTerminationSeconds(60);
+//
+//        // 增加日志装饰器，打印执行情况
+//        executor.setTaskDecorator(runnable -> () -> {
+//            log.debug("▶️ 任务开始执行，线程 = {}", Thread.currentThread().getName());
+//            try {
+//                runnable.run();
+//                log.debug("✅ 任务执行完成，线程 = {}", Thread.currentThread().getName());
+//            } catch (Exception e) {
+//                log.error("❌ 任务执行异常，线程 = {}", Thread.currentThread().getName(), e);
+//                throw e;
+//            }
+//        });
+//
+//        // 拒绝策略日志
+//        executor.setRejectedExecutionHandler((r, exec) -> {
+//            log.error("🚨 任务被拒绝: ActiveCount={}, QueueSize={}, PoolSize={}",
+//                    exec.getActiveCount(),
+//                    exec.getQueue().size(),
+//                    exec.getPoolSize());
+//            new ThreadPoolExecutor.AbortPolicy().rejectedExecution(r, exec);
+//        });
+//
+//
+//        executor.initialize();
+//        log.info("✅ 异步任务线程池初始化完成: corePoolSize={}, maxPoolSize={}, queueCapacity={}",
+//                executor.getCorePoolSize(),
+//                executor.getMaxPoolSize(),
+//                executor.getThreadPoolExecutor().getQueue().remainingCapacity());
+//        return executor;
+//    }
 
     /**
      * 应用启动后执行数据库、缓存、中间件连接检查
