@@ -36,14 +36,16 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // 使用Jackson2JsonRedisSerializer来序列化和反序列化redis的value值
-        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(new ObjectMapper(), Object.class);
+        // 配置ObjectMapper
         ObjectMapper om = new ObjectMapper();
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         om.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL);
         // 注册JavaTimeModule以支持LocalDateTime等Java 8时间类型
         om.registerModule(new JavaTimeModule());
-        jackson2JsonRedisSerializer.setObjectMapper(om);
+
+        // 使用Jackson2JsonRedisSerializer来序列化和反序列化redis的value值
+        // Spring Boot 3.2.5 版本的正确构造方式
+        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(om, Object.class);
 
         StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
 
@@ -69,13 +71,15 @@ public class RedisConfig {
         // 配置序列化
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig();
         
-        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(new ObjectMapper(), Object.class);
+        // 配置ObjectMapper
         ObjectMapper om = new ObjectMapper();
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         om.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL);
         // 注册JavaTimeModule以支持LocalDateTime等Java 8时间类型
         om.registerModule(new JavaTimeModule());
-        jackson2JsonRedisSerializer.setObjectMapper(om);
+        
+        // Spring Boot 3.2.5 版本的正确构造方式
+        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(om, Object.class);
 
         config = config.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jackson2JsonRedisSerializer))
