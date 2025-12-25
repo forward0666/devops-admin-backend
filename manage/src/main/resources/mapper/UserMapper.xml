@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.admin.manage.mapper.UserMapper">
+<mapper namespace="com.backend.manage.mapper.UserMapper">
 
-    <resultMap id="UserResultMap" type="com.admin.manage.model.User">
+    <resultMap id="UserResultMap" type="com.backend.manage.model.User">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
@@ -78,14 +78,14 @@
         ORDER BY created_at DESC
     </select>
 
-    <insert id="insert" parameterType="com.admin.manage.model.User" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.manage.model.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role, 
                           created_by, updated_by, active, email_verified, phone_verified, login_count, password_changed_at)
         VALUES (#{username}, #{password}, #{email}, #{phone}, #{tgUsername}, #{fullName}, #{avatarUrl}, #{departmentId}, #{position}, #{employeeId}, #{role}, 
                 #{createdBy}, #{updatedBy}, #{active}, #{emailVerified}, #{phoneVerified}, #{loginCount}, #{passwordChangedAt})
     </insert>
 
-    <update id="update" parameterType="com.admin.manage.model.User">
+    <update id="update" parameterType="com.backend.manage.model.User">
         UPDATE users
         SET username = #{username}, email = #{email}, phone = #{phone}, tg_username = #{tgUsername}, full_name = #{fullName}, 
             avatar_url = #{avatarUrl}, department_id = #{departmentId}, position = #{position}, employee_id = #{employeeId}, 

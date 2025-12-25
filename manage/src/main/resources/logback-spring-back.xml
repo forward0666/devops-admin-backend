@@ -27,7 +27,7 @@
     </root>
 
     <!-- ===================== 指定包日志级别 ===================== -->
-<!--    <logger name="com.admin.manage" level="INFO"/>-->
+<!--    <logger name="com.backend.manage" level="INFO"/>-->
 <!--    <logger name="org.springframework.web" level="INFO"/>-->
 <!--    <logger name="org.apache.ibatis" level="INFO"/>-->
 </configuration>
