@@ -13,7 +13,8 @@ public class KaptchaConfig {
 
     @Bean
     public Producer kaptchaProducer() {
-        Properties properties = new Properties();
+        // 使用Java 21的特性，简化Properties创建
+        var properties = new Properties();
         
         // 无边框，更现代化
         properties.setProperty("kaptcha.border", "no");

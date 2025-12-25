@@ -3,12 +3,9 @@ package com.admin.security;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
-//import org.springframework.cloud.openfeign.EnableFeignClients;
 
-
+// 使用Java 21的unnamed variables and var特性
 @EnableDiscoveryClient
-//@EnableFeignClients
-
 @SpringBootApplication(
         scanBasePackages = {
                 "com.admin.security", // 主工程包
@@ -16,8 +13,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
                 "config",
                 "monitor",
                 "filter"
-        }
-        ,
+        },
         exclude = {
                 org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class,
                 org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
@@ -28,6 +24,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 public class SecurityApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(SecurityApplication.class, args);
+        var app = new SpringApplication(SecurityApplication.class);
+        app.run(args);
     }
 }

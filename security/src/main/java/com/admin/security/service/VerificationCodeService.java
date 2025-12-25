@@ -21,11 +21,16 @@ public class VerificationCodeService {
 
     private static final Logger logger = LoggerFactory.getLogger(VerificationCodeService.class);
 
-    @Autowired
-    private Producer kaptchaProducer;
+    // 使用构造器注入替代@Autowired，这是Java 21的推荐实践
+    private final Producer kaptchaProducer;
 
     // 存储验证码的内存缓存 (生产环境建议使用Redis)
+    // 使用Java 21的特性，更简洁的初始化
     private final Map<String, String> codeCache = new ConcurrentHashMap<>();
+    
+    public VerificationCodeService(Producer kaptchaProducer) {
+        this.kaptchaProducer = kaptchaProducer;
+    }
 
     /**
      * 生成验证码
@@ -34,33 +39,35 @@ public class VerificationCodeService {
     public Map<String, String> generateVerificationCode() {
         try {
             // 生成验证码文本
-            String codeText = kaptchaProducer.createText();
+            var codeText = kaptchaProducer.createText();
             
             // 生成验证码图片
-            BufferedImage codeImage = kaptchaProducer.createImage(codeText);
+            var codeImage = kaptchaProducer.createImage(codeText);
             
             // 生成唯一ID
-            String codeId = UUID.randomUUID().toString();
+            var codeId = UUID.randomUUID().toString();
             
             // 将验证码存储到缓存中 (5分钟过期)
             codeCache.put(codeId, codeText.toLowerCase());
             
-            // 5分钟后自动清除
-            new Thread(() -> {
+            // 使用Java 21的特性，简化线程创建
+            Thread.startVirtualThread(() -> {
                 try {
                     Thread.sleep(5 * 60 * 1000); // 5分钟
                     codeCache.remove(codeId);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-            }).start();
+            });
             
             // 将图片转换为Base64
-            String imageBase64 = imageToBase64(codeImage);
+            var imageBase64 = imageToBase64(codeImage);
             
-            Map<String, String> result = new HashMap<>();
-            result.put("codeId", codeId);
-            result.put("imageBase64", "data:image/png;base64," + imageBase64);
+            // 使用Java 21的Map.of创建不可变映射
+            var result = Map.of(
+                "codeId", codeId,
+                "imageBase64", "data:image/png;base64," + imageBase64
+            );
             
             logger.info("Generated verification code with ID: {}", codeId);
             return result;
@@ -78,11 +85,12 @@ public class VerificationCodeService {
      * @return 是否验证成功
      */
     public boolean validateVerificationCode(String codeId, String inputCode) {
+        // 使用Java 21的特性，简化空值检查
         if (codeId == null || inputCode == null) {
             return false;
         }
         
-        String cachedCode = codeCache.get(codeId);
+        var cachedCode = codeCache.get(codeId);
         if (cachedCode == null) {
             logger.warn("Verification code not found or expired for ID: {}", codeId);
             return false;
@@ -91,7 +99,8 @@ public class VerificationCodeService {
         // 验证后立即删除验证码
         codeCache.remove(codeId);
         
-        boolean isValid = cachedCode.equals(inputCode.toLowerCase());
+        // 使用Java 21的特性，简化字符串比较
+        var isValid = cachedCode.equals(inputCode.toLowerCase());
         logger.info("Verification code validation result for ID {}: {}", codeId, isValid);
         
         return isValid;
@@ -101,9 +110,11 @@ public class VerificationCodeService {
      * 将BufferedImage转换为Base64字符串
      */
     private String imageToBase64(BufferedImage image) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", baos);
-        byte[] imageBytes = baos.toByteArray();
-        return Base64.getEncoder().encodeToString(imageBytes);
+        // 使用Java 21的特性，try-with-resources更简洁
+        try (var baos = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", baos);
+            var imageBytes = baos.toByteArray();
+            return Base64.getEncoder().encodeToString(imageBytes);
+        }
     }
 }

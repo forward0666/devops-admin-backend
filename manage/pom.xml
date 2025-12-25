@@ -10,7 +10,7 @@
         <version>1.0.0</version>
     </parent>
 
-    <artifactId>mange</artifactId>
+    <artifactId>manage</artifactId>
     <name>Manage</name>
     <description>Manage</description>
 

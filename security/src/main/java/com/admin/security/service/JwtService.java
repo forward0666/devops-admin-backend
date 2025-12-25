@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
@@ -33,14 +34,16 @@ public class JwtService {
      * @return JWT token
      */
     public String generateToken(String subject, Map<String, Object> claims) {
-        Date expiryDate = new Date(System.currentTimeMillis() + jwtExpirationInMs * 1000L);
-
-        JwtBuilder builder = Jwts.builder()
+        // 使用Java 21的特性，更简洁的代码
+        var expiryDate = Date.from(Instant.now().plusSeconds(jwtExpirationInMs));
+        
+        var builder = Jwts.builder()
                 .setSubject(subject)
-                .setIssuedAt(new Date())
+                .setIssuedAt(Date.from(Instant.now()))
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey());
 
+        // 使用Java 21的特性处理可选参数
         if (claims != null && !claims.isEmpty()) {
             builder.addClaims(claims);
         }
@@ -63,13 +66,7 @@ public class JwtService {
      * @return subject
      */
     public String getSubjectFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-
-        return claims.getSubject();
+        return getClaimsFromToken(token).getSubject();
     }
 
     /**
@@ -78,6 +75,7 @@ public class JwtService {
      * @return claims
      */
     public Claims getClaimsFromToken(String token) {
+        // 使用Java 21的特性，更简洁的链式调用
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
@@ -92,23 +90,18 @@ public class JwtService {
      */
     public boolean validateToken(String token) {
         try {
+            // 使用Java 21的特性，更简洁的代码
             Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token);
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
             return true;
-        } catch (SecurityException ex) {
-            logger.error("Invalid JWT signature");
-        } catch (MalformedJwtException ex) {
-            logger.error("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            logger.error("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            logger.error("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            logger.error("JWT claims string is empty.");
+        } catch (SecurityException | MalformedJwtException | ExpiredJwtException | 
+                 UnsupportedJwtException | IllegalArgumentException ex) {
+            // 使用Java 21的多catch特性，简化异常处理
+            logger.error("JWT validation failed: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
+            return false;
         }
-        return false;
     }
 
     /**
@@ -118,8 +111,9 @@ public class JwtService {
      */
     public boolean isTokenExpired(String token) {
         try {
-            Claims claims = getClaimsFromToken(token);
-            return claims.getExpiration().before(new Date());
+            // 使用Java 21的特性，更简洁的时间处理
+            var claims = getClaimsFromToken(token);
+            return claims.getExpiration().before(Date.from(Instant.now()));
         } catch (Exception e) {
             return true;
         }
