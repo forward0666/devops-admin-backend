@@ -2,296 +2,235 @@ package com.backend.manage.service;
 
 import com.backend.manage.model.Department;
 import com.backend.manage.model.User;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.data.redis.core.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-/**
- * 缓存服务
- * 管理用户、部门、系统设置和Token的Redis缓存
- */
 @Service
 @Slf4j
 public class CacheService {
 
-    // 使用Java 21的构造器注入，避免@Autowired
     private final RedisTemplate<String, Object> redisTemplate;
-    
+
     public CacheService(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 
-    // 缓存键前缀
-    private static final String USER_CACHE_PREFIX = "user:";
-    private static final String USERS_LIST_CACHE_KEY = "users:list";
-    private static final String DEPARTMENT_CACHE_PREFIX = "department:";
-    private static final String DEPARTMENTS_LIST_CACHE_KEY = "departments:list";
-    private static final String USER_DEPARTMENT_CACHE_PREFIX = "user:department:";
-    private static final String TOKEN_VALIDATION_CACHE_PREFIX = "token:validation:";
-    private static final String SYSTEM_SETTINGS_CACHE_PREFIX = "settings:";
+    /* ================= key 前缀 ================= */
 
-    // 缓存过期时间（分钟）
-    private static final long CACHE_EXPIRE_MINUTES = 30;
-    private static final long TOKEN_CACHE_EXPIRE_MINUTES = 1440; // 1天
-    private static final long SETTINGS_CACHE_EXPIRE_MINUTES = 60; // 1小时
+    private static final String USER_PREFIX = "user:";
+    private static final String USERS_LIST = "users:list";
 
-    // ================= 用户缓存 =================
+    private static final String DEPT_PREFIX = "department:";
+    private static final String DEPT_LIST = "departments:list";
+    private static final String DEPT_USERS = "department:users:";
+
+    private static final String USER_DEPT_PREFIX = "user:department:";
+    private static final String TOKEN_PREFIX = "token:validation:";
+    private static final String SETTINGS_PREFIX = "settings:";
+
+    private static final long CACHE_MIN = 30;
+    private static final long TOKEN_MIN = 1440;
+    private static final long SETTINGS_MIN = 60;
+
+    /* ================= Redis 健康检查 ================= */
+
+    private volatile boolean redisAvailable = true;
+    private volatile long lastCheck = 0;
+
+    private boolean redisOk() {
+        long now = System.currentTimeMillis();
+        if (redisAvailable && now - lastCheck < 30_000) return true;
+
+        try {
+            redisTemplate.getConnectionFactory().getConnection().ping();
+            redisAvailable = true;
+        } catch (Exception e) {
+            redisAvailable = false;
+        }
+        lastCheck = now;
+        return redisAvailable;
+    }
+
+    public boolean isRedisAvailable() {
+        return redisOk();
+    }
+
+    /* ================= 用户缓存 ================= */
 
     public void cacheUser(User user) {
-        if (user != null && user.getId() != null) {
-            var key = USER_CACHE_PREFIX + user.getId();
-            redisTemplate.opsForValue().set(key, user, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            log.debug("Cached user: {}", user.getId());
-        }
+        if (!redisOk() || user == null || user.getId() == null) return;
+        redisTemplate.opsForValue().set(
+                USER_PREFIX + user.getId(),
+                user,
+                CACHE_MIN,
+                TimeUnit.MINUTES
+        );
     }
 
     public User getCachedUser(Long userId) {
-        if (userId == null) return null;
-        var key = USER_CACHE_PREFIX + userId;
-        var cached = redisTemplate.opsForValue().get(key);
-        
-        // 使用Java 21的模式匹配，简化类型检查
-        return switch (cached) {
-            case User u -> u;
-            case null -> null;
-            default -> null; // 如果缓存中不是User类型，返回null
-        };
+        if (!redisOk() || userId == null) return null;
+        Object v = redisTemplate.opsForValue().get(USER_PREFIX + userId);
+        return (v instanceof User u) ? u : null;
     }
 
     public void cacheUsersList(List<User> users) {
-        redisTemplate.opsForValue().set(USERS_LIST_CACHE_KEY, users, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        log.debug("Cached users list with {} users", users.size());
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(USERS_LIST, users, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
     public List<User> getCachedUsersList() {
-        var cached = redisTemplate.opsForValue().get(USERS_LIST_CACHE_KEY);
-        
-        // 使用Java 21的模式匹配，简化类型检查
-        return switch (cached) {
-            case List<?> list when list.stream().allMatch(u -> u instanceof User) -> (List<User>) list;
-            case null -> null;
-            default -> null; // 如果缓存中不是User列表，返回null
-        };
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(USERS_LIST);
+        return (v instanceof List<?>) ? (List<User>) v : null;
     }
 
     public void clearUserCache(Long userId) {
-        if (userId != null) {
-            var key = USER_CACHE_PREFIX + userId;
-            redisTemplate.delete(key);
-            log.debug("Cleared cache for user: {}", userId);
-        }
-        redisTemplate.delete(USERS_LIST_CACHE_KEY);
-        clearByPrefix(USER_DEPARTMENT_CACHE_PREFIX);
+        if (!redisOk() || userId == null) return;
+        redisTemplate.delete(USER_PREFIX + userId);
     }
 
     public void clearAllUserCache() {
-        clearByPrefix(USER_CACHE_PREFIX);
-        redisTemplate.delete(USERS_LIST_CACHE_KEY);
-        clearByPrefix(USER_DEPARTMENT_CACHE_PREFIX);
-        log.debug("Cleared all user caches");
+        clearByPrefix(USER_PREFIX);
+        redisTemplate.delete(USERS_LIST);
     }
 
-    // ================= 部门缓存 =================
+    /* ================= 部门缓存 ================= */
 
-    public void cacheDepartment(Department department) {
-        if (department != null && department.getId() != null) {
-            var key = DEPARTMENT_CACHE_PREFIX + department.getId();
-            redisTemplate.opsForValue().set(key, department, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            log.debug("Cached department: {}", department.getId());
-        }
+    public void cacheDepartment(Department dept) {
+        if (!redisOk() || dept == null || dept.getId() == null) return;
+        redisTemplate.opsForValue().set(
+                DEPT_PREFIX + dept.getId(),
+                dept,
+                CACHE_MIN,
+                TimeUnit.MINUTES
+        );
     }
 
-    public Department getCachedDepartment(Long departmentId) {
-        if (departmentId == null) return null;
-        var key = DEPARTMENT_CACHE_PREFIX + departmentId;
-        var cached = redisTemplate.opsForValue().get(key);
-        
-        // 使用Java 21的模式匹配，简化类型检查
-        return switch (cached) {
-            case Department d -> d;
-            case null -> null;
-            default -> null; // 如果缓存中不是Department类型，返回null
-        };
+    public Department getCachedDepartment(Long id) {
+        if (!redisOk() || id == null) return null;
+        Object v = redisTemplate.opsForValue().get(DEPT_PREFIX + id);
+        return (v instanceof Department d) ? d : null;
     }
 
-    public void cacheDepartmentsList(List<Department> departments) {
-        redisTemplate.opsForValue().set(DEPARTMENTS_LIST_CACHE_KEY, departments, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        log.debug("Cached departments list with {} departments", departments.size());
+    public void cacheDepartmentsList(List<Department> list) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(DEPT_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
     public List<Department> getCachedDepartmentsList() {
-        var cached = redisTemplate.opsForValue().get(DEPARTMENTS_LIST_CACHE_KEY);
-        
-        // 使用Java 21的模式匹配，简化类型检查
-        return switch (cached) {
-            case List<?> list when list.stream().allMatch(d -> d instanceof Department) -> (List<Department>) list;
-            case null -> null;
-            default -> null; // 如果缓存中不是Department列表，返回null
-        };
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(DEPT_LIST);
+        return (v instanceof List<?>) ? (List<Department>) v : null;
     }
 
-    public void cacheDepartmentUsers(Long departmentId, List<User> users) {
-        if (departmentId != null) {
-            String key = USER_DEPARTMENT_CACHE_PREFIX + departmentId;
-            redisTemplate.opsForValue().set(key, users, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            log.debug("Cached users for department: {}", departmentId);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    public List<User> getCachedDepartmentUsers(Long departmentId) {
-        if (departmentId == null) return null;
-        var key = USER_DEPARTMENT_CACHE_PREFIX + departmentId;
-        var cached = redisTemplate.opsForValue().get(key);
-        
-        // 使用Java 21的模式匹配，简化类型检查
-        return switch (cached) {
-            case List<?> list when list.stream().allMatch(u -> u instanceof User) -> (List<User>) list;
-            case null -> null;
-            default -> null; // 如果缓存中不是User列表，返回null
-        };
-    }
-
-    public void clearDepartmentCache(Long departmentId) {
-        if (departmentId != null) {
-            redisTemplate.delete(DEPARTMENT_CACHE_PREFIX + departmentId);
-            redisTemplate.delete(USER_DEPARTMENT_CACHE_PREFIX + departmentId);
-            log.debug("Cleared cache for department: {}", departmentId);
-        }
-        redisTemplate.delete(DEPARTMENTS_LIST_CACHE_KEY);
+    public void clearDepartmentCache(Long id) {
+        if (!redisOk() || id == null) return;
+        redisTemplate.delete(DEPT_PREFIX + id);
     }
 
     public void clearAllDepartmentCache() {
-        clearByPrefix(DEPARTMENT_CACHE_PREFIX);
-        redisTemplate.delete(DEPARTMENTS_LIST_CACHE_KEY);
-        clearByPrefix(USER_DEPARTMENT_CACHE_PREFIX);
-        log.debug("Cleared all department caches");
+        clearByPrefix(DEPT_PREFIX);
+        redisTemplate.delete(DEPT_LIST);
     }
 
-    // ================= Token 缓存 =================
+    /* ================= 部门用户缓存 ================= */
 
-    public void cacheTokenValidation(String token, boolean isValid) {
-        if (token == null || token.isEmpty()) return;
-        try {
-            String username = extractUsernameFromToken(token);
-            String key = TOKEN_VALIDATION_CACHE_PREFIX + username + ":" + token.hashCode();
-            redisTemplate.opsForValue().set(key, isValid, TOKEN_CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-
-            if (isValid) {
-                String tokenKey = "token:" + username + ":" + token.hashCode();
-                redisTemplate.opsForValue().set(tokenKey, token, TOKEN_CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            }
-        } catch (Exception e) {
-            redisTemplate.opsForValue().set(TOKEN_VALIDATION_CACHE_PREFIX + token.hashCode(),
-                    isValid, TOKEN_CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        }
+    public void cacheDepartmentUsers(Long deptId, List<User> users) {
+        if (!redisOk() || deptId == null) return;
+        redisTemplate.opsForValue().set(
+                DEPT_USERS + deptId,
+                users,
+                CACHE_MIN,
+                TimeUnit.MINUTES
+        );
     }
 
-    private String extractUsernameFromToken(String token) {
-        try {
-            String[] parts = token.split("\\.");
-            if (parts.length != 3) return "unknown";
-            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
-            ObjectMapper objectMapper = new ObjectMapper();
-            Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
-            if (claims.containsKey("username")) return (String) claims.get("username");
-            if (claims.containsKey("sub")) return (String) claims.get("sub");
-            if (claims.containsKey("subject")) return (String) claims.get("subject");
-        } catch (Exception e) {
-            log.error("Error extracting username from token: {}", e.getMessage());
-        }
-        return "unknown";
+    @SuppressWarnings("unchecked")
+    public List<User> getCachedDepartmentUsers(Long deptId) {
+        if (!redisOk() || deptId == null) return null;
+        Object v = redisTemplate.opsForValue().get(DEPT_USERS + deptId);
+        return (v instanceof List<?>) ? (List<User>) v : null;
+    }
+
+    /* ================= Token 缓存 ================= */
+
+    public void cacheTokenValidation(String token, boolean valid) {
+        if (!redisOk() || token == null) return;
+        redisTemplate.opsForValue().set(
+                TOKEN_PREFIX + DigestUtils.sha256Hex(token),
+                valid,
+                TOKEN_MIN,
+                TimeUnit.MINUTES
+        );
     }
 
     public Boolean getCachedTokenValidation(String token) {
-        if (token == null || token.isEmpty()) return null;
-        try {
-            String username = extractUsernameFromToken(token);
-            String key = TOKEN_VALIDATION_CACHE_PREFIX + username + ":" + token.hashCode();
-            Object cached = redisTemplate.opsForValue().get(key);
-            if (cached instanceof Boolean) return (Boolean) cached;
+        if (!redisOk() || token == null) return null;
+        Object v = redisTemplate.opsForValue().get(
+                TOKEN_PREFIX + DigestUtils.sha256Hex(token)
+        );
+        return (v instanceof Boolean b) ? b : null;
+    }
 
-            String fallbackKey = TOKEN_VALIDATION_CACHE_PREFIX + token.hashCode();
-            Object fallbackCached = redisTemplate.opsForValue().get(fallbackKey);
-            return (fallbackCached instanceof Boolean) ? (Boolean) fallbackCached : null;
-        } catch (Exception e) {
+    /* ================= 系统设置 ================= */
+
+    public void cacheSystemSettings(String key, Object value) {
+        if (!redisOk() || key == null) return;
+        redisTemplate.opsForValue().set(
+                SETTINGS_PREFIX + key,
+                value,
+                SETTINGS_MIN,
+                TimeUnit.MINUTES
+        );
+    }
+
+    public Object getCachedSystemSettings(String key) {
+        if (!redisOk() || key == null) return null;
+        return redisTemplate.opsForValue().get(SETTINGS_PREFIX + key);
+    }
+
+    /* ================= prefix 清理（SCAN） ================= */
+
+    public void clearByPrefix(String prefix) {
+        if (!redisOk()) return;
+
+        redisTemplate.execute((RedisCallback<Void>) connection -> {
+            try (Cursor<byte[]> cursor = connection.scan(
+                    ScanOptions.scanOptions().match(prefix + "*").count(1000).build()
+            )) {
+                while (cursor.hasNext()) {
+                    connection.del(cursor.next());
+                }
+            }
             return null;
-        }
+        });
     }
-
-    public void clearTokenValidationCache(String token) {
-        if (token == null || token.isEmpty()) return;
-        try {
-            String username = extractUsernameFromToken(token);
-            redisTemplate.delete(TOKEN_VALIDATION_CACHE_PREFIX + username + ":" + token.hashCode());
-            redisTemplate.delete("token:" + username + ":" + token.hashCode());
-            redisTemplate.delete(TOKEN_VALIDATION_CACHE_PREFIX + token.hashCode());
-        } catch (Exception e) {
-            redisTemplate.delete(TOKEN_VALIDATION_CACHE_PREFIX + token.hashCode());
-        }
-    }
-
-    public void clearAllTokenValidationCache() {
-        clearByPrefix(TOKEN_VALIDATION_CACHE_PREFIX);
-        clearByPrefix("token:");
-        log.debug("Cleared all token validation caches");
-    }
-
-    // ================= 系统设置缓存 =================
-
-    public void cacheSystemSettings(String settingsType, Object settings) {
-        if (settingsType != null && settings != null) {
-            String key = SYSTEM_SETTINGS_CACHE_PREFIX + settingsType;
-            redisTemplate.opsForValue().set(key, settings, SETTINGS_CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            log.debug("Cached system settings: {}", settingsType);
-        }
-    }
-
-    public Object getCachedSystemSettings(String settingsType) {
-        if (settingsType == null) return null;
-        return redisTemplate.opsForValue().get(SYSTEM_SETTINGS_CACHE_PREFIX + settingsType);
-    }
-
-    public void clearSystemSettingsCache(String settingsType) {
-        if (settingsType != null) {
-            redisTemplate.delete(SYSTEM_SETTINGS_CACHE_PREFIX + settingsType);
-        }
-    }
-
-    public void clearAllSystemSettingsCache() {
-        clearByPrefix(SYSTEM_SETTINGS_CACHE_PREFIX);
-        log.debug("Cleared all system settings caches");
-    }
-
-    // ================= 全部缓存 =================
 
     public void clearAllCache() {
-        clearAllUserCache();
-        clearAllDepartmentCache();
-        clearAllTokenValidationCache();
-        clearAllSystemSettingsCache();
-        log.info("Cleared ALL caches (user, department, token, system settings)");
+        clearByPrefix(USER_PREFIX);
+        clearByPrefix(DEPT_PREFIX);
+        clearByPrefix(USER_DEPT_PREFIX);
+        clearByPrefix(DEPT_USERS);
+        clearByPrefix(TOKEN_PREFIX);
+        clearByPrefix(SETTINGS_PREFIX);
     }
 
-    // ================= 工具方法 =================
-
-    private void clearByPrefix(String prefix) {
-        redisTemplate.delete(redisTemplate.keys(prefix + "*"));
-    }
-
-    public boolean isRedisAvailable() {
-        try {
-            redisTemplate.opsForValue().get("test");
-            return true;
-        } catch (Exception e) {
-            return false;
+    /**
+     * 清理指定系统配置缓存
+     * key 为 null 或 empty 时，不做任何操作
+     */
+    public void clearSystemSettingsCache(String key) {
+        if (!redisOk() || key == null || key.isBlank()) {
+            return;
         }
+        redisTemplate.delete(SETTINGS_PREFIX + key);
     }
 }
