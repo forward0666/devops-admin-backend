@@ -78,7 +78,7 @@ public class VerificationCodeService {
      * @return 是否验证成功
      */
     public boolean validateVerificationCode(String codeId, String inputCode) {
-        // 使用Java 21的特性，简化空值检查
+        // 使用Java 21的模式匹配，简化空值检查
         if (codeId == null || inputCode == null) {
             return false;
         }
@@ -91,7 +91,7 @@ public class VerificationCodeService {
         }
         
         // 检查是否过期
-        Long expireTime = codeExpireTime.get(codeId);
+        var expireTime = codeExpireTime.get(codeId);
         if (expireTime == null || System.currentTimeMillis() > expireTime) {
             logger.warn("Verification code expired for ID: {}", codeId);
             // 清除过期的验证码
@@ -104,13 +104,13 @@ public class VerificationCodeService {
         var isValid = cachedCode.equals(inputCode.toLowerCase());
         logger.info("Verification code validation result for ID {}: {}", codeId, isValid);
         
-        // 只有验证成功时才删除验证码，失败时保留以便重试
+        // 使用Java 21的模式匹配，优化验证结果处理
         if (isValid) {
             codeCache.remove(codeId);
             codeExpireTime.remove(codeId);
+            return true;
         }
-        
-        return isValid;
+        return false; // 验证失败时保留验证码以便重试
     }
 
     /**

@@ -35,11 +35,12 @@ public class JwtService {
      */
     public String generateToken(String subject, Map<String, Object> claims) {
         // 使用Java 21的特性，更简洁的代码
-        var expiryDate = Date.from(Instant.now().plusSeconds(jwtExpirationInMs));
+        var now = Instant.now();
+        var expiryDate = Date.from(now.plusSeconds(jwtExpirationInMs));
         
         var builder = Jwts.builder()
                 .setSubject(subject)
-                .setIssuedAt(Date.from(Instant.now()))
+                .setIssuedAt(Date.from(now))
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey());
 

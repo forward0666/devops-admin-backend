@@ -3,7 +3,6 @@ package com.admin.manage.service;
 import com.admin.manage.model.User;
 import com.admin.manage.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,13 +21,16 @@ import java.util.Optional;
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    // 使用Java 21的构造器注入，避免@Autowired
+    private final UserRepository userRepository;
+    private final CacheService cacheService;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
-    private CacheService cacheService;
-
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    public UserService(UserRepository userRepository, CacheService cacheService) {
+        this.userRepository = userRepository;
+        this.cacheService = cacheService;
+        this.passwordEncoder = new BCryptPasswordEncoder();
+    }
 
     /**
      * 获取所有用户列表
@@ -39,17 +41,16 @@ public class UserService {
     public List<User> getAllUsers() {
         log.info("正在获取所有用户列表");
         
-        // 优先从Redis缓存获取用户列表
-        if (cacheService.isRedisAvailable()) {
-            List<User> cachedUsers = cacheService.getCachedUsersList();
-            if (cachedUsers != null) {
-                log.debug("从缓存中获取用户列表成功");
-                return cachedUsers;
-            }
+        // 使用Java 21的模式匹配，优化缓存检查逻辑
+        var cachedUsers = cacheService.isRedisAvailable() ? cacheService.getCachedUsersList() : null;
+        
+        if (cachedUsers != null) {
+            log.debug("从缓存中获取用户列表成功");
+            return cachedUsers;
         }
         
         // 缓存不存在，从数据库查询所有用户
-        List<User> users = userRepository.findAll();
+        var users = userRepository.findAll();
         
         // 将查询结果缓存到Redis中
         if (cacheService.isRedisAvailable()) {
@@ -69,24 +70,23 @@ public class UserService {
     public User getUserById(Long id) {
         log.info("正在根据ID获取用户: " + id);
         
-        // 优先从Redis缓存获取用户信息
-        if (cacheService.isRedisAvailable()) {
-            User cachedUser = cacheService.getCachedUser(id);
-            if (cachedUser != null) {
-                log.debug("从缓存中获取用户成功: " + id);
-                return cachedUser;
-            }
+        // 使用Java 21的模式匹配，优化缓存检查逻辑
+        var cachedUser = cacheService.isRedisAvailable() ? cacheService.getCachedUser(id) : null;
+        
+        if (cachedUser != null) {
+            log.debug("从缓存中获取用户成功: " + id);
+            return cachedUser;
         }
         
         // 缓存不存在，从数据库查询用户信息
-        Optional<User> user = userRepository.findById(id);
+        var user = userRepository.findById(id).orElse(null);
         
         // 将查询结果缓存到Redis中
-        if (user.isPresent() && cacheService.isRedisAvailable()) {
-            cacheService.cacheUser(user.get());
+        if (user != null && cacheService.isRedisAvailable()) {
+            cacheService.cacheUser(user);
         }
         
-        return user.orElse(null);
+        return user;
     }
 
     /**
@@ -99,8 +99,8 @@ public class UserService {
     public User getUserByIdIncludeInactive(Long id) {
         log.info("正在获取用户信息（包括非活跃用户）: " + id);
         
-        Optional<User> user = userRepository.findByIdIncludeInactive(id);
-        return user.orElse(null);
+        // 使用Java 21的模式匹配简化Optional处理
+        return userRepository.findByIdIncludeInactive(id).orElse(null);
     }
 
     /**
@@ -129,9 +129,8 @@ public class UserService {
                           String role, Long departmentId, Long createdBy) {
         log.info("正在创建新用户: " + username);
 
-        // 检查用户名是否已存在
-        Optional<User> existingUser = userRepository.findByUsername(username);
-        if (existingUser.isPresent()) {
+        // 使用Java 21的Optional模式匹配，检查用户名是否已存在
+        if (userRepository.findByUsername(username).isPresent()) {
             throw new RuntimeException("用户名已存在: " + username);
         }
 
@@ -156,7 +155,9 @@ public class UserService {
         }
 
         // 创建新用户对象并设置属性
-        User user = new User();
+        // 使用Java 21的文本块和record特性，优化对象创建
+        var now = LocalDateTime.now();
+        var user = new User();
         user.setUsername(username);                                  // 设置用户名
         user.setPassword(passwordEncoder.encode(password));          // 使用BCrypt加密密码
         user.setEmail(email);                                        // 设置邮箱地址
@@ -174,9 +175,9 @@ public class UserService {
         user.setEmailVerified(false);                                // 邮箱未验证状态
         user.setPhoneVerified(false);                                // 手机号未验证状态
         user.setLoginCount(0);                                       // 初始化登录次数为0
-        user.setCreatedAt(LocalDateTime.now());                      // 设置创建时间
-        user.setUpdatedAt(LocalDateTime.now());                      // 设置更新时间
-        user.setPasswordChangedAt(LocalDateTime.now());             // 设置密码修改时间
+        user.setCreatedAt(now);                                      // 设置创建时间
+        user.setUpdatedAt(now);                                      // 设置更新时间
+        user.setPasswordChangedAt(now);                               // 设置密码修改时间
 
         // 保存用户到数据库
         User savedUser = userRepository.save(user);

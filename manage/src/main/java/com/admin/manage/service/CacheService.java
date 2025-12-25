@@ -20,8 +20,12 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class CacheService {
 
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+    // 使用Java 21的构造器注入，避免@Autowired
+    private final RedisTemplate<String, Object> redisTemplate;
+    
+    public CacheService(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     // 缓存键前缀
     private static final String USER_CACHE_PREFIX = "user:";
@@ -41,7 +45,7 @@ public class CacheService {
 
     public void cacheUser(User user) {
         if (user != null && user.getId() != null) {
-            String key = USER_CACHE_PREFIX + user.getId();
+            var key = USER_CACHE_PREFIX + user.getId();
             redisTemplate.opsForValue().set(key, user, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
             log.debug("Cached user: {}", user.getId());
         }
@@ -49,9 +53,15 @@ public class CacheService {
 
     public User getCachedUser(Long userId) {
         if (userId == null) return null;
-        String key = USER_CACHE_PREFIX + userId;
-        Object cached = redisTemplate.opsForValue().get(key);
-        return (cached instanceof User) ? (User) cached : null;
+        var key = USER_CACHE_PREFIX + userId;
+        var cached = redisTemplate.opsForValue().get(key);
+        
+        // 使用Java 21的模式匹配，简化类型检查
+        return switch (cached) {
+            case User u -> u;
+            case null -> null;
+            default -> null; // 如果缓存中不是User类型，返回null
+        };
     }
 
     public void cacheUsersList(List<User> users) {
@@ -61,13 +71,20 @@ public class CacheService {
 
     @SuppressWarnings("unchecked")
     public List<User> getCachedUsersList() {
-        Object cached = redisTemplate.opsForValue().get(USERS_LIST_CACHE_KEY);
-        return (cached instanceof List) ? (List<User>) cached : null;
+        var cached = redisTemplate.opsForValue().get(USERS_LIST_CACHE_KEY);
+        
+        // 使用Java 21的模式匹配，简化类型检查
+        return switch (cached) {
+            case List<?> list when list.stream().allMatch(u -> u instanceof User) -> (List<User>) list;
+            case null -> null;
+            default -> null; // 如果缓存中不是User列表，返回null
+        };
     }
 
     public void clearUserCache(Long userId) {
         if (userId != null) {
-            redisTemplate.delete(USER_CACHE_PREFIX + userId);
+            var key = USER_CACHE_PREFIX + userId;
+            redisTemplate.delete(key);
             log.debug("Cleared cache for user: {}", userId);
         }
         redisTemplate.delete(USERS_LIST_CACHE_KEY);
@@ -85,7 +102,7 @@ public class CacheService {
 
     public void cacheDepartment(Department department) {
         if (department != null && department.getId() != null) {
-            String key = DEPARTMENT_CACHE_PREFIX + department.getId();
+            var key = DEPARTMENT_CACHE_PREFIX + department.getId();
             redisTemplate.opsForValue().set(key, department, CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
             log.debug("Cached department: {}", department.getId());
         }
@@ -93,9 +110,15 @@ public class CacheService {
 
     public Department getCachedDepartment(Long departmentId) {
         if (departmentId == null) return null;
-        String key = DEPARTMENT_CACHE_PREFIX + departmentId;
-        Object cached = redisTemplate.opsForValue().get(key);
-        return (cached instanceof Department) ? (Department) cached : null;
+        var key = DEPARTMENT_CACHE_PREFIX + departmentId;
+        var cached = redisTemplate.opsForValue().get(key);
+        
+        // 使用Java 21的模式匹配，简化类型检查
+        return switch (cached) {
+            case Department d -> d;
+            case null -> null;
+            default -> null; // 如果缓存中不是Department类型，返回null
+        };
     }
 
     public void cacheDepartmentsList(List<Department> departments) {
@@ -105,8 +128,14 @@ public class CacheService {
 
     @SuppressWarnings("unchecked")
     public List<Department> getCachedDepartmentsList() {
-        Object cached = redisTemplate.opsForValue().get(DEPARTMENTS_LIST_CACHE_KEY);
-        return (cached instanceof List) ? (List<Department>) cached : null;
+        var cached = redisTemplate.opsForValue().get(DEPARTMENTS_LIST_CACHE_KEY);
+        
+        // 使用Java 21的模式匹配，简化类型检查
+        return switch (cached) {
+            case List<?> list when list.stream().allMatch(d -> d instanceof Department) -> (List<Department>) list;
+            case null -> null;
+            default -> null; // 如果缓存中不是Department列表，返回null
+        };
     }
 
     public void cacheDepartmentUsers(Long departmentId, List<User> users) {
@@ -120,9 +149,15 @@ public class CacheService {
     @SuppressWarnings("unchecked")
     public List<User> getCachedDepartmentUsers(Long departmentId) {
         if (departmentId == null) return null;
-        String key = USER_DEPARTMENT_CACHE_PREFIX + departmentId;
-        Object cached = redisTemplate.opsForValue().get(key);
-        return (cached instanceof List) ? (List<User>) cached : null;
+        var key = USER_DEPARTMENT_CACHE_PREFIX + departmentId;
+        var cached = redisTemplate.opsForValue().get(key);
+        
+        // 使用Java 21的模式匹配，简化类型检查
+        return switch (cached) {
+            case List<?> list when list.stream().allMatch(u -> u instanceof User) -> (List<User>) list;
+            case null -> null;
+            default -> null; // 如果缓存中不是User列表，返回null
+        };
     }
 
     public void clearDepartmentCache(Long departmentId) {

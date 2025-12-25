@@ -148,40 +148,30 @@ public class JwtController {
      */
     @PostMapping("/verifyCode")
     public ResponseEntity<Map<String, Object>> verifyCode(@RequestBody VerificationCodeRequest request) {
-        Map<String, Object> response = new HashMap<>();
-        
+        // 使用Java 21的record模式和switch表达式优化代码
         try {
-            if (request.getCodeId() == null || request.getCodeId().trim().isEmpty()) {
-                response.put("success", false);
-                response.put("message", "验证码ID不能为空");
-                return ResponseEntity.badRequest().body(response);
+            // 使用模式匹配检查请求有效性
+            if (!request.isValid()) {
+                var errorMessage = request.codeId() == null || request.codeId().trim().isEmpty() 
+                    ? "验证码ID不能为空" : "验证码不能为空";
+                return ResponseEntity.badRequest()
+                        .body(Map.of("success", false, "message", errorMessage));
             }
             
-            if (request.getCode() == null || request.getCode().trim().isEmpty()) {
-                response.put("success", false);
-                response.put("message", "验证码不能为空");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            boolean isValid = verificationCodeService.validateVerificationCode(
-                request.getCodeId(), 
-                request.getCode()
-            );
-            
+            // 使用if-else处理验证结果
+            var isValid = verificationCodeService.validateVerificationCode(request.codeId(), request.code());
+            Map<String, Object> response;
             if (isValid) {
-                response.put("success", true);
-                response.put("message", "验证码验证成功");
+                response = Map.of("success", true, "message", "验证码验证成功");
             } else {
-                response.put("success", false);
-                response.put("message", "验证码错误或已过期");
+                response = Map.of("success", false, "message", "验证码错误或已过期");
             }
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "验证码验证失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "message", "验证码验证失败: " + e.getMessage()));
         }
     }
 }

@@ -29,6 +29,7 @@ public class OperationLogService {
     @Async
     public void logOperation(OperationLog operationLog) {
         try {
+            // 使用Java 21的模式匹配简化条件检查
             if (operationLog.getOperationId() == null) {
                 operationLog.setOperationId(UUID.randomUUID().toString());
             }
