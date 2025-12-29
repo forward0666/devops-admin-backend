@@ -7,8 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,10 +16,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Autowired
@@ -38,14 +36,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         // Skip JWT validation for OPTIONS requests (CORS preflight)
         if ("OPTIONS".equals(method)) {
-            logger.debug("Skipping JWT validation for OPTIONS request to path: {}", path);
+            log.debug("Skipping JWT validation for OPTIONS request to path: {}", path);
             filterChain.doFilter(request, response);
             return;
         }
         
         // Skip JWT validation for login endpoint, logout, and health checks
         if (path.equals("/login") || path.equals("/logout") || path.equals("/health") || path.equals("/actuator/health")) {
-            logger.debug("Skipping JWT validation for path: {}", path);
+            log.debug("Skipping JWT validation for path: {}", path);
             filterChain.doFilter(request, response);
             return;
         }
@@ -61,9 +59,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (cacheService.isRedisAvailable()) {
                     isValidToken = cacheService.getCachedTokenValidation(token);
                     if (isValidToken != null) {
-                        logger.info("Token validation from Redis cache: {}，path: {}", isValidToken,path);
+                        log.info("Token validation from Redis cache: {}，path: {}", isValidToken,path);
                         if (!isValidToken) {
-                            logger.warn("Token validation failed - token is invalid according to Redis cache");
+                            log.warn("Token validation failed - token is invalid according to Redis cache");
                             sendUnauthorizedResponse(response, "Invalid or expired token");
                             return;
                         }
@@ -78,13 +76,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         Map<String, String> requestBody = new HashMap<>();
                         requestBody.put("token", token);
                         
-                        logger.info("Validating token with security service via Feign");
+                        log.info("Validating token with security service via Feign");
                         Map<String, Object> serviceResponse = securityServiceClient.validateToken(requestBody);
                         
                         if (serviceResponse != null) {
                             Boolean valid = (Boolean) serviceResponse.get("valid");
                             if (Boolean.TRUE.equals(valid)) {
-                                logger.info("Token validation successful via security service");
+                                log.info("Token validation successful via security service");
                                 
                                 // Extract token data
                                 tokenData = extractTokenInfo(token);
@@ -92,20 +90,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 // Store validation result in Redis
                                 if (cacheService.isRedisAvailable()) {
                                     cacheService.cacheTokenValidation(token, true);
-                                    logger.info("Stored token validation result in Redis");
+                                    log.info("Stored token validation result in Redis");
                                 }
                             } else {
-                                logger.warn("Token validation failed: {}", serviceResponse.get("message"));
+                                log.warn("Token validation failed: {}", serviceResponse.get("message"));
                                 sendUnauthorizedResponse(response, "Invalid or expired token");
                                 return;
                             }
                         } else {
-                            logger.warn("Security service returned null response for token validation");
+                            log.warn("Security service returned null response for token validation");
                             sendUnauthorizedResponse(response, "Token validation failed");
                             return;
                         }
                     } catch (Exception e) {
-                        logger.error("Error validating token with security service: {}", e.getMessage());
+                        log.error("Error validating token with security service: {}", e.getMessage());
                         sendUnauthorizedResponse(response, "Token validation error: " + e.getMessage());
                         return;
                     }
@@ -146,7 +144,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
                     }
                     
-                    logger.debug("Extracted role from token: {}", role);
+                    log.debug("Extracted role from token: {}", role);
                     
                     // Get userId
                     Object userIdObj = tokenData.get("userId");
@@ -159,14 +157,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         try {
                             userId = Integer.parseInt((String) userIdObj);
                         } catch (NumberFormatException e) {
-                            logger.warn("Could not parse userId as integer: {}", userIdObj);
+                            log.warn("Could not parse userId as integer: {}", userIdObj);
                         }
                     }
                     
                     // Get email
                     String email = (String) tokenData.get("email");
                     
-                    logger.info("JWT validation successful for user: {} with role: {}", username, role);
+                    log.info("JWT validation successful for user: {} with role: {}", username, role);
                     
                     // Add user info to request attributes for controllers
                     request.setAttribute("userId", userId);
@@ -176,18 +174,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     request.setAttribute("isAuthenticated", true);
                     
                 } else {
-                    logger.warn("JWT token validation failed - invalid token structure");
+                    log.warn("JWT token validation failed - invalid token structure");
                     sendUnauthorizedResponse(response, "Invalid or expired token");
                     return;
                 }
                 
             } catch (Exception e) {
-                logger.error("JWT token validation error: {}", e.getMessage());
+                log.error("JWT token validation error: {}", e.getMessage());
                 sendUnauthorizedResponse(response, "Token validation failed: " + e.getMessage());
                 return;
             }
         } else {
-            logger.warn("No Authorization header found for path: {}", path);
+            log.warn("No Authorization header found for path: {}", path);
             sendUnauthorizedResponse(response, "Authorization header required");
             return;
         }
@@ -211,7 +209,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
             Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
             
-            logger.info("Extracted token claims: {}", claims);
+            log.info("Extracted token claims: {}", claims);
             
             Map<String, Object> userInfo = new HashMap<>();
             userInfo.put("valid", true);
@@ -227,7 +225,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return userInfo;
             
         } catch (Exception e) {
-            logger.error("Error extracting token info: {}", e.getMessage());
+            log.error("Error extracting token info: {}", e.getMessage());
             return null;
         }
     }

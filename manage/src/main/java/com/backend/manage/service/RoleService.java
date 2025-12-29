@@ -2,8 +2,7 @@ package com.backend.manage.service;
 
 import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.mapper.RoleMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,10 +14,9 @@ import java.util.List;
  * 处理角色相关的业务逻辑
  * 使用 Java 21 风格
  */
+@Slf4j
 @Service
 public class RoleService {
-
-    private static final Logger log = LoggerFactory.getLogger(RoleService.class);
 
     @Autowired
     private RoleMapper roleMapper;

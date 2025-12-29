@@ -13,11 +13,6 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
                 "config",
                 "monitor",
                 "filter"
-        },
-        exclude = {
-                org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration.class,
-                org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class
         }
 )
 public class SecurityApplication {

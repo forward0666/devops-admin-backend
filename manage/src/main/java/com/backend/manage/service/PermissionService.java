@@ -8,8 +8,7 @@ import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.mapper.MenuMapper;
 import com.backend.manage.mapper.PermissionMapper;
 import com.backend.manage.mapper.RoleMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +27,9 @@ import java.util.stream.Collectors;
  * @author Backend Team
  * @version 2.0.0
  */
+@Slf4j
 @Service
 public class PermissionService {
-
-    private static final Logger logger = LoggerFactory.getLogger(PermissionService.class);
 
     @Autowired
     private PermissionMapper permissionMapper;
@@ -47,7 +45,7 @@ public class PermissionService {
      * @return 权限映射响应列表
      */
     public List<PermissionResponseDto> getAllPermissionMappings() {
-        logger.info("Fetching all permission mappings");
+        log.info("Fetching all permission mappings");
         try {
             List<PermissionMappingEntity> mappings = permissionMapper.findAllWithDetails();
 
@@ -78,10 +76,10 @@ public class PermissionService {
                     })
                     .toList();
 
-            logger.info("Successfully retrieved {} permission mappings", responses.size());
+            log.info("Successfully retrieved {} permission mappings", responses.size());
             return responses;
         } catch (Exception e) {
-            logger.error("Error retrieving permission mappings", e);
+            log.error("Error retrieving permission mappings", e);
             throw new RuntimeException("Failed to retrieve permission mappings: " + e.getMessage(), e);
         }
     }
@@ -92,12 +90,12 @@ public class PermissionService {
      * @return 权限映射响应
      */
     public PermissionResponseDto getPermissionMappingByRoleId(Long roleId) {
-        logger.info("Fetching permission mapping for role ID: {}", roleId);
+        log.info("Fetching permission mapping for role ID: {}", roleId);
         try {
             // 验证角色存在
             var role = roleMapper.findById(roleId);
             if (role == null) {
-                logger.warn("Role not found with ID: {}", roleId);
+                log.warn("Role not found with ID: {}", roleId);
                 return new PermissionResponseDto(roleId, null, null, List.of(), List.of(), null, null);
             }
 
@@ -120,10 +118,10 @@ public class PermissionService {
                     mappings.isEmpty() ? null : mappings.get(0).getUpdatedAt()
             );
 
-            logger.info("Successfully retrieved permission mapping for role: {}", role.getName());
+            log.info("Successfully retrieved permission mapping for role: {}", role.getName());
             return response;
         } catch (Exception e) {
-            logger.error("Error retrieving permission mapping for role ID: {}", roleId, e);
+            log.error("Error retrieving permission mapping for role ID: {}", roleId, e);
             throw new RuntimeException("Failed to retrieve permission mapping: " + e.getMessage(), e);
         }
     }
@@ -135,12 +133,12 @@ public class PermissionService {
      */
     @Transactional
     public boolean updatePermissionMapping(PermissionRequestDto request) {
-        logger.info("Updating permission mapping for role ID: {}", request.getRoleId());
+        log.info("Updating permission mapping for role ID: {}", request.getRoleId());
         try {
             // 验证角色存在
             RoleEntity role = roleMapper.findById(request.getRoleId());
             if (role == null) {
-                logger.warn("Role not found with ID: {}", request.getRoleId());
+                log.warn("Role not found with ID: {}", request.getRoleId());
                 throw new IllegalArgumentException("Role not found");
             }
 
@@ -150,7 +148,7 @@ public class PermissionService {
                         .filter(menuId -> menuMapper.findById(menuId) == null)
                         .toList();
                 if (!invalidMenus.isEmpty()) {
-                    logger.warn("Menus not found with IDs: {}", invalidMenus);
+                    log.warn("Menus not found with IDs: {}", invalidMenus);
                     throw new IllegalArgumentException("Menu not found with ID: " + invalidMenus.get(0));
                 }
             }
@@ -174,13 +172,13 @@ public class PermissionService {
                 permissionMapper.batchInsert(mappings);
             }
 
-            logger.info("Successfully updated permission mapping for role: {}", role.getName());
+            log.info("Successfully updated permission mapping for role: {}", role.getName());
             return true;
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid permission mapping data: {}", e.getMessage());
+            log.warn("Invalid permission mapping data: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error updating permission mapping for role ID: {}", request.getRoleId(), e);
+            log.error("Error updating permission mapping for role ID: {}", request.getRoleId(), e);
             throw new RuntimeException("Failed to update permission mapping: " + e.getMessage(), e);
         }
     }
@@ -192,23 +190,23 @@ public class PermissionService {
      */
     @Transactional
     public boolean deletePermissionMapping(Long roleId) {
-        logger.info("Deleting permission mapping for role ID: {}", roleId);
+        log.info("Deleting permission mapping for role ID: {}", roleId);
         try {
             // 验证角色存在
             RoleEntity role = roleMapper.findById(roleId);
             if (role == null) {
-                logger.warn("Role not found with ID: {}", roleId);
+                log.warn("Role not found with ID: {}", roleId);
                 throw new IllegalArgumentException("Role not found");
             }
 
             int deleted = permissionMapper.deleteByRoleId(roleId);
-            logger.info("Successfully deleted {} permission mappings for role: {}", deleted, role.getName());
+            log.info("Successfully deleted {} permission mappings for role: {}", deleted, role.getName());
             return true;
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid role ID for deletion: {}", e.getMessage());
+            log.warn("Invalid role ID for deletion: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error deleting permission mapping for role ID: {}", roleId, e);
+            log.error("Error deleting permission mapping for role ID: {}", roleId, e);
             throw new RuntimeException("Failed to delete permission mapping: " + e.getMessage(), e);
         }
     }

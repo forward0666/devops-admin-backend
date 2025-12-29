@@ -5,18 +5,16 @@ import com.backend.manage.entity.SystemConfigEntity;
 import com.backend.manage.repository.SystemConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Repository
 public class SystemConfigRepositoryImpl implements SystemConfigRepository {
-
-    private static final Logger logger = LoggerFactory.getLogger(SystemConfigRepositoryImpl.class);
 
     @Autowired
     private SystemConfigMapper systemConfigMapper;
@@ -29,7 +27,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
             SystemConfigEntity config = systemConfigMapper.findByKey(key);
             return config != null ? config.getConfigValue() : defaultValue;
         } catch (Exception e) {
-            logger.error("Error getting config value for key: {}", key, e);
+            log.error("Error getting config value for key: {}", key, e);
             return defaultValue;
         }
     }
@@ -42,7 +40,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
                 existingConfig.setConfigValue(value);
                 existingConfig.setUpdatedAt(LocalDateTime.now());
                 systemConfigMapper.update(existingConfig);
-                logger.info("Updated config: {} = {}", key, value);
+                log.info("Updated config: {} = {}", key, value);
             } else {
                 SystemConfigEntity newConfig = new SystemConfigEntity();
                 newConfig.setConfigKey(key);
@@ -53,10 +51,10 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
                 newConfig.setCreatedAt(LocalDateTime.now());
                 newConfig.setUpdatedAt(LocalDateTime.now());
                 systemConfigMapper.insert(newConfig);
-                logger.info("Created new config: {} = {}", key, value);
+                log.info("Created new config: {} = {}", key, value);
             }
         } catch (Exception e) {
-            logger.error("Error setting config value for key: {}", key, e);
+            log.error("Error setting config value for key: {}", key, e);
             throw new RuntimeException("Failed to set config value", e);
         }
     }
@@ -70,7 +68,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
             }
             return objectMapper.readValue(config.getConfigValue(), clazz);
         } catch (Exception e) {
-            logger.error("Error getting config object for key: {}", key, e);
+            log.error("Error getting config object for key: {}", key, e);
             return defaultValue;
         }
     }
@@ -84,7 +82,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
             }
             return objectMapper.readValue(config.getConfigValue(), typeRef);
         } catch (Exception e) {
-            logger.error("Error getting config object with TypeReference for key: {}", key, e);
+            log.error("Error getting config object with TypeReference for key: {}", key, e);
             return defaultValue;
         }
     }
@@ -95,7 +93,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
             String jsonValue = objectMapper.writeValueAsString(value);
             setConfigValue(key, jsonValue);
         } catch (Exception e) {
-            logger.error("Error setting config object for key: {}", key, e);
+            log.error("Error setting config object for key: {}", key, e);
             throw new RuntimeException("Failed to set config object", e);
         }
     }
@@ -105,7 +103,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             return systemConfigMapper.findAll();
         } catch (Exception e) {
-            logger.error("Error getting all configs", e);
+            log.error("Error getting all configs", e);
             throw new RuntimeException("Failed to get all configs", e);
         }
     }
@@ -115,7 +113,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             return systemConfigMapper.findPublicConfigs();
         } catch (Exception e) {
-            logger.error("Error getting public configs", e);
+            log.error("Error getting public configs", e);
             throw new RuntimeException("Failed to get public configs", e);
         }
     }
@@ -125,7 +123,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             return systemConfigMapper.findByKey(key);
         } catch (Exception e) {
-            logger.error("Error getting config by key: {}", key, e);
+            log.error("Error getting config by key: {}", key, e);
             return null;
         }
     }
@@ -136,10 +134,10 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
             config.setCreatedAt(LocalDateTime.now());
             config.setUpdatedAt(LocalDateTime.now());
             systemConfigMapper.insert(config);
-            logger.info("Created new config: {}", config.getConfigKey());
+            log.info("Created new config: {}", config.getConfigKey());
             return config;
         } catch (Exception e) {
-            logger.error("Error creating config: {}", config.getConfigKey(), e);
+            log.error("Error creating config: {}", config.getConfigKey(), e);
             throw new RuntimeException("Failed to create config", e);
         }
     }
@@ -149,10 +147,10 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             config.setUpdatedAt(LocalDateTime.now());
             systemConfigMapper.update(config);
-            logger.info("Updated config: {}", config.getConfigKey());
+            log.info("Updated config: {}", config.getConfigKey());
             return config;
         } catch (Exception e) {
-            logger.error("Error updating config: {}", config.getConfigKey(), e);
+            log.error("Error updating config: {}", config.getConfigKey(), e);
             throw new RuntimeException("Failed to update config", e);
         }
     }
@@ -162,12 +160,12 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             int deleted = systemConfigMapper.deleteByKey(key);
             if (deleted > 0) {
-                logger.info("Deleted config: {}", key);
+                log.info("Deleted config: {}", key);
                 return true;
             }
             return false;
         } catch (Exception e) {
-            logger.error("Error deleting config: {}", key, e);
+            log.error("Error deleting config: {}", key, e);
             throw new RuntimeException("Failed to delete config", e);
         }
     }
@@ -177,7 +175,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
         try {
             return systemConfigMapper.findByKey(key) != null;
         } catch (Exception e) {
-            logger.error("Error checking if config exists: {}", key, e);
+            log.error("Error checking if config exists: {}", key, e);
             return false;
         }
     }

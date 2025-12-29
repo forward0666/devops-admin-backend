@@ -1,8 +1,7 @@
 package filter;
 
+import lombok.extern.slf4j.Slf4j;
 import network.TraceIdUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -11,11 +10,10 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
+@Slf4j
 @Component
 @Order(-100) // 提高优先级，确保最早执行
 public class TraceIdFilter implements WebFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(TraceIdFilter.class);
 
     // 请求头常量
     public static final String TRACE_ID_HEADER_CF_RAY = "CF-RAY";

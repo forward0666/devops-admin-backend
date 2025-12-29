@@ -2,8 +2,7 @@ package com.backend.security.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +11,9 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class JwtService {
-
-    private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -97,10 +95,10 @@ public class JwtService {
                     .build()
                     .parseClaimsJws(token);
             return true;
-        } catch (SecurityException | MalformedJwtException | ExpiredJwtException | 
+        } catch (SecurityException | MalformedJwtException | ExpiredJwtException |
                  UnsupportedJwtException | IllegalArgumentException ex) {
             // 使用Java 21的多catch特性，简化异常处理
-            logger.error("JWT validation failed: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
+            log.error("JWT validation failed: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
             return false;
         }
     }

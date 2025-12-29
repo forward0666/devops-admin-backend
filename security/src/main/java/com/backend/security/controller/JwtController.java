@@ -1,10 +1,10 @@
 package com.backend.security.controller;
 
-import com.backend.security.dto.JwtGenerateRequest;
-import com.backend.security.dto.JwtValidateRequest;
-import com.backend.security.dto.JwtResponse;
-import com.backend.security.dto.VerificationCodeRequest;
-import com.backend.security.dto.VerificationCodeResponse;
+import com.backend.security.dto.JwtGenerateRequestDto;
+import com.backend.security.dto.JwtValidateRequestDto;
+import com.backend.security.dto.JwtResponseDto;
+import com.backend.security.dto.VerificationCodeRequestDto;
+import com.backend.security.dto.VerificationCodeResponseDto;
 import com.backend.security.service.JwtService;
 import com.backend.security.service.VerificationCodeService;
 import io.jsonwebtoken.Claims;
@@ -35,19 +35,19 @@ public class JwtController {
      * 生成JWT token
      */
     @PostMapping("/generate")
-    public ResponseEntity<JwtResponse> generateToken(@Valid @RequestBody JwtGenerateRequest request) {
+    public ResponseEntity<JwtResponseDto> generateToken(@Valid @RequestBody JwtGenerateRequestDto request) {
         // 使用try-catch块捕获异常，并使用Java 21的switch表达式
         return tryGenerateToken(request);
     }
     
     // 将异常处理提取为私有方法，提高代码可读性
-    private ResponseEntity<JwtResponse> tryGenerateToken(JwtGenerateRequest request) {
+    private ResponseEntity<JwtResponseDto> tryGenerateToken(JwtGenerateRequestDto request) {
         try {
             String token = jwtService.generateToken(request.subject(), request.claims());
-            return ResponseEntity.ok(JwtResponse.success("Token generated successfully", token));
+            return ResponseEntity.ok(JwtResponseDto.success("Token generated successfully", token));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
-                    .body(JwtResponse.error("Failed to generate token: " + e.getMessage()));
+                    .body(JwtResponseDto.error("Failed to generate token: " + e.getMessage()));
         }
     }
 
@@ -55,13 +55,13 @@ public class JwtController {
      * 验证JWT token并返回所有信息
      */
     @PostMapping("/validate")
-    public ResponseEntity<JwtResponse> validateToken(@Valid @RequestBody JwtValidateRequest request) {
+    public ResponseEntity<JwtResponseDto> validateToken(@Valid @RequestBody JwtValidateRequestDto request) {
         // 使用try-catch块捕获异常，并使用Java 21的switch表达式
         return tryValidateToken(request.token());
     }
     
     // 将异常处理提取为私有方法，提高代码可读性
-    private ResponseEntity<JwtResponse> tryValidateToken(String token) {
+    private ResponseEntity<JwtResponseDto> tryValidateToken(String token) {
         try {
             if (jwtService.validateToken(token)) {
                 Claims claims = jwtService.getClaimsFromToken(token);
@@ -73,14 +73,14 @@ public class JwtController {
                 data.put("expired", claims.getExpiration().before(Date.from(Instant.now())));
                 data.put("claims", claims);
                 
-                return ResponseEntity.ok(JwtResponse.success("Token is valid", token, data));
+                return ResponseEntity.ok(JwtResponseDto.success("Token is valid", token, data));
             } else {
                 return ResponseEntity.badRequest()
-                        .body(JwtResponse.error("Token is invalid or expired"));
+                        .body(JwtResponseDto.error("Token is invalid or expired"));
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest()
-                    .body(JwtResponse.error("Failed to validate token: " + e.getMessage()));
+                    .body(JwtResponseDto.error("Failed to validate token: " + e.getMessage()));
         }
     }
 
@@ -88,16 +88,16 @@ public class JwtController {
      * 生成数字图形验证码
      */
     @PostMapping("/verificationCode")
-    public ResponseEntity<VerificationCodeResponse> generateVerificationCode() {
+    public ResponseEntity<VerificationCodeResponseDto> generateVerificationCode() {
         // 使用try-catch块捕获异常
         return tryGenerateVerificationCode();
     }
     
     // 将异常处理提取为私有方法，提高代码可读性
-    private ResponseEntity<VerificationCodeResponse> tryGenerateVerificationCode() {
+    private ResponseEntity<VerificationCodeResponseDto> tryGenerateVerificationCode() {
         try {
             var result = verificationCodeService.generateVerificationCode();
-            return ResponseEntity.ok(new VerificationCodeResponse(
+            return ResponseEntity.ok(new VerificationCodeResponseDto(
                     true, 
                     "Verification code generated successfully", 
                     result.get("codeId"), 
@@ -105,7 +105,7 @@ public class JwtController {
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
-                    .body(new VerificationCodeResponse(false, "Failed to generate verification code: " + e.getMessage(), null, null));
+                    .body(new VerificationCodeResponseDto(false, "Failed to generate verification code: " + e.getMessage(), null, null));
         }
     }
 
@@ -147,7 +147,7 @@ public class JwtController {
      * - 敏感操作的安全验证
      */
     @PostMapping("/verifyCode")
-    public ResponseEntity<Map<String, Object>> verifyCode(@RequestBody VerificationCodeRequest request) {
+    public ResponseEntity<Map<String, Object>> verifyCode(@RequestBody VerificationCodeRequestDto request) {
         // 使用Java 21的record模式和switch表达式优化代码
         try {
             // 使用模式匹配检查请求有效性

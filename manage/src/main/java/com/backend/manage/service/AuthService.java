@@ -5,8 +5,7 @@ import com.backend.manage.dto.LoginRequestDto;
 import com.backend.manage.dto.LoginResponseDto;
 import com.backend.manage.entity.UserEntity;
 import com.backend.manage.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,10 +21,9 @@ import java.util.Optional;
  * @author Backend Team
  * @version 2.0.0
  */
+@Slf4j
 @Service
 public class AuthService {
-
-    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private SecurityServiceClient securityServiceClient; // 安全服务客户端，用于调用安全微服务
@@ -49,11 +47,11 @@ public class AuthService {
      * @throws RuntimeException 当认证失败时抛出异常
      */
     public LoginResponseDto login(LoginRequestDto loginRequest, String clientIP) {
-        logger.info("处理用户登录请求，用户名: {}，来源IP: {}", loginRequest.username(), clientIP);
+        log.info("处理用户登录请求，用户名: {}，来源IP: {}", loginRequest.username(), clientIP);
 
         // 步骤0: 验证客户端IP白名单/黑名单
         if (!validateClientIP(clientIP)) {
-            logger.warn("登录被拒绝: IP {} 不被允许或已被阻止", clientIP);
+            log.warn("登录被拒绝: IP {} 不被允许或已被阻止", clientIP);
             throw new RuntimeException("访问被拒绝: 您的IP地址未获得授权");
         }
 
@@ -61,11 +59,11 @@ public class AuthService {
         var user = authenticateUser(loginRequest.username(), loginRequest.password());
 
         if (user == null) {
-            logger.warn("认证失败: 用户名或密码无效 {}", loginRequest.username());
+            log.warn("认证失败: 用户名或密码无效 {}", loginRequest.username());
             throw new RuntimeException("无效的用户名或密码");
         }
 
-        logger.info("用户凭据验证成功: {}", loginRequest.username());
+        log.info("用户凭据验证成功: {}", loginRequest.username());
 
         // 步骤2: 验证验证码（通过安全服务）
         boolean isValidCode = validateVerificationCode(
@@ -74,16 +72,16 @@ public class AuthService {
         );
 
         if (!isValidCode) {
-            logger.warn("认证失败: 验证码无效 {}", loginRequest.username());
+            log.warn("认证失败: 验证码无效 {}", loginRequest.username());
             throw new RuntimeException("无效的验证码");
         }
 
-        logger.info("验证码验证成功: {}", loginRequest.username());
+        log.info("验证码验证成功: {}", loginRequest.username());
 
         // 步骤3: 生成JWT承载令牌
         var token = generateBearerToken(user);
 
-        logger.info("承载令牌生成成功: {}", loginRequest.username());
+        log.info("承载令牌生成成功: {}", loginRequest.username());
 
         // 步骤4: 返回包含令牌和用户详情的响应
         return new LoginResponseDto(token, user);
@@ -99,7 +97,7 @@ public class AuthService {
      */
     private boolean validateVerificationCode(String codeKey, String code) {
         try {
-            logger.info("通过安全服务验证验证码，使用Feign客户端");
+            log.info("通过安全服务验证验证码，使用Feign客户端");
 
             // Java 21: 使用 Map.of() 创建不可变映射
             var requestBody = Map.<String, String>of(
@@ -113,18 +111,18 @@ public class AuthService {
             if (response != null) {
                 var success = (Boolean) response.get("success");
                 if (Boolean.TRUE.equals(success)) {
-                    logger.info("验证码验证成功");
+                    log.info("验证码验证成功");
                     return true;
                 } else {
-                    logger.warn("验证码验证失败: {}", response.get("message"));
+                    log.warn("验证码验证失败: {}", response.get("message"));
                     return false;
                 }
             }
 
-            logger.warn("安全服务返回空响应");
+            log.warn("安全服务返回空响应");
             return false;
         } catch (Exception e) {
-            logger.warn("使用Feign验证验证码时出错: {}", e.getMessage());
+            log.warn("使用Feign验证验证码时出错: {}", e.getMessage());
             return false; // 生产环境直接失败，开发环境使用fallback机制
         }
     }
@@ -139,7 +137,7 @@ public class AuthService {
      */
     private String generateBearerToken(UserEntity user) {
         try {
-            logger.info("通过安全服务为用户生成JWT令牌: {}", user.getUsername());
+            log.info("通过安全服务为用户生成JWT令牌: {}", user.getUsername());
 
             var requestBody = new HashMap<String, Object>();
             requestBody.put("subject", user.getUsername()); // JWT主题，通常为用户名
@@ -158,12 +156,12 @@ public class AuthService {
 
             if (response != null && response.get("token") != null) {
                 var token = (String) response.get("token");
-                logger.info("通过安全服务成功生成JWT令牌");
+                log.info("通过安全服务成功生成JWT令牌");
 
                 // 如果Redis可用，将令牌验证结果缓存
                 if (cacheService.isRedisAvailable()) {
                     cacheService.cacheTokenValidation(token, true);
-                    logger.info("令牌已存储在Redis缓存中供验证使用");
+                    log.info("令牌已存储在Redis缓存中供验证使用");
                 }
 
                 return token;
@@ -172,7 +170,7 @@ public class AuthService {
             throw new RuntimeException("从安全服务生成令牌失败");
 
         } catch (Exception e) {
-            logger.warn("通过安全服务生成JWT令牌时出错: {}", e.getMessage());
+            log.warn("通过安全服务生成JWT令牌时出错: {}", e.getMessage());
             throw new RuntimeException("令牌生成服务不可用");
         }
     }
@@ -186,7 +184,7 @@ public class AuthService {
      * @return User 认证成功的用户对象，如果认证失败返回null
      */
     private UserEntity authenticateUser(String username, String password) {
-        logger.info("对用户进行数据库认证: {}", username);
+        log.info("对用户进行数据库认证: {}", username);
 
         var authenticatedUser = userRepository.authenticate(username, password);
         return authenticatedUser.orElse(null);
@@ -201,25 +199,25 @@ public class AuthService {
      */
     private boolean validateClientIP(String clientIP) {
         try {
-            logger.info("验证客户端IP: {}", clientIP);
+            log.info("验证客户端IP: {}", clientIP);
 
             // 检查IP是否在黑名单中
             if (ipWhitelistService.isIPBlocked(clientIP)) {
-                logger.warn("客户端IP {} 在黑名单中", clientIP);
+                log.warn("客户端IP {} 在黑名单中", clientIP);
                 return false;
             }
 
             // 检查IP是否在白名单中
             if (!ipWhitelistService.isIPAllowed(clientIP)) {
-                logger.warn("客户端IP {} 不在白名单中", clientIP);
+                log.warn("客户端IP {} 不在白名单中", clientIP);
                 return false;
             }
 
-            logger.info("客户端IP {} 通过验证", clientIP);
+            log.info("客户端IP {} 通过验证", clientIP);
             return true;
 
         } catch (Exception e) {
-            logger.error("验证客户端IP {} 时出错: {}", clientIP, e.getMessage());
+            log.error("验证客户端IP {} 时出错: {}", clientIP, e.getMessage());
             return true; // fail-open策略，防止误锁
         }
     }
@@ -244,7 +242,7 @@ public class AuthService {
      */
     public boolean validateToken(String token) {
         try {
-            logger.info("通过安全服务验证JWT令牌");
+            log.info("通过安全服务验证JWT令牌");
 
             // 清理令牌（移除Bearer前缀）
             var cleanToken = token.replace("Bearer ", "");
@@ -253,7 +251,7 @@ public class AuthService {
             if (cacheService.isRedisAvailable()) {
                 var cachedResult = cacheService.getCachedTokenValidation(cleanToken);
                 if (cachedResult != null) {
-                    logger.debug("从缓存中获取令牌验证结果: {}", cachedResult);
+                    log.debug("从缓存中获取令牌验证结果: {}", cachedResult);
                     return cachedResult;
                 }
             }
@@ -268,13 +266,13 @@ public class AuthService {
             if (response != null) {
                 var valid = (Boolean) response.get("valid");
                 if (Boolean.TRUE.equals(valid)) {
-                    logger.info("通过安全服务JWT令牌验证成功");
+                    log.info("通过安全服务JWT令牌验证成功");
                     isValid = true;
                 } else {
-                    logger.warn("JWT令牌验证失败: {}", response.get("message"));
+                    log.warn("JWT令牌验证失败: {}", response.get("message"));
                 }
             } else {
-                logger.warn("安全服务返回空响应（令牌验证）");
+                log.warn("安全服务返回空响应（令牌验证）");
             }
 
             // 缓存验证结果
@@ -285,7 +283,7 @@ public class AuthService {
             return isValid;
 
         } catch (Exception e) {
-            logger.error("令牌验证过程中出错: {}", e.getMessage());
+            log.error("令牌验证过程中出错: {}", e.getMessage());
             return false; // 生产环境直接失败，开发环境使用fallback机制
         }
     }

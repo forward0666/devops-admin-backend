@@ -7,7 +7,7 @@ package com.backend.security.dto;
  * 
  * 使用Java 21的record特性，简化不可变数据载体
  */
-public record VerificationCodeRequest(
+public record VerificationCodeRequestDto(
     /**
      * 验证码ID
      * 中文注释：验证码的唯一标识，用于查找对应的验证码
@@ -23,8 +23,8 @@ public record VerificationCodeRequest(
     /**
      * 创建一个空请求的静态工厂方法
      */
-    public static VerificationCodeRequest empty() {
-        return new VerificationCodeRequest(null, null);
+    public static VerificationCodeRequestDto empty() {
+        return new VerificationCodeRequestDto(null, null);
     }
     
     /**

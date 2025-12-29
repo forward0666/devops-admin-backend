@@ -1,8 +1,7 @@
 package com.backend.security.service;
 
 import com.google.code.kaptcha.Producer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -14,10 +13,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Service
 public class VerificationCodeService {
-
-    private static final Logger logger = LoggerFactory.getLogger(VerificationCodeService.class);
 
     // 使用构造器注入替代@Autowired，这是Java 21的推荐实践
     private final Producer kaptchaProducer;
@@ -59,12 +57,12 @@ public class VerificationCodeService {
                 "codeId", codeId,
                 "imageBase64", "data:image/png;base64," + imageBase64
             );
-            
-            logger.info("Generated verification code with ID: {}", codeId);
+
+            log.info("Generated verification code with ID: {}", codeId);
             return result;
-            
+
         } catch (Exception e) {
-            logger.error("Failed to generate verification code", e);
+            log.error("Failed to generate verification code", e);
             throw new RuntimeException("Failed to generate verification code", e);
         }
     }
@@ -84,23 +82,23 @@ public class VerificationCodeService {
         // 检查验证码是否存在
         var cachedCode = codeCache.get(codeId);
         if (cachedCode == null) {
-            logger.warn("Verification code not found for ID: {}", codeId);
+            log.warn("Verification code not found for ID: {}", codeId);
             return false;
         }
-        
+
         // 检查是否过期
         var expireTime = codeExpireTime.get(codeId);
         if (expireTime == null || System.currentTimeMillis() > expireTime) {
-            logger.warn("Verification code expired for ID: {}", codeId);
+            log.warn("Verification code expired for ID: {}", codeId);
             // 清除过期的验证码
             codeCache.remove(codeId);
             codeExpireTime.remove(codeId);
             return false;
         }
-        
+
         // 验证后立即删除验证码
         var isValid = cachedCode.equals(inputCode.toLowerCase());
-        logger.info("Verification code validation result for ID {}: {}", codeId, isValid);
+        log.info("Verification code validation result for ID {}: {}", codeId, isValid);
         
         // 使用Java 21的模式匹配，优化验证结果处理
         if (isValid) {

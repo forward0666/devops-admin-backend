@@ -2,8 +2,7 @@ package com.backend.manage.service;
 
 import com.backend.manage.mapper.MenuMapper;
 import com.backend.manage.entity.MenuEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +17,9 @@ import java.util.stream.Collectors;
  * 支持Redis缓存，提高查询性能
  * 使用 Java 21 风格
  */
+@Slf4j
 @Service
 public class MenuService {
-
-    private static final Logger logger = LoggerFactory.getLogger(MenuService.class);
 
     @Autowired
     private MenuMapper menuMapper;
@@ -35,13 +33,13 @@ public class MenuService {
      * @return 菜单列表
      */
     public List<MenuEntity> getAllMenus() {
-        logger.info("Fetching all menus");
+        log.info("Fetching all menus");
 
         // 优先从Redis缓存获取菜单列表
         if (cacheService.isRedisAvailable()) {
             var cachedMenus = cacheService.getCachedMenusList();
             if (cachedMenus != null) {
-                logger.debug("从缓存中获取菜单列表成功");
+                log.debug("从缓存中获取菜单列表成功");
                 return cachedMenus;
             }
         }
@@ -58,10 +56,10 @@ public class MenuService {
                 cacheService.cacheMenusList(menus);
             }
 
-            logger.info("成功获取 {} 个菜单", menus.size());
+            log.info("成功获取 {} 个菜单", menus.size());
             return menus;
         } catch (Exception e) {
-            logger.error("获取所有菜单时发生错误", e);
+            log.error("获取所有菜单时发生错误", e);
             throw new RuntimeException("获取菜单列表失败", e);
         }
     }
@@ -73,10 +71,10 @@ public class MenuService {
      * @return 菜单对象
      */
     public MenuEntity getMenuById(Long id) {
-        logger.info("Fetching menu by ID: {}", id);
+        log.info("Fetching menu by ID: {}", id);
 
         if (id == null) {
-            logger.warn("菜单ID不能为空");
+            log.warn("菜单ID不能为空");
             return null;
         }
 
@@ -84,7 +82,7 @@ public class MenuService {
         if (cacheService.isRedisAvailable()) {
             var cachedMenu = cacheService.getCachedMenu(id);
             if (cachedMenu != null) {
-                logger.debug("从缓存中获取菜单成功: {}", id);
+                log.debug("从缓存中获取菜单成功: {}", id);
                 return cachedMenu;
             }
         }
@@ -100,7 +98,7 @@ public class MenuService {
 
             return menu;
         } catch (Exception e) {
-            logger.error("获取菜单时发生错误", e);
+            log.error("获取菜单时发生错误", e);
             throw new RuntimeException("获取菜单失败", e);
         }
     }
@@ -113,7 +111,7 @@ public class MenuService {
      * @throws IllegalArgumentException 如果父菜单不存在
      */
     public MenuEntity createMenu(MenuEntity menu) {
-        logger.info("Creating new menu: {}", menu.getName());
+        log.info("Creating new menu: {}", menu.getName());
 
         // 验证父菜单是否存在
         if (menu.getParentId() != null && menuMapper.existsById(menu.getParentId()) == 0) {
@@ -133,7 +131,7 @@ public class MenuService {
         // 清除菜单列表缓存
         clearMenuCache();
 
-        logger.info("Successfully created menu with ID: {}", menu.getId());
+        log.info("Successfully created menu with ID: {}", menu.getId());
         return menu;
     }
 
@@ -145,7 +143,7 @@ public class MenuService {
      * @throws IllegalArgumentException 如果菜单不存在或父菜单无效
      */
     public MenuEntity updateMenu(MenuEntity menu) {
-        logger.info("Updating menu with ID: {}", menu.getId());
+        log.info("Updating menu with ID: {}", menu.getId());
 
         // 验证菜单是否存在
         if (menuMapper.existsById(menu.getId()) == 0) {
@@ -169,10 +167,10 @@ public class MenuService {
             // 清除菜单相关缓存
             clearMenuCache();
 
-            logger.info("Successfully updated menu with ID: {}", menu.getId());
+            log.info("Successfully updated menu with ID: {}", menu.getId());
             return menu;
         } else {
-            logger.error("Failed to update menu with ID: {}", menu.getId());
+            log.error("Failed to update menu with ID: {}", menu.getId());
             return null;
         }
     }
@@ -185,7 +183,7 @@ public class MenuService {
      * @throws IllegalStateException 如果菜单有子菜单
      */
     public boolean deleteMenu(Long id) {
-        logger.info("Deleting menu with ID: {}", id);
+        log.info("Deleting menu with ID: {}", id);
 
         // 检查菜单是否存在
         if (menuMapper.existsById(id) == 0) {
@@ -203,10 +201,10 @@ public class MenuService {
             // 清除菜单相关缓存
             clearMenuCache();
 
-            logger.info("Successfully deleted menu with ID: {}", id);
+            log.info("Successfully deleted menu with ID: {}", id);
             return true;
         } else {
-            logger.error("Failed to delete menu with ID: {}", id);
+            log.error("Failed to delete menu with ID: {}", id);
             return false;
         }
     }
@@ -217,13 +215,13 @@ public class MenuService {
      * @return 根菜单列表
      */
     public List<MenuEntity> getRootMenus() {
-        logger.info("Fetching root menus");
+        log.info("Fetching root menus");
 
         // 优先从Redis缓存获取根菜单
         if (cacheService.isRedisAvailable()) {
             var cachedMenus = cacheService.getCachedRootMenusList();
             if (cachedMenus != null) {
-                logger.debug("从缓存中获取根菜单成功");
+                log.debug("从缓存中获取根菜单成功");
                 return cachedMenus;
             }
         }
@@ -237,10 +235,10 @@ public class MenuService {
                 cacheService.cacheRootMenusList(menus);
             }
 
-            logger.info("成功获取 {} 个根菜单", menus.size());
+            log.info("成功获取 {} 个根菜单", menus.size());
             return menus;
         } catch (Exception e) {
-            logger.error("获取根菜单时发生错误", e);
+            log.error("获取根菜单时发生错误", e);
             throw new RuntimeException("获取根菜单失败", e);
         }
     }
@@ -251,7 +249,7 @@ public class MenuService {
      * @return 子菜单列表
      */
     public List<MenuEntity> getChildMenus(Long parentId) {
-        logger.info("Fetching child menus for parent ID: {}", parentId);
+        log.info("Fetching child menus for parent ID: {}", parentId);
         return menuMapper.findByParentId(parentId);
     }
 
@@ -285,7 +283,7 @@ public class MenuService {
     private void clearMenuCache() {
         if (cacheService.isRedisAvailable()) {
             cacheService.clearAllMenuCache();
-            logger.debug("已清除菜单缓存");
+            log.debug("已清除菜单缓存");
         }
     }
 }
