@@ -11,23 +11,23 @@
     <modelVersion>4.0.0</modelVersion>
 
     <!-- 项目坐标信息 -->
-    <groupId>com.backend</groupId>          <!-- 组织标识：com.admin -->
-    <artifactId>devop</artifactId><!-- 项目标识：admin-platform -->
-    <version>1.0.0</version>              <!-- 版本号：1.0.0 -->
-    <packaging>pom</packaging>            <!-- 打包类型：pom（多模块项目） -->
-    <name>Devop Backend</name>    <!-- 项目名称 -->
-    <description>Parent project for Devop Backend</description><!-- 项目描述 -->
+    <groupId>com.backend</groupId>                              <!-- 组织标识：com.admin -->
+    <artifactId>devop</artifactId>                              <!-- 项目标识：admin-platform -->
+    <version>1.0.0</version>                                    <!-- 版本号：1.0.0 -->
+    <packaging>pom</packaging>                                  <!-- 打包类型：pom（多模块项目） -->
+    <name>Devop Backend</name>                                  <!-- 项目名称 -->
+    <description>Parent project for Devop Backend</description> <!-- 项目描述 -->
 
     <!-- 项目模块定义 -->
     <modules>
-        <module>utils-core</module>                 <!-- 工具模块 -->
-        <module>utils-webflux</module>              <!-- 工具模块，针对webflux -->
-        <module>gateway</module>                    <!-- 网关模块：负责请求路由和过滤 -->
-        <module>cloudflare-logs-producer</module>    <!-- Cloudflare日志生成者 -->
-        <module>cloudflare-logs-consumer</module>   <!-- Cloudflare日志消费者：处理日志数据 -->
-        <module>telegram-bot-manager</module>       <!-- Telegram机器人管理器 -->
-        <module>security</module>                    <!-- 安全模块：负责用户认证和授权 -->
-        <module>manage</module>                       <!-- 管理服务模块 -->
+        <module>utils-core</module>                             <!-- 工具模块 -->
+        <module>utils-webflux</module>                          <!-- 工具模块，针对webflux -->
+        <module>gateway</module>                                <!-- 网关模块：负责请求路由和过滤 -->
+        <module>cloudflare-logs-producer</module>               <!-- Cloudflare日志生成者 -->
+        <module>cloudflare-logs-consumer</module>               <!-- Cloudflare日志消费者：处理日志数据 -->
+        <module>telegram-bot-manager</module>                   <!-- Telegram机器人管理器 -->
+        <module>security</module>                               <!-- 安全模块：负责用户认证和授权 -->
+        <module>manage</module>                                 <!-- 管理服务模块 -->
     </modules>
 
     <properties>

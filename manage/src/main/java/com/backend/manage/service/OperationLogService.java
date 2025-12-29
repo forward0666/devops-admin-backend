@@ -50,7 +50,10 @@ public class OperationLogService {
             String operationName,
             String resourceType,
             String resourceId,
-            HttpServletRequest request,
+            String method,
+            String url,
+            String ipAddress,
+            String userAgent,
             Object requestBody,
             Object responseBody,
             boolean success,
@@ -73,10 +76,10 @@ public class OperationLogService {
                     .operationName(operationName)
                     .resourceType(resourceType)
                     .resourceId(resourceId)
-                    .method(request.getMethod())
-                    .url(request.getRequestURI())
-                    .ipAddress(getClientIpAddress(request))
-                    .userAgent(request.getHeader("User-Agent"))
+                    .method(method)
+                    .url(url)
+                    .ipAddress(ipAddress)
+                    .userAgent(userAgent)
                     .requestBody(JsonUtil.toJson(requestBody))
                     .responseBody(JsonUtil.toJson(responseBody))
                     .success(success)

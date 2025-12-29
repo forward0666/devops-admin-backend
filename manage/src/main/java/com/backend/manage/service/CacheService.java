@@ -1,6 +1,9 @@
 package com.backend.manage.service;
 
 import com.backend.manage.model.Department;
+import com.backend.manage.model.Menu;
+import com.backend.manage.model.Position;
+import com.backend.manage.model.Role;
 import com.backend.manage.model.User;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -28,9 +31,19 @@ public class CacheService {
     private static final String DEPT_LIST = "departments:list";
     private static final String DEPT_USERS = "department:users:";
 
+    private static final String MENU_PREFIX = "menu:";
+    private static final String MENU_LIST = "menus:list";
+    private static final String MENU_ROOT = "menus:root";
+
     private static final String USER_DEPT_PREFIX = "user:department:";
     private static final String TOKEN_PREFIX = "token:validation:";
     private static final String SETTINGS_PREFIX = "settings:";
+
+    private static final String ROLE_PREFIX = "role:";
+    private static final String ROLE_LIST = "roles:list";
+
+    private static final String POSITION_PREFIX = "position:";
+    private static final String POSITION_LIST = "positions:list";
 
     private static final long CACHE_MIN = 30;      // 通用缓存分钟
     private static final long TOKEN_MIN = 1440;    // Token缓存分钟
@@ -140,6 +153,121 @@ public class CacheService {
         return (v instanceof List<?>) ? (List<User>) v : null;
     }
 
+    /* ================= 菜单缓存 ================= */
+    public void cacheMenu(Menu menu) {
+        if (!redisOk() || menu == null || menu.getId() == null) return;
+        redisTemplate.opsForValue().set(MENU_PREFIX + menu.getId(), menu, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public Menu getCachedMenu(Long id) {
+        if (!redisOk() || id == null) return null;
+        Object v = redisTemplate.opsForValue().get(MENU_PREFIX + id);
+        return (v instanceof Menu m) ? m : null;
+    }
+
+    public void cacheMenusList(List<Menu> list) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(MENU_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Menu> getCachedMenusList() {
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(MENU_LIST);
+        return (v instanceof List<?>) ? (List<Menu>) v : null;
+    }
+
+    public void cacheRootMenusList(List<Menu> list) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(MENU_ROOT, list, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Menu> getCachedRootMenusList() {
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(MENU_ROOT);
+        return (v instanceof List<?>) ? (List<Menu>) v : null;
+    }
+
+    public void clearMenuCache(Long id) {
+        if (!redisOk() || id == null) return;
+        redisTemplate.delete(MENU_PREFIX + id);
+    }
+
+    public void clearAllMenuCache() {
+        clearByPrefix(MENU_PREFIX);
+        redisTemplate.delete(MENU_LIST);
+        redisTemplate.delete(MENU_ROOT);
+    }
+
+    /* ================= 角色缓存 ================= */
+    public void cacheRole(Role role) {
+        if (!redisOk() || role == null || role.getId() == null) return;
+        redisTemplate.opsForValue().set(ROLE_PREFIX + role.getId(), role, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public Role getCachedRole(Long id) {
+        if (!redisOk() || id == null) return null;
+        Object v = redisTemplate.opsForValue().get(ROLE_PREFIX + id);
+        return (v instanceof Role r) ? r : null;
+    }
+
+    public void cacheRolesList(List<Role> list) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(ROLE_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Role> getCachedRolesList() {
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(ROLE_LIST);
+        return (v instanceof List<?>) ? (List<Role>) v : null;
+    }
+
+    public void clearRoleCache(Long id) {
+        if (!redisOk() || id == null) return;
+        redisTemplate.delete(ROLE_PREFIX + id);
+    }
+
+    public void clearAllRoleCache() {
+        clearByPrefix(ROLE_PREFIX);
+        redisTemplate.delete(ROLE_LIST);
+    }
+
+    /* ================= 职位缓存 ================= */
+    public void cachePosition(Position position) {
+        if (!redisOk() || position == null || position.getId() == null) return;
+        redisTemplate.opsForValue().set(POSITION_PREFIX + position.getId(), position, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public Position getCachedPosition(Long id) {
+        if (!redisOk() || id == null) return null;
+        Object v = redisTemplate.opsForValue().get(POSITION_PREFIX + id);
+        return (v instanceof Position p) ? p : null;
+    }
+
+    public void cachePositionsList(List<Position> list) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(POSITION_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Position> getCachedPositionsList() {
+        if (!redisOk()) return null;
+        Object v = redisTemplate.opsForValue().get(POSITION_LIST);
+        return (v instanceof List<?>) ? (List<Position>) v : null;
+    }
+
+    public void clearPositionCache(Long id) {
+        if (!redisOk() || id == null) return;
+        redisTemplate.delete(POSITION_PREFIX + id);
+    }
+
+    public void clearAllPositionCache() {
+        clearByPrefix(POSITION_PREFIX);
+        redisTemplate.delete(POSITION_LIST);
+    }
+
     /* ================= Token 缓存 ================= */
     public void cacheTokenValidation(String token, boolean valid) {
         if (!redisOk() || token == null) return;
@@ -187,9 +315,18 @@ public class CacheService {
     public void clearAllCache() {
         clearByPrefix(USER_PREFIX);
         clearByPrefix(DEPT_PREFIX);
+        clearByPrefix(MENU_PREFIX);
         clearByPrefix(USER_DEPT_PREFIX);
         clearByPrefix(DEPT_USERS);
         clearByPrefix(TOKEN_PREFIX);
         clearByPrefix(SETTINGS_PREFIX);
+        clearByPrefix(ROLE_PREFIX);
+        clearByPrefix(POSITION_PREFIX);
+        redisTemplate.delete(USERS_LIST);
+        redisTemplate.delete(DEPT_LIST);
+        redisTemplate.delete(MENU_LIST);
+        redisTemplate.delete(MENU_ROOT);
+        redisTemplate.delete(ROLE_LIST);
+        redisTemplate.delete(POSITION_LIST);
     }
 }

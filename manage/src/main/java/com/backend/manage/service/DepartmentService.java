@@ -197,10 +197,10 @@ public class DepartmentService {
             // 更新部门信息
             Department updatedDepartment = departmentRepository.update(department);
             populateDepartmentUsers(updatedDepartment);  // 填充更新后的用户信息
-            
+
             // 更新部门后清除相关缓存，确保数据一致性
             if (cacheService.isRedisAvailable()) {
-                cacheService.clearDepartmentCache(department.getId());
+                cacheService.clearAllDepartmentCache();
             }
             
             log.info("成功更新部门: {}", updatedDepartment.getName());
@@ -248,7 +248,7 @@ public class DepartmentService {
             if (deleted) {
                 // 删除部门后清除相关缓存，确保数据一致性
                 if (cacheService.isRedisAvailable()) {
-                    cacheService.clearDepartmentCache(id);
+                    cacheService.clearAllDepartmentCache();
                 }
                 
                 log.info("成功删除部门，ID: {}", id);

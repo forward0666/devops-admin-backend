@@ -270,7 +270,11 @@ public class UserService {
             
             // Clear cache after updating user
             if (cacheService.isRedisAvailable()) {
-                cacheService.clearUserCache(id);
+                cacheService.clearAllUserCache();
+                // Clear department cache if department changed
+                if (departmentId != null && !departmentId.equals(user.getDepartmentId())) {
+                    cacheService.clearByPrefix("department:users:");
+                }
             }
             
             log.info("User updated successfully: " + id);
@@ -299,11 +303,18 @@ public class UserService {
 
         Optional<User> optionalUser = userRepository.findByIdIncludeInactive(id);
         if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+            Long departmentId = user.getDepartmentId();
+            
             userRepository.deleteById(id);
             
             // Clear cache after deleting user
             if (cacheService.isRedisAvailable()) {
-                cacheService.clearUserCache(id);
+                cacheService.clearAllUserCache();
+                // Clear department cache if user was in a department
+                if (departmentId != null) {
+                    cacheService.clearByPrefix("department:users:" + departmentId);
+                }
             }
             
             log.info("User deleted successfully: " + id);
@@ -334,6 +345,12 @@ public class UserService {
                 user.setPassword(passwordEncoder.encode(newPassword));
                 user.setUpdatedAt(LocalDateTime.now());
                 userRepository.save(user);
+                
+                // Clear cache after changing password
+                if (cacheService.isRedisAvailable()) {
+                    cacheService.clearUserCache(id);
+                }
+                
                 log.info("Password changed successfully for user: " + id);
                 return true;
             } else {
@@ -363,6 +380,12 @@ public class UserService {
             user.setPasswordChangedAt(LocalDateTime.now());
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
+            
+            // Clear cache after resetting password
+            if (cacheService.isRedisAvailable()) {
+                cacheService.clearUserCache(id);
+            }
+            
             log.info("Password reset successfully for user: " + id);
             return true;
         }
@@ -389,6 +412,12 @@ public class UserService {
             user.setLoginCount(user.getLoginCount() + 1);
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
+            
+            // Clear cache after updating login info
+            if (cacheService.isRedisAvailable()) {
+                cacheService.clearUserCache(id);
+            }
+            
             log.info("Login info updated successfully for user: " + id);
             return true;
         }
@@ -412,6 +441,12 @@ public class UserService {
             user.setEmailVerified(true);
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
+            
+            // Clear cache after verifying email
+            if (cacheService.isRedisAvailable()) {
+                cacheService.clearUserCache(id);
+            }
+            
             log.info("Email verified successfully for user: " + id);
             return true;
         }
@@ -435,6 +470,12 @@ public class UserService {
             user.setPhoneVerified(true);
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
+            
+            // Clear cache after verifying phone
+            if (cacheService.isRedisAvailable()) {
+                cacheService.clearUserCache(id);
+            }
+            
             log.info("Phone verified successfully for user: " + id);
             return true;
         }

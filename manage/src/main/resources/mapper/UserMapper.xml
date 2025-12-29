@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.backend.manage.mapper.UserMapper">
 
+    <!-- ================= ResultMap ================= -->
     <resultMap id="UserResultMap" type="com.backend.manage.model.User">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
@@ -28,137 +32,215 @@
         <result property="passwordChangedAt" column="password_changed_at"/>
     </resultMap>
 
+    <!-- ================= 查询 ================= -->
+
     <select id="findByUsername" parameterType="string" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role, 
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-        WHERE username = #{username} AND active = true
+        WHERE username = #{username}
+          AND active = true
     </select>
 
     <select id="findById" parameterType="long" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-        WHERE id = #{id} AND active = true
+        WHERE id = #{id}
+          AND active = true
     </select>
 
     <select id="findByIdIncludeInactive" parameterType="long" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
         WHERE id = #{id}
     </select>
 
     <select id="findAll" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-<!--        WHERE active = true-->
         ORDER BY created_at DESC
     </select>
 
     <select id="authenticate" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-        WHERE username = #{username} AND active = true
+        WHERE username = #{username}
+          AND active = true
     </select>
 
     <select id="findByDepartmentId" parameterType="long" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-        WHERE department_id = #{departmentId} AND active = true
+        WHERE department_id = #{departmentId}
+          AND active = true
         ORDER BY created_at DESC
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.model.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role, 
-                          created_by, updated_by, active, email_verified, phone_verified, login_count, password_changed_at)
-        VALUES (#{username}, #{password}, #{email}, #{phone}, #{tgUsername}, #{fullName}, #{avatarUrl}, #{departmentId}, #{position}, #{employeeId}, #{role}, 
-                #{createdBy}, #{updatedBy}, #{active}, #{emailVerified}, #{phoneVerified}, #{loginCount}, #{passwordChangedAt})
+    <!-- ================= 插入（核心修复） ================= -->
+
+    <insert id="insert"
+            parameterType="com.backend.manage.model.User"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO users (
+            username,
+            password,
+            email,
+            phone,
+            tg_username,
+            full_name,
+            avatar_url,
+            department_id,
+            position,
+            employee_id,
+            role,
+            created_by,
+            updated_by,
+            active,
+            email_verified,
+            phone_verified,
+            login_count,
+            password_changed_at
+        )
+        VALUES (
+                   #{username},
+                   #{password},
+                   NULLIF(#{email}, ''),
+                   NULLIF(#{phone}, ''),
+                   NULLIF(#{tgUsername}, ''),
+                   #{fullName},
+                   #{avatarUrl},
+                   #{departmentId},
+                   #{position},
+                   NULLIF(#{employeeId}, ''),
+                   #{role},
+                   #{createdBy},
+                   #{updatedBy},
+                   #{active},
+                   #{emailVerified},
+                   #{phoneVerified},
+                   #{loginCount},
+                   #{passwordChangedAt}
+               )
     </insert>
+
+    <!-- ================= 更新（核心修复） ================= -->
 
     <update id="update" parameterType="com.backend.manage.model.User">
         UPDATE users
-        SET username = #{username}, email = #{email}, phone = #{phone}, tg_username = #{tgUsername}, full_name = #{fullName}, 
-            avatar_url = #{avatarUrl}, department_id = #{departmentId}, position = #{position}, employee_id = #{employeeId}, 
-            role = #{role}, updated_by = #{updatedBy}, active = #{active}, email_verified = #{emailVerified}, phone_verified = #{phoneVerified}
+        SET
+            username        = #{username},
+            email           = NULLIF(#{email}, ''),
+            phone           = NULLIF(#{phone}, ''),
+            tg_username     = NULLIF(#{tgUsername}, ''),
+            full_name       = #{fullName},
+            avatar_url      = #{avatarUrl},
+            department_id   = #{departmentId},
+            position        = #{position},
+            employee_id     = NULLIF(#{employeeId}, ''),
+            role            = #{role},
+            updated_by      = #{updatedBy},
+            active          = #{active},
+            email_verified  = #{emailVerified},
+            phone_verified  = #{phoneVerified}
         WHERE id = #{id}
     </update>
 
+    <!-- ================= 其他更新 ================= -->
+
     <update id="updatePassword">
         UPDATE users
-        SET password = #{password}, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        SET password = #{password},
+            password_changed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
     </update>
 
     <update id="updateLoginInfo">
         UPDATE users
-        SET last_login_at = #{lastLoginAt}, last_login_ip = #{lastLoginIp}, login_count = login_count + 1, updated_at = CURRENT_TIMESTAMP
+        SET last_login_at = #{lastLoginAt},
+            last_login_ip = #{lastLoginIp},
+            login_count = login_count + 1,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
     </update>
 
+    <!-- ================= 删除 ================= -->
+
     <delete id="deleteById" parameterType="long">
-        DELETE FROM users
-        WHERE id = #{id}
+        DELETE FROM users WHERE id = #{id}
     </delete>
+
+    <!-- ================= 存在性校验（NULL 安全） ================= -->
 
     <select id="existsById" parameterType="long" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE id = #{id} AND active = true
+        WHERE id = #{id}
+          AND active = true
     </select>
 
     <select id="existsByUsername" parameterType="string" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE username = #{username} AND active = true
+        WHERE username = #{username}
+          AND active = true
     </select>
 
     <select id="existsByEmail" parameterType="string" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE email = #{email} AND active = true
+        WHERE active = true
+        <if test="email != null and email != ''">
+            AND email = #{email}
+        </if>
     </select>
 
     <select id="existsByPhone" parameterType="string" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE phone = #{phone} AND active = true
+        WHERE active = true
+        <if test="phone != null and phone != ''">
+            AND phone = #{phone}
+        </if>
     </select>
 
     <select id="existsByTgUsername" parameterType="string" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE tg_username = #{tgUsername} AND active = true
+        WHERE active = true
+        <if test="tgUsername != null and tgUsername != ''">
+            AND tg_username = #{tgUsername}
+        </if>
     </select>
 
     <select id="existsByEmployeeId" parameterType="string" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE employee_id = #{employeeId} AND active = true
+        WHERE active = true
+        <if test="employeeId != null and employeeId != ''">
+            AND employee_id = #{employeeId}
+        </if>
     </select>
 
     <select id="countByDepartmentId" parameterType="long" resultType="int">
         SELECT COUNT(*)
         FROM users
-        WHERE department_id = #{departmentId} AND active = true
+        WHERE department_id = #{departmentId}
+          AND active = true
     </select>
 
+    <!-- ================= 搜索 ================= -->
+
     <select id="searchByUsernameOrEmail" parameterType="string" resultMap="UserResultMap">
-        SELECT id, username, password, email, phone, tg_username, full_name, avatar_url, department_id, position, employee_id, role,
-               created_at, updated_at, created_by, updated_by, active, email_verified, phone_verified, 
-               last_login_at, last_login_ip, login_count, password_changed_at
+        SELECT *
         FROM users
-        WHERE active = true 
-        AND (username LIKE CONCAT('%', #{query}, '%') OR email LIKE CONCAT('%', #{query}, '%') OR phone LIKE CONCAT('%', #{query}, '%') OR tg_username LIKE CONCAT('%', #{query}, '%'))
+        WHERE active = true
+          AND (
+            username LIKE CONCAT('%', #{query}, '%')
+                OR email LIKE CONCAT('%', #{query}, '%')
+                OR phone LIKE CONCAT('%', #{query}, '%')
+                OR tg_username LIKE CONCAT('%', #{query}, '%')
+            )
         ORDER BY created_at DESC
     </select>
 
