@@ -1,6 +1,6 @@
 package com.backend.manage.mapper;
 
-import com.backend.manage.model.Position;
+import com.backend.manage.entity.PositionEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -9,17 +9,15 @@ import java.util.List;
 @Mapper
 public interface PositionMapper {
 
-    List<Position> findAll();
+    List<PositionEntity> findAll();
 
-    Position findById(@Param("id") Long id);
+    PositionEntity findById(@Param("id") Long id);
 
-    Position findByCode(@Param("code") String code);
+    PositionEntity findByCode(@Param("code") String code);
 
-    List<Position> findByDepartmentId(@Param("departmentId") Long departmentId);
+    int insert(PositionEntity position);
 
-    int insert(Position position);
-
-    int update(Position position);
+    int update(PositionEntity position);
 
     int deleteById(@Param("id") Long id);
 
@@ -29,5 +27,7 @@ public interface PositionMapper {
 
     boolean existsByCodeExcludingId(@Param("code") String code, @Param("id") Long id);
 
-    int updateUserCount(@Param("id") Long id);
+    List<PositionEntity> findByDepartmentId(@Param("departmentId") Long departmentId);
+
+    void updateUserCount(@Param("id") Long id);
 }

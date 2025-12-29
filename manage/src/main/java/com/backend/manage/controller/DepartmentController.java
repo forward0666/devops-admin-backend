@@ -1,8 +1,8 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponse;
-import com.backend.manage.model.Department;
+import com.backend.manage.dto.ApiResponseDto;
+import com.backend.manage.entity.DepartmentEntity;
 import com.backend.manage.service.DepartmentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,16 +51,16 @@ public class DepartmentController {
      * @return ResponseEntity包含操作结果，成功时返回部门列表数据，失败时返回错误信息
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Department>>> getAllDepartments() {
+    public ResponseEntity<ApiResponseDto<List<DepartmentEntity>>> getAllDepartments() {
         logger.info("GET /departments - Fetching all departments");
         try {
-            List<Department> departments = departmentService.getAllDepartments();
+            List<DepartmentEntity> departments = departmentService.getAllDepartments();
             logger.info("Successfully retrieved {} departments", departments.size());
-            return ResponseEntity.ok(ApiResponse.success("Departments retrieved successfully", departments));
+            return ResponseEntity.ok(ApiResponseDto.success("Departments retrieved successfully", departments));
         } catch (Exception e) {
             logger.error("Error retrieving departments", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to retrieve departments: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve departments: " + e.getMessage()));
         }
     }
 
@@ -81,22 +81,22 @@ public class DepartmentController {
      * @return ResponseEntity包含操作结果，成功时返回部门详情数据，失败时返回错误信息
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Department>> getDepartmentById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<DepartmentEntity>> getDepartmentById(@PathVariable Long id) {
         logger.info("GET /departments/{} - Fetching department by ID", id);
         try {
-            Department department = departmentService.getDepartmentById(id);
+            DepartmentEntity department = departmentService.getDepartmentById(id);
             if (department != null) {
                 logger.info("Successfully retrieved department: {}", department.getName());
-                return ResponseEntity.ok(ApiResponse.success("Department retrieved successfully", department));
+                return ResponseEntity.ok(ApiResponseDto.success("Department retrieved successfully", department));
             } else {
                 logger.warn("Department not found with ID: {}", id);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Department not found"));
+                        .body(ApiResponseDto.error("Department not found"));
             }
         } catch (Exception e) {
             logger.error("Error retrieving department with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to retrieve department: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve department: " + e.getMessage()));
         }
     }
 
@@ -125,21 +125,21 @@ public class DepartmentController {
         resourceType = "DEPARTMENT",
         description = "创建新部门"
     )
-    public ResponseEntity<ApiResponse<Department>> createDepartment(@Valid @RequestBody Department department) {
+    public ResponseEntity<ApiResponseDto<DepartmentEntity>> createDepartment(@Valid @RequestBody DepartmentEntity department) {
         logger.info("POST /departments - Creating new department: {}", department.getName());
         try {
-            Department createdDepartment = departmentService.createDepartment(department);
+            DepartmentEntity createdDepartment = departmentService.createDepartment(department);
             logger.info("Successfully created department with ID: {}", createdDepartment.getId());
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success("Department created successfully", createdDepartment));
+                    .body(ApiResponseDto.success("Department created successfully", createdDepartment));
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid department data: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error("Invalid department data: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Invalid department data: " + e.getMessage()));
         } catch (Exception e) {
             logger.error("Error creating department: {}", department.getName(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to create department: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to create department: " + e.getMessage()));
         }
     }
 
@@ -170,27 +170,27 @@ public class DepartmentController {
         resourceIdIndex = 0,
         description = "更新部门信息"
     )
-    public ResponseEntity<ApiResponse<Department>> updateDepartment(@PathVariable Long id, @Valid @RequestBody Department department) {
+    public ResponseEntity<ApiResponseDto<DepartmentEntity>> updateDepartment(@PathVariable Long id, @Valid @RequestBody DepartmentEntity department) {
         logger.info("PUT /departments/{} - Updating department", id);
         try {
             department.setId(id);
-            Department updatedDepartment = departmentService.updateDepartment(department);
+            DepartmentEntity updatedDepartment = departmentService.updateDepartment(department);
             if (updatedDepartment != null) {
                 logger.info("Successfully updated department: {}", updatedDepartment.getName());
-                return ResponseEntity.ok(ApiResponse.success("Department updated successfully", updatedDepartment));
+                return ResponseEntity.ok(ApiResponseDto.success("Department updated successfully", updatedDepartment));
             } else {
                 logger.warn("Department not found for update with ID: {}", id);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Department not found"));
+                        .body(ApiResponseDto.error("Department not found"));
             }
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid department data for update: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error("Invalid department data: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Invalid department data: " + e.getMessage()));
         } catch (Exception e) {
             logger.error("Error updating department with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to update department: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to update department: " + e.getMessage()));
         }
     }
 
@@ -220,26 +220,26 @@ public class DepartmentController {
         resourceIdIndex = 0,
         description = "删除部门"
     )
-    public ResponseEntity<ApiResponse<Void>> deleteDepartment(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<Void>> deleteDepartment(@PathVariable Long id) {
         logger.info("DELETE /departments/{} - Deleting department", id);
         try {
             boolean deleted = departmentService.deleteDepartment(id);
             if (deleted) {
                 logger.info("Successfully deleted department with ID: {}", id);
-                return ResponseEntity.ok(ApiResponse.success("Department deleted successfully", null));
+                return ResponseEntity.ok(ApiResponseDto.success("Department deleted successfully", null));
             } else {
                 logger.warn("Department not found for deletion with ID: {}", id);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Department not found"));
+                        .body(ApiResponseDto.error("Department not found"));
             }
         } catch (IllegalStateException e) {
             logger.warn("Cannot delete department with ID {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error(e.getMessage()));
+                    .body(ApiResponseDto.error(e.getMessage()));
         } catch (Exception e) {
             logger.error("Error deleting department with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to delete department: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to delete department: " + e.getMessage()));
         }
     }
 
@@ -259,16 +259,16 @@ public class DepartmentController {
      * @return ResponseEntity包含操作结果，成功时返回用户列表数据，失败时返回错误信息
      */
     @GetMapping("/{id}/users")
-    public ResponseEntity<ApiResponse<List<Object>>> getDepartmentUsers(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<List<Object>>> getDepartmentUsers(@PathVariable Long id) {
         logger.info("GET /departments/{}/users - Fetching users for department", id);
         try {
             List<Object> users = departmentService.getDepartmentUsers(id);
             logger.info("Successfully retrieved {} users for department ID: {}", users.size(), id);
-            return ResponseEntity.ok(ApiResponse.success("Department users retrieved successfully", users));
+            return ResponseEntity.ok(ApiResponseDto.success("Department users retrieved successfully", users));
         } catch (Exception e) {
             logger.error("Error retrieving users for department ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to retrieve department users: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve department users: " + e.getMessage()));
         }
     }
 
@@ -290,25 +290,25 @@ public class DepartmentController {
      * @return ResponseEntity包含操作结果，成功时返回匹配的部门列表，失败时返回错误信息
      */
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<Department>>> searchDepartments(@RequestParam String name) {
+    public ResponseEntity<ApiResponseDto<List<DepartmentEntity>>> searchDepartments(@RequestParam String name) {
         logger.info("GET /departments/search?name={} - Searching departments", name);
         try {
             if (name == null || name.trim().isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(ApiResponse.error("Search name cannot be empty"));
+                        .body(ApiResponseDto.error("Search name cannot be empty"));
             }
-            
-            List<Department> allDepartments = departmentService.getAllDepartments();
-            List<Department> filteredDepartments = allDepartments.stream()
+
+            List<DepartmentEntity> allDepartments = departmentService.getAllDepartments();
+            List<DepartmentEntity> filteredDepartments = allDepartments.stream()
                     .filter(dept -> dept.getName().toLowerCase().contains(name.toLowerCase()))
                     .toList();
             
             logger.info("Found {} departments matching search term: {}", filteredDepartments.size(), name);
-            return ResponseEntity.ok(ApiResponse.success("Departments found", filteredDepartments));
+            return ResponseEntity.ok(ApiResponseDto.success("Departments found", filteredDepartments));
         } catch (Exception e) {
             logger.error("Error searching departments with name: {}", name, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to search departments: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to search departments: " + e.getMessage()));
         }
     }
 

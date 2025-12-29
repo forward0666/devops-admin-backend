@@ -1,6 +1,6 @@
 package com.backend.manage.controller;
 
-import com.backend.manage.dto.ApiResponse;
+import com.backend.manage.dto.ApiResponseDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,12 +26,12 @@ public class VerificationCodeController {
      * 在实际实现中，验证码会与密钥一起存储到缓存中，用于后续验证
      * 当前为模拟实现，使用固定的验证码和随机生成的密钥
      * 
-     * @return ApiResponse<Map<String, String>> 包含验证码和密钥的响应对象
+     * @return ApiResponseDto<Map<String, String>> 包含验证码和密钥的响应对象
      *         - verificationCode: 验证码字符串
      *         - verificationCodeKey: 验证码密钥，用于后续验证
      */
     @GetMapping("/verification/code")
-    public ApiResponse<Map<String, String>> getVerificationCode() {
+    public ApiResponseDto<Map<String, String>> getVerificationCode() {
         try {
             // 在实际实现中，这里会生成一个真实的验证码（如图形验证码）
             // 并将验证码和密钥存储到缓存中（如Redis），设置过期时间
@@ -47,10 +47,10 @@ public class VerificationCodeController {
             response.put("verificationCodeKey", codeKey);
             
             // 返回成功响应
-            return ApiResponse.success("验证码生成成功", response);
+            return ApiResponseDto.success("验证码生成成功", response);
         } catch (Exception e) {
             // 处理异常情况
-            return ApiResponse.error("生成验证码失败: " + e.getMessage());
+            return ApiResponseDto.error("生成验证码失败: " + e.getMessage());
         }
     }
 }

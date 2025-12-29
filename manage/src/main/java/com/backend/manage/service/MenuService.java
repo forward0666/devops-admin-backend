@@ -1,7 +1,7 @@
 package com.backend.manage.service;
 
 import com.backend.manage.mapper.MenuMapper;
-import com.backend.manage.model.Menu;
+import com.backend.manage.entity.MenuEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
  * 菜单服务类
  * 提供菜单相关的业务逻辑处理
  * 支持Redis缓存，提高查询性能
+ * 使用 Java 21 风格
  */
 @Service
 public class MenuService {
@@ -33,12 +34,12 @@ public class MenuService {
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
      * @return 菜单列表
      */
-    public List<Menu> getAllMenus() {
+    public List<MenuEntity> getAllMenus() {
         logger.info("Fetching all menus");
 
         // 优先从Redis缓存获取菜单列表
         if (cacheService.isRedisAvailable()) {
-            List<Menu> cachedMenus = cacheService.getCachedMenusList();
+            var cachedMenus = cacheService.getCachedMenusList();
             if (cachedMenus != null) {
                 logger.debug("从缓存中获取菜单列表成功");
                 return cachedMenus;
@@ -47,7 +48,7 @@ public class MenuService {
 
         try {
             // 从数据库查询所有菜单
-            List<Menu> menus = menuMapper.findAll();
+            var menus = menuMapper.findAll();
 
             // 为每个菜单设置父级菜单名称
             setParentNames(menus);
@@ -71,7 +72,7 @@ public class MenuService {
      * @param id 菜单ID
      * @return 菜单对象
      */
-    public Menu getMenuById(Long id) {
+    public MenuEntity getMenuById(Long id) {
         logger.info("Fetching menu by ID: {}", id);
 
         if (id == null) {
@@ -81,7 +82,7 @@ public class MenuService {
 
         // 优先从Redis缓存获取菜单信息
         if (cacheService.isRedisAvailable()) {
-            Menu cachedMenu = cacheService.getCachedMenu(id);
+            var cachedMenu = cacheService.getCachedMenu(id);
             if (cachedMenu != null) {
                 logger.debug("从缓存中获取菜单成功: {}", id);
                 return cachedMenu;
@@ -90,7 +91,7 @@ public class MenuService {
 
         try {
             // 从数据库查询菜单信息
-            Menu menu = menuMapper.findById(id);
+            var menu = menuMapper.findById(id);
 
             // 缓存到Redis
             if (menu != null && cacheService.isRedisAvailable()) {
@@ -111,26 +112,18 @@ public class MenuService {
      * @return 创建的菜单对象
      * @throws IllegalArgumentException 如果父菜单不存在
      */
-    public Menu createMenu(Menu menu) {
+    public MenuEntity createMenu(MenuEntity menu) {
         logger.info("Creating new menu: {}", menu.getName());
 
         // 验证父菜单是否存在
-        if (menu.getParentId() != null) {
-            if (menuMapper.existsById(menu.getParentId()) == 0) {
-                throw new IllegalArgumentException("Parent menu not found with ID: " + menu.getParentId());
-            }
+        if (menu.getParentId() != null && menuMapper.existsById(menu.getParentId()) == 0) {
+            throw new IllegalArgumentException("Parent menu not found with ID: " + menu.getParentId());
         }
 
-        // 设置默认值
-        if (menu.getSort() == null) {
-            menu.setSort(0);
-        }
-        if (menu.getStatus() == null || menu.getStatus().isEmpty()) {
-            menu.setStatus("active");
-        }
-        if (menu.getType() == null || menu.getType().isEmpty()) {
-            menu.setType("menu");
-        }
+        // 设置默认值 - Java 21: 使用 switch 表达式
+        menu.setSort(menu.getSort() != null ? menu.getSort() : 0);
+        menu.setStatus(menu.getStatus() != null && !menu.getStatus().isEmpty() ? menu.getStatus() : "active");
+        menu.setType(menu.getType() != null && !menu.getType().isEmpty() ? menu.getType() : "menu");
 
         menu.setCreatedAt(LocalDateTime.now());
         menu.setUpdatedAt(LocalDateTime.now());
@@ -151,7 +144,7 @@ public class MenuService {
      * @return 更新后的菜单对象
      * @throws IllegalArgumentException 如果菜单不存在或父菜单无效
      */
-    public Menu updateMenu(Menu menu) {
+    public MenuEntity updateMenu(MenuEntity menu) {
         logger.info("Updating menu with ID: {}", menu.getId());
 
         // 验证菜单是否存在
@@ -223,12 +216,12 @@ public class MenuService {
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
      * @return 根菜单列表
      */
-    public List<Menu> getRootMenus() {
+    public List<MenuEntity> getRootMenus() {
         logger.info("Fetching root menus");
 
         // 优先从Redis缓存获取根菜单
         if (cacheService.isRedisAvailable()) {
-            List<Menu> cachedMenus = cacheService.getCachedRootMenusList();
+            var cachedMenus = cacheService.getCachedRootMenusList();
             if (cachedMenus != null) {
                 logger.debug("从缓存中获取根菜单成功");
                 return cachedMenus;
@@ -237,7 +230,7 @@ public class MenuService {
 
         try {
             // 从数据库查询根菜单
-            List<Menu> menus = menuMapper.findRootMenus();
+            var menus = menuMapper.findRootMenus();
 
             // 缓存到Redis
             if (cacheService.isRedisAvailable()) {
@@ -257,7 +250,7 @@ public class MenuService {
      * @param parentId 父菜单ID
      * @return 子菜单列表
      */
-    public List<Menu> getChildMenus(Long parentId) {
+    public List<MenuEntity> getChildMenus(Long parentId) {
         logger.info("Fetching child menus for parent ID: {}", parentId);
         return menuMapper.findByParentId(parentId);
     }
@@ -266,24 +259,24 @@ public class MenuService {
      * 为菜单列表设置父级菜单名称
      * @param menus 菜单列表
      */
-    private void setParentNames(List<Menu> menus) {
+    private void setParentNames(List<MenuEntity> menus) {
         if (menus == null || menus.isEmpty()) {
             return;
         }
 
-        // 创建ID到菜单的映射
-        Map<Long, Menu> menuMap = menus.stream()
-                .collect(Collectors.toMap(Menu::getId, menu -> menu));
+        // 创建ID到菜单的映射 - Java 21: 使用 stream 简化
+        Map<Long, MenuEntity> menuMap = menus.stream()
+                .collect(Collectors.toMap(MenuEntity::getId, menu -> menu));
 
         // 为每个菜单设置父级菜单名称
-        for (Menu menu : menus) {
+        menus.forEach(menu -> {
             if (menu.getParentId() != null) {
-                Menu parent = menuMap.get(menu.getParentId());
+                var parent = menuMap.get(menu.getParentId());
                 if (parent != null) {
                     menu.setParentName(parent.getName());
                 }
             }
-        }
+        });
     }
 
     /**

@@ -1,8 +1,9 @@
 package com.backend.manage.service;
 
+import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.mapper.RoleMapper;
-import com.backend.manage.model.Role;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +13,12 @@ import java.util.List;
 /**
  * 角色服务类
  * 处理角色相关的业务逻辑
+ * 使用 Java 21 风格
  */
-@Slf4j
 @Service
 public class RoleService {
+
+    private static final Logger log = LoggerFactory.getLogger(RoleService.class);
 
     @Autowired
     private RoleMapper roleMapper;
@@ -26,12 +29,12 @@ public class RoleService {
     /**
      * 获取所有角色列表
      */
-    public List<Role> getAllRoles() {
+    public List<RoleEntity> getAllRoles() {
         log.info("正在获取所有角色列表");
 
         // 优先从Redis缓存获取角色列表
         if (cacheService.isRedisAvailable()) {
-            List<Role> cachedRoles = cacheService.getCachedRolesList();
+            var cachedRoles = cacheService.getCachedRolesList();
             if (cachedRoles != null) {
                 log.debug("从缓存中获取角色列表成功");
                 return cachedRoles;
@@ -39,13 +42,7 @@ public class RoleService {
         }
 
         try {
-            List<Role> roles = roleMapper.findAll();
-
-            // 为每个角色加载权限
-            for (Role role : roles) {
-                List<String> permissions = roleMapper.findPermissionsByRoleId(role.getId());
-                role.setPermissions(permissions);
-            }
+            var roles = roleMapper.findAll();
 
             // 将查询结果缓存到Redis中
             if (cacheService.isRedisAvailable()) {
@@ -63,7 +60,7 @@ public class RoleService {
     /**
      * 根据ID获取角色
      */
-    public Role getRoleById(Long id) {
+    public RoleEntity getRoleById(Long id) {
         log.info("正在根据ID获取角色: {}", id);
 
         if (id == null) {
@@ -73,7 +70,7 @@ public class RoleService {
 
         // 优先从Redis缓存获取角色信息
         if (cacheService.isRedisAvailable()) {
-            Role cachedRole = cacheService.getCachedRole(id);
+            var cachedRole = cacheService.getCachedRole(id);
             if (cachedRole != null) {
                 log.debug("从缓存中获取角色成功: {}", id);
                 return cachedRole;
@@ -81,11 +78,8 @@ public class RoleService {
         }
 
         try {
-            Role role = roleMapper.findById(id);
+            var role = roleMapper.findById(id);
             if (role != null) {
-                List<String> permissions = roleMapper.findPermissionsByRoleId(role.getId());
-                role.setPermissions(permissions);
-
                 // 将查询结果缓存到Redis中
                 if (cacheService.isRedisAvailable()) {
                     cacheService.cacheRole(role);
@@ -106,7 +100,7 @@ public class RoleService {
     /**
      * 创建新角色
      */
-    public Role createRole(Role role) {
+    public RoleEntity createRole(RoleEntity role) {
         log.info("正在创建新角色: {}", role.getName());
 
         validateRoleForCreation(role);
@@ -125,13 +119,6 @@ public class RoleService {
 
             roleMapper.insert(role);
 
-            // 插入权限
-            if (role.getPermissions() != null && !role.getPermissions().isEmpty()) {
-                for (String permissionCode : role.getPermissions()) {
-                    roleMapper.insertRolePermission(role.getId(), permissionCode);
-                }
-            }
-
             // 清除相关缓存
             if (cacheService.isRedisAvailable()) {
                 cacheService.clearAllRoleCache();
@@ -148,7 +135,7 @@ public class RoleService {
     /**
      * 更新角色
      */
-    public Role updateRole(Role role) {
+    public RoleEntity updateRole(RoleEntity role) {
         log.info("正在更新角色，ID: {}", role.getId());
 
         validateRoleForUpdate(role);
@@ -165,14 +152,6 @@ public class RoleService {
 
             role.setUpdatedAt(LocalDateTime.now());
             roleMapper.update(role);
-
-            // 更新权限
-            roleMapper.deleteRolePermissions(role.getId());
-            if (role.getPermissions() != null && !role.getPermissions().isEmpty()) {
-                for (String permissionCode : role.getPermissions()) {
-                    roleMapper.insertRolePermission(role.getId(), permissionCode);
-                }
-            }
 
             // 清除相关缓存
             if (cacheService.isRedisAvailable()) {
@@ -204,7 +183,7 @@ public class RoleService {
                 return false;
             }
 
-            Role role = roleMapper.findById(id);
+            RoleEntity role = roleMapper.findById(id);
             if (role.getUserCount() != null && role.getUserCount() > 0) {
                 throw new IllegalStateException("无法删除包含 " + role.getUserCount() + " 个用户的角色。请先重新分配用户。");
             }
@@ -229,7 +208,7 @@ public class RoleService {
 
     // Private helper methods
 
-    private void validateRoleForCreation(Role role) {
+    private void validateRoleForCreation(RoleEntity role) {
         if (role == null) {
             throw new IllegalArgumentException("角色不能为空");
         }
@@ -259,7 +238,7 @@ public class RoleService {
         }
     }
 
-    private void validateRoleForUpdate(Role role) {
+    private void validateRoleForUpdate(RoleEntity role) {
         if (role == null) {
             throw new IllegalArgumentException("角色不能为空");
         }

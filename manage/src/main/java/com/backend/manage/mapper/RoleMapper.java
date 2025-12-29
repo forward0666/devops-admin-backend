@@ -1,6 +1,6 @@
 package com.backend.manage.mapper;
 
-import com.backend.manage.model.Role;
+import com.backend.manage.entity.RoleEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -9,15 +9,15 @@ import java.util.List;
 @Mapper
 public interface RoleMapper {
 
-    List<Role> findAll();
+    List<RoleEntity> findAll();
 
-    Role findById(@Param("id") Long id);
+    RoleEntity findById(@Param("id") Long id);
 
-    Role findByCode(@Param("code") String code);
+    RoleEntity findByCode(@Param("code") String code);
 
-    int insert(Role role);
+    int insert(RoleEntity role);
 
-    int update(Role role);
+    int update(RoleEntity role);
 
     int deleteById(@Param("id") Long id);
 
@@ -26,10 +26,4 @@ public interface RoleMapper {
     boolean existsByCode(@Param("code") String code);
 
     boolean existsByCodeExcludingId(@Param("code") String code, @Param("id") Long id);
-
-    List<String> findPermissionsByRoleId(@Param("roleId") Long roleId);
-
-    int insertRolePermission(@Param("roleId") Long roleId, @Param("permissionCode") String permissionCode);
-
-    int deleteRolePermissions(@Param("roleId") Long roleId);
 }

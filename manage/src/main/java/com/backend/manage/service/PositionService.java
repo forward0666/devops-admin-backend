@@ -1,7 +1,7 @@
 package com.backend.manage.service;
 
 import com.backend.manage.mapper.PositionMapper;
-import com.backend.manage.model.Position;
+import com.backend.manage.entity.PositionEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,12 +29,12 @@ public class PositionService {
     /**
      * 获取所有职位列表
      */
-    public List<Position> getAllPositions() {
+    public List<PositionEntity> getAllPositions() {
         log.info("正在获取所有职位列表");
 
         // 优先从Redis缓存获取职位列表
         if (cacheService.isRedisAvailable()) {
-            List<Position> cachedPositions = cacheService.getCachedPositionsList();
+            List<PositionEntity> cachedPositions = cacheService.getCachedPositionsList();
             if (cachedPositions != null) {
                 log.debug("从缓存中获取职位列表成功");
                 return cachedPositions;
@@ -42,7 +42,7 @@ public class PositionService {
         }
 
         try {
-            List<Position> positions = positionMapper.findAll();
+            List<PositionEntity> positions = positionMapper.findAll();
 
             // 将查询结果缓存到Redis中
             if (cacheService.isRedisAvailable()) {
@@ -60,7 +60,7 @@ public class PositionService {
     /**
      * 根据ID获取职位
      */
-    public Position getPositionById(Long id) {
+    public PositionEntity getPositionById(Long id) {
         log.info("正在根据ID获取职位: {}", id);
 
         if (id == null) {
@@ -70,7 +70,7 @@ public class PositionService {
 
         // 优先从Redis缓存获取职位信息
         if (cacheService.isRedisAvailable()) {
-            Position cachedPosition = cacheService.getCachedPosition(id);
+            PositionEntity cachedPosition = cacheService.getCachedPosition(id);
             if (cachedPosition != null) {
                 log.debug("从缓存中获取职位成功: {}", id);
                 return cachedPosition;
@@ -78,11 +78,11 @@ public class PositionService {
         }
 
         try {
-            Position position = positionMapper.findById(id);
+            PositionEntity position = positionMapper.findById(id);
             if (position != null) {
                 // 将查询结果缓存到Redis中
                 if (cacheService.isRedisAvailable()) {
-                    cacheService.cachePosition(position);
+                    cacheService.cachePosition((PositionEntity) position);
                 }
 
                 log.info("成功获取职位: {}", position.getName());
@@ -100,7 +100,7 @@ public class PositionService {
     /**
      * 创建新职位
      */
-    public Position createPosition(Position position) {
+    public PositionEntity createPosition(PositionEntity position) {
         log.info("正在创建新职位: {}", position.getName());
 
         validatePositionForCreation(position);
@@ -142,7 +142,7 @@ public class PositionService {
     /**
      * 更新职位
      */
-    public Position updatePosition(Position position) {
+    public PositionEntity updatePosition(PositionEntity position) {
         log.info("正在更新职位，ID: {}", position.getId());
 
         validatePositionForUpdate(position);
@@ -197,7 +197,7 @@ public class PositionService {
                 return false;
             }
 
-            Position position = positionMapper.findById(id);
+            PositionEntity position = positionMapper.findById(id);
             if (position.getUserCount() != null && position.getUserCount() > 0) {
                 throw new IllegalStateException("无法删除包含 " + position.getUserCount() + " 个用户的职位。请先重新分配用户。");
             }
@@ -223,7 +223,7 @@ public class PositionService {
     /**
      * 根据部门ID获取职位列表
      */
-    public List<Position> getPositionsByDepartmentId(Long departmentId) {
+    public List<PositionEntity> getPositionsByDepartmentId(Long departmentId) {
         log.info("获取部门ID {} 下的职位列表", departmentId);
 
         try {
@@ -248,7 +248,7 @@ public class PositionService {
 
     // Private helper methods
 
-    private void validatePositionForCreation(Position position) {
+    private void validatePositionForCreation(PositionEntity position) {
         if (position == null) {
             throw new IllegalArgumentException("职位不能为空");
         }
@@ -282,7 +282,7 @@ public class PositionService {
         }
     }
 
-    private void validatePositionForUpdate(Position position) {
+    private void validatePositionForUpdate(PositionEntity position) {
         if (position == null) {
             throw new IllegalArgumentException("职位不能为空");
         }

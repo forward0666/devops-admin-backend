@@ -1,7 +1,7 @@
 package com.backend.manage.service;
 
-import com.backend.manage.model.Department;
-import com.backend.manage.model.User;
+import com.backend.manage.entity.DepartmentEntity;
+import com.backend.manage.entity.UserEntity;
 import com.backend.manage.repository.DepartmentRepository;
 import com.backend.manage.repository.impl.DepartmentRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -32,15 +32,15 @@ public class DepartmentService {
      * 获取所有部门列表及其统计信息
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
      * 自动填充每个部门的用户信息和最近用户列表
-     * 
+     *
      * @return 所有部门的列表，包含完整的统计信息和用户数据
      */
-    public List<Department> getAllDepartments() {
+    public List<DepartmentEntity> getAllDepartments() {
         log.info("正在获取所有部门列表");
-        
+
         // 优先从Redis缓存获取部门列表，提高性能
         if (cacheService.isRedisAvailable()) {
-            List<Department> cachedDepartments = cacheService.getCachedDepartmentsList();
+            List<DepartmentEntity> cachedDepartments = cacheService.getCachedDepartmentsList();
             if (cachedDepartments != null) {
                 log.debug("从缓存中获取部门列表成功");
                 return cachedDepartments;
@@ -49,10 +49,10 @@ public class DepartmentService {
         
         try {
             // 从数据库查询所有部门
-            List<Department> departments = departmentRepository.findAll();
-            
+            List<DepartmentEntity> departments = departmentRepository.findAll();
+
             // 为每个部门填充用户信息和最近用户列表
-            for (Department department : departments) {
+            for (DepartmentEntity department : departments) {
                 populateDepartmentUsers(department);
             }
             
@@ -77,7 +77,7 @@ public class DepartmentService {
      * @param id 部门ID
      * @return 包含完整详细信息的部门对象，如果不存在则返回null
      */
-    public Department getDepartmentById(Long id) {
+    public DepartmentEntity getDepartmentById(Long id) {
         log.info("正在根据ID获取部门: {}", id);
         
         if (id == null) {
@@ -87,19 +87,19 @@ public class DepartmentService {
         
         // 优先从Redis缓存获取部门信息
         if (cacheService.isRedisAvailable()) {
-            Department cachedDepartment = cacheService.getCachedDepartment(id);
+            DepartmentEntity cachedDepartment = cacheService.getCachedDepartment(id);
             if (cachedDepartment != null) {
                 log.debug("从缓存中获取部门成功: {}", id);
                 return cachedDepartment;
             }
         }
-        
+
         try {
             // 从数据库查询部门信息
-            Optional<Department> departmentOpt = departmentRepository.findById(id);
-            
+            Optional<DepartmentEntity> departmentOpt = departmentRepository.findById(id);
+
             if (departmentOpt.isPresent()) {
-                Department department = departmentOpt.get();
+                DepartmentEntity department = departmentOpt.get();
                 populateDepartmentUsers(department);  // 填充用户信息
                 
                 // 将查询结果缓存到Redis中
@@ -127,7 +127,7 @@ public class DepartmentService {
      * @return 创建成功的部门对象
      * @throws IllegalArgumentException 当部门名称已存在或验证失败时抛出
      */
-    public Department createDepartment(Department department) {
+    public DepartmentEntity createDepartment(DepartmentEntity department) {
         log.info("正在创建新部门: {}", department.getName());
         
         // 验证部门数据合法性
@@ -151,7 +151,7 @@ public class DepartmentService {
             }
             
             // 保存部门到数据库
-            Department createdDepartment = departmentRepository.save(department);
+            DepartmentEntity createdDepartment = departmentRepository.save(department);
             
             // 创建新部门后清除相关缓存，确保数据一致性
             if (cacheService.isRedisAvailable()) {
@@ -175,7 +175,7 @@ public class DepartmentService {
      * @return 更新成功的部门对象，如果部门不存在则返回null
      * @throws IllegalArgumentException 当新部门名称与其他部门冲突时抛出
      */
-    public Department updateDepartment(Department department) {
+    public DepartmentEntity updateDepartment(DepartmentEntity department) {
         log.info("正在更新部门，ID: {}", department.getId());
         
         // 验证部门数据合法性
@@ -195,7 +195,7 @@ public class DepartmentService {
             }
             
             // 更新部门信息
-            Department updatedDepartment = departmentRepository.update(department);
+            DepartmentEntity updatedDepartment = departmentRepository.update(department);
             populateDepartmentUsers(updatedDepartment);  // 填充更新后的用户信息
 
             // 更新部门后清除相关缓存，确保数据一致性
@@ -237,7 +237,7 @@ public class DepartmentService {
             }
             
             // 检查部门中是否有用户，有用户的部门不能删除
-            List<User> users = departmentRepository.findUsersByDepartmentId(id);
+            List<UserEntity> users = departmentRepository.findUsersByDepartmentId(id);
             if (!users.isEmpty()) {
                 throw new IllegalStateException("无法删除包含 " + users.size() + " 个用户的部门。请先重新分配用户。");
             }
@@ -286,11 +286,11 @@ public class DepartmentService {
                 return new ArrayList<>();
             }
             
-            List<User> users = departmentRepository.findUsersByDepartmentId(departmentId);
-            
+            List<UserEntity> users = departmentRepository.findUsersByDepartmentId(departmentId);
+
             // Convert to list of objects for API response
             List<Object> result = new ArrayList<>();
-            for (User user : users) {
+            for (UserEntity user : users) {
                 Map<String, Object> userMap = new HashMap<>();
                 userMap.put("id", user.getId());
                 userMap.put("username", user.getUsername());
@@ -321,20 +321,20 @@ public class DepartmentService {
         log.info("Fetching statistics for department ID: {}", departmentId);
         
         try {
-            Department department = getDepartmentById(departmentId);
+            DepartmentEntity department = getDepartmentById(departmentId);
             if (department == null) {
                 return new HashMap<>();
             }
-            
+
             Map<String, Object> stats = new HashMap<>();
             stats.put("totalUsers", department.getUserCount());
             stats.put("activeProjects", department.getActiveProjects());
             stats.put("completedProjects", department.getCompletedProjects());
             stats.put("totalProjects", department.getActiveProjects() + department.getCompletedProjects());
-            
+
             // Calculate additional statistics
-            List<User> users = departmentRepository.findUsersByDepartmentId(departmentId);
-            long activeUsers = users.stream().filter(User::isActive).count();
+            List<UserEntity> users = departmentRepository.findUsersByDepartmentId(departmentId);
+            long activeUsers = users.stream().filter(UserEntity::isActive).count();
             long adminUsers = users.stream().filter(u -> "admin".equals(u.getRole())).count();
             long editorUsers = users.stream().filter(u -> "editor".equals(u.getRole())).count();
             long viewerUsers = users.stream().filter(u -> "viewer".equals(u.getRole())).count();
@@ -375,14 +375,14 @@ public class DepartmentService {
     
     // Private helper methods
     
-    private void populateDepartmentUsers(Department department) {
+    private void populateDepartmentUsers(DepartmentEntity department) {
         try {
-            List<User> allUsers = departmentRepository.findUsersByDepartmentId(department.getId());
-            List<User> recentUsers = departmentRepository.findRecentUsersByDepartmentId(department.getId());
-            
+            List<UserEntity> allUsers = departmentRepository.findUsersByDepartmentId(department.getId());
+            List<UserEntity> recentUsers = departmentRepository.findRecentUsersByDepartmentId(department.getId());
+
             department.setUsers(allUsers);
             department.setRecentUsers(recentUsers);
-            
+
             // Update user count if it doesn't match
             Integer currentUserCount = department.getUserCount();
             if (currentUserCount == null || currentUserCount != allUsers.size()) {
@@ -395,8 +395,8 @@ public class DepartmentService {
             department.setRecentUsers(new ArrayList<>());
         }
     }
-    
-    private void validateDepartmentForCreation(Department department) {
+
+    private void validateDepartmentForCreation(DepartmentEntity department) {
         if (department == null) {
             throw new IllegalArgumentException("Department cannot be null");
         }
@@ -414,7 +414,7 @@ public class DepartmentService {
         }
     }
     
-    private void validateDepartmentForUpdate(Department department) {
+    private void validateDepartmentForUpdate(DepartmentEntity department) {
         if (department == null) {
             throw new IllegalArgumentException("Department cannot be null");
         }

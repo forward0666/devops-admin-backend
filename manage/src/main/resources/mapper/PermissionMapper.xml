@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.backend.manage.mapper.PermissionMapper">
+
+    <resultMap id="PermissionMappingResultMap" type="com.backend.manage.entity.PermissionMappingEntity">
+        <id property="id" column="id"/>
+        <result property="roleId" column="role_id"/>
+        <result property="roleName" column="role_name"/>
+        <result property="roleCode" column="role_code"/>
+        <result property="menuId" column="menu_id"/>
+        <result property="menuName" column="menu_name"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findById" resultMap="PermissionMappingResultMap">
+        SELECT * FROM role_menu_permissions
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByRoleId" resultMap="PermissionMappingResultMap">
+        SELECT * FROM role_menu_permissions
+        WHERE role_id = #{roleId}
+        ORDER BY menu_id ASC
+    </select>
+
+    <select id="findByMenuId" resultMap="PermissionMappingResultMap">
+        SELECT * FROM role_menu_permissions
+        WHERE menu_id = #{menuId}
+        ORDER BY role_id ASC
+    </select>
+
+    <select id="findAllWithDetails" resultMap="PermissionMappingResultMap">
+        SELECT
+            rmp.id,
+            rmp.role_id,
+            r.name AS role_name,
+            r.code AS role_code,
+            rmp.menu_id,
+            m.name AS menu_name,
+            rmp.created_at,
+            rmp.updated_at
+        FROM role_menu_permissions rmp
+        LEFT JOIN roles r ON rmp.role_id = r.id
+        LEFT JOIN menus m ON rmp.menu_id = m.id
+        ORDER BY r.id ASC, m.id ASC
+    </select>
+
+    <select id="findByRoleIdWithMenus" resultMap="PermissionMappingResultMap">
+        SELECT
+            rmp.id,
+            rmp.role_id,
+            r.name AS role_name,
+            r.code AS role_code,
+            rmp.menu_id,
+            m.name AS menu_name,
+            rmp.created_at,
+            rmp.updated_at
+        FROM role_menu_permissions rmp
+        LEFT JOIN roles r ON rmp.role_id = r.id
+        LEFT JOIN menus m ON rmp.menu_id = m.id
+        WHERE rmp.role_id = #{roleId}
+        ORDER BY m.sort ASC, m.id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.backend.manage.entity.PermissionMappingEntity">
+        INSERT INTO role_menu_permissions (role_id, menu_id, created_at, updated_at)
+        VALUES (#{roleId}, #{menuId}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO role_menu_permissions (role_id, menu_id, created_at, updated_at)
+        VALUES
+        <foreach collection="mappings" item="mapping" separator=",">
+            (#{mapping.roleId}, #{mapping.menuId}, #{mapping.createdAt}, #{mapping.updatedAt})
+        </foreach>
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM role_menu_permissions
+        WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByRoleId">
+        DELETE FROM role_menu_permissions
+        WHERE role_id = #{roleId}
+    </delete>
+
+    <delete id="deleteByMenuId">
+        DELETE FROM role_menu_permissions
+        WHERE menu_id = #{menuId}
+    </delete>
+
+    <select id="countByRoleId" resultType="int">
+        SELECT COUNT(*) FROM role_menu_permissions
+        WHERE role_id = #{roleId}
+    </select>
+
+</mapper>

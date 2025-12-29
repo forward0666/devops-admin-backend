@@ -6,7 +6,7 @@
 <mapper namespace="com.backend.manage.mapper.UserMapper">
 
     <!-- ================= ResultMap ================= -->
-    <resultMap id="UserResultMap" type="com.backend.manage.model.User">
+    <resultMap id="UserResultMap" type="com.backend.manage.entity.UserEntity">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
@@ -78,7 +78,7 @@
     <!-- ================= 插入（核心修复） ================= -->
 
     <insert id="insert"
-            parameterType="com.backend.manage.model.User"
+            parameterType="com.backend.manage.entity.UserEntity"
             useGeneratedKeys="true"
             keyProperty="id">
         INSERT INTO users (
@@ -125,7 +125,7 @@
 
     <!-- ================= 更新（核心修复） ================= -->
 
-    <update id="update" parameterType="com.backend.manage.model.User">
+    <update id="update" parameterType="com.backend.manage.entity.UserEntity">
         UPDATE users
         SET
             username        = #{username},

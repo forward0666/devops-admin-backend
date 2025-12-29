@@ -1,7 +1,7 @@
 package com.backend.manage.repository.impl;
 
 import com.backend.manage.mapper.UserMapper;
-import com.backend.manage.model.User;
+import com.backend.manage.entity.UserEntity;
 import com.backend.manage.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,51 +21,51 @@ public class UserRepositoryImpl implements UserRepository {
     private UserMapper userMapper;
     
     @Override
-    public Optional<User> findByUsername(String username) {
+    public Optional<UserEntity> findByUsername(String username) {
         log.debug("Finding user by username: {}", username);
-        User user = userMapper.findByUsername(username);
+        UserEntity user = userMapper.findByUsername(username);
         return Optional.ofNullable(user);
     }
-    
+
     @Override
-    public Optional<User> authenticate(String username, String password) {
+    public Optional<UserEntity> authenticate(String username, String password) {
         log.debug("Authenticating user: {}", username);
-        
+
         // Note: In production, password should be hashed and compared properly
         // This is a simplified implementation for demonstration
-        User user = userMapper.authenticate(username, password);
-        
+        UserEntity user = userMapper.authenticate(username, password);
+
         if (user != null) {
             log.debug("Authentication successful for user: {}", username);
         } else {
             log.debug("Authentication failed for user: {}", username);
         }
-        
+
         return Optional.ofNullable(user);
     }
-    
+
     @Override
-    public List<User> findAll() {
+    public List<UserEntity> findAll() {
         log.debug("Finding all users");
         return userMapper.findAll();
     }
-    
+
     @Override
-    public Optional<User> findById(Long id) {
+    public Optional<UserEntity> findById(Long id) {
         log.debug("Finding user by ID: {}", id);
-        User user = userMapper.findById(id);
+        UserEntity user = userMapper.findById(id);
         return Optional.ofNullable(user);
     }
-    
+
     @Override
-    public Optional<User> findByIdIncludeInactive(Long id) {
+    public Optional<UserEntity> findByIdIncludeInactive(Long id) {
         log.debug("Finding user by ID including inactive: {}", id);
-        User user = userMapper.findByIdIncludeInactive(id);
+        UserEntity user = userMapper.findByIdIncludeInactive(id);
         return Optional.ofNullable(user);
     }
-    
+
     @Override
-    public User save(User user) {
+    public UserEntity save(UserEntity user) {
         if (user.getId() == null) {
             log.debug("Creating new user: {}", user.getUsername());
             userMapper.insert(user);
@@ -75,21 +75,21 @@ public class UserRepositoryImpl implements UserRepository {
         }
         return user;
     }
-    
+
     @Override
     public void deleteById(Long id) {
         log.debug("Deleting user by ID: {}", id);
         userMapper.deleteById(id);
     }
-    
+
     @Override
-    public List<User> findByDepartmentId(Long departmentId) {
+    public List<UserEntity> findByDepartmentId(Long departmentId) {
         log.debug("Finding users by department ID: {}", departmentId);
         return userMapper.findByDepartmentId(departmentId);
     }
-    
+
     @Override
-    public List<User> searchByUsernameOrEmail(String query) {
+    public List<UserEntity> searchByUsernameOrEmail(String query) {
         log.debug("Searching users by username, email, phone, or Telegram username: {}", query);
         return userMapper.searchByUsernameOrEmail(query);
     }

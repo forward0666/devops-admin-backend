@@ -1,6 +1,6 @@
 package com.backend.manage.mapper;
 
-import com.backend.manage.model.Menu;
+import com.backend.manage.entity.MenuEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,34 +18,34 @@ public interface MenuMapper {
      * @param id 菜单ID
      * @return 菜单对象
      */
-    Menu findById(@Param("id") Long id);
+    MenuEntity findById(@Param("id") Long id);
 
     /**
      * 查找所有菜单
      * @return 菜单列表
      */
-    List<Menu> findAll();
+    List<MenuEntity> findAll();
 
     /**
      * 根据父菜单ID查找子菜单
      * @param parentId 父菜单ID
      * @return 子菜单列表
      */
-    List<Menu> findByParentId(@Param("parentId") Long parentId);
+    List<MenuEntity> findByParentId(@Param("parentId") Long parentId);
 
     /**
      * 插入新菜单
-     * @param menu 菜单对象
+     * @param MenuEntity 菜单对象
      * @return 插入记录数
      */
-    int insert(Menu menu);
+    int insert(MenuEntity MenuEntity);
 
     /**
      * 更新现有菜单
-     * @param menu 菜单对象
+     * @param MenuEntity 菜单对象
      * @return 更新记录数
      */
-    int update(Menu menu);
+    int update(MenuEntity MenuEntity);
 
     /**
      * 根据ID删除菜单
@@ -72,5 +72,5 @@ public interface MenuMapper {
      * 查找所有根菜单（顶级菜单）
      * @return 根菜单列表
      */
-    List<Menu> findRootMenus();
+    List<MenuEntity> findRootMenus();
 }

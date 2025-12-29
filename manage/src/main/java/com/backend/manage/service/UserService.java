@@ -1,6 +1,6 @@
 package com.backend.manage.service;
 
-import com.backend.manage.model.User;
+import com.backend.manage.entity.UserEntity;
 import com.backend.manage.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,10 +35,10 @@ public class UserService {
     /**
      * 获取所有用户列表
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
-     * 
+     *
      * @return 所有用户的列表
      */
-    public List<User> getAllUsers() {
+    public List<UserEntity> getAllUsers() {
         log.info("正在获取所有用户列表");
         
         // 使用Java 21的模式匹配，优化缓存检查逻辑
@@ -67,7 +67,7 @@ public class UserService {
      * @param id 用户ID
      * @return 用户对象，如果不存在则返回null
      */
-    public User getUserById(Long id) {
+    public UserEntity getUserById(Long id) {
         log.info("正在根据ID获取用户: " + id);
         
         // 使用Java 21的模式匹配，优化缓存检查逻辑
@@ -96,7 +96,7 @@ public class UserService {
      * @param id 用户ID
      * @return 用户对象，如果不存在则返回null
      */
-    public User getUserByIdIncludeInactive(Long id) {
+    public UserEntity getUserByIdIncludeInactive(Long id) {
         log.info("正在获取用户信息（包括非活跃用户）: " + id);
         
         // 使用Java 21的模式匹配简化Optional处理
@@ -124,8 +124,8 @@ public class UserService {
      * @return 创建成功的用户对象
      * @throws RuntimeException 当用户名、邮箱、手机号、Telegram用户名或员工ID已存在时抛出异常
      */
-    public User createUser(String username, String password, String email, String phone, String tgUsername, 
-                          String fullName, String avatarUrl, String position, String employeeId, 
+    public UserEntity createUser(String username, String password, String email, String phone, String tgUsername,
+                          String fullName, String avatarUrl, String position, String employeeId,
                           String role, Long departmentId, Long createdBy) {
         log.info("正在创建新用户: " + username);
 
@@ -157,7 +157,7 @@ public class UserService {
         // 创建新用户对象并设置属性
         // 使用Java 21的文本块和record特性，优化对象创建
         var now = LocalDateTime.now();
-        var user = new User();
+        var user = new UserEntity();
         user.setUsername(username);                                  // 设置用户名
         user.setPassword(passwordEncoder.encode(password));          // 使用BCrypt加密密码
         user.setEmail(email);                                        // 设置邮箱地址
@@ -180,7 +180,7 @@ public class UserService {
         user.setPasswordChangedAt(now);                               // 设置密码修改时间
 
         // 保存用户到数据库
-        User savedUser = userRepository.save(user);
+        UserEntity savedUser = userRepository.save(user);
         
         // 创建用户后清除相关缓存，确保数据一致性
         if (cacheService.isRedisAvailable()) {
@@ -203,7 +203,7 @@ public class UserService {
      * @param departmentId 部门ID
      * @return 创建成功的用户对象
      */
-    public User createUser(String username, String password, String email, String fullName, String role, Long departmentId) {
+    public UserEntity createUser(String username, String password, String email, String fullName, String role, Long departmentId) {
         return createUser(username, password, email, null, null, fullName, null, null, null, role, departmentId, null);
     }
 
@@ -224,14 +224,14 @@ public class UserService {
      * @param updatedBy the ID of user updating this user
      * @return the updated User object or null if not found
      */
-    public User updateUser(Long id, String email, String phone, String tgUsername, String fullName, 
-                          String avatarUrl, String position, String employeeId, String role, 
+    public UserEntity updateUser(Long id, String email, String phone, String tgUsername, String fullName,
+                          String avatarUrl, String position, String employeeId, String role,
                           Long departmentId, Boolean active, Long updatedBy) {
         log.info("Updating user: " + id);
 
-        Optional<User> optionalUser = userRepository.findByIdIncludeInactive(id);
+        Optional<UserEntity> optionalUser = userRepository.findByIdIncludeInactive(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             
             // Check for duplicate email
             if (email != null && !email.equals(user.getEmail()) && userRepository.existsByEmail(email)) {
@@ -266,7 +266,7 @@ public class UserService {
             if (updatedBy != null) user.setUpdatedBy(updatedBy);
             user.setUpdatedAt(LocalDateTime.now());
 
-            User updatedUser = userRepository.save(user);
+            UserEntity updatedUser = userRepository.save(user);
             
             // Clear cache after updating user
             if (cacheService.isRedisAvailable()) {
@@ -288,7 +288,7 @@ public class UserService {
     /**
      * Update an existing user (simplified version for backward compatibility)
      */
-    public User updateUser(Long id, String email, String fullName, String role, Long departmentId, Boolean active) {
+    public UserEntity updateUser(Long id, String email, String fullName, String role, Long departmentId, Boolean active) {
         return updateUser(id, email, null, null, fullName, null, null, null, role, departmentId, active, null);
     }
 
@@ -301,9 +301,9 @@ public class UserService {
     public boolean deleteUser(Long id) {
         log.info("Deleting user: " + id);
 
-        Optional<User> optionalUser = userRepository.findByIdIncludeInactive(id);
+        Optional<UserEntity> optionalUser = userRepository.findByIdIncludeInactive(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             Long departmentId = user.getDepartmentId();
             
             userRepository.deleteById(id);
@@ -336,9 +336,9 @@ public class UserService {
     public boolean changePassword(Long id, String oldPassword, String newPassword) {
         log.info("Changing password for user: " + id);
 
-        Optional<User> optionalUser = userRepository.findById(id);
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             
             // Verify old password
             if (passwordEncoder.matches(oldPassword, user.getPassword())) {
@@ -373,9 +373,9 @@ public class UserService {
     public boolean resetPassword(Long id, String newPassword) {
         log.info("Resetting password for user: " + id);
 
-        Optional<User> optionalUser = userRepository.findById(id);
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             user.setPassword(passwordEncoder.encode(newPassword));
             user.setPasswordChangedAt(LocalDateTime.now());
             user.setUpdatedAt(LocalDateTime.now());
@@ -404,9 +404,9 @@ public class UserService {
     public boolean updateLoginInfo(Long id, String ipAddress) {
         log.info("Updating login info for user: " + id);
 
-        Optional<User> optionalUser = userRepository.findById(id);
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             user.setLastLoginAt(LocalDateTime.now());
             user.setLastLoginIp(ipAddress);
             user.setLoginCount(user.getLoginCount() + 1);
@@ -435,9 +435,9 @@ public class UserService {
     public boolean verifyEmail(Long id) {
         log.info("Verifying email for user: " + id);
 
-        Optional<User> optionalUser = userRepository.findById(id);
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             user.setEmailVerified(true);
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
@@ -464,9 +464,9 @@ public class UserService {
     public boolean verifyPhone(Long id) {
         log.info("Verifying phone for user: " + id);
 
-        Optional<User> optionalUser = userRepository.findById(id);
+        Optional<UserEntity> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+            UserEntity user = optionalUser.get();
             user.setPhoneVerified(true);
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
@@ -490,20 +490,20 @@ public class UserService {
      * @param departmentId the department ID
      * @return List of users in the department
      */
-    public List<User> getUsersByDepartment(Long departmentId) {
+    public List<UserEntity> getUsersByDepartment(Long departmentId) {
         log.info("Retrieving users for department: " + departmentId);
-        
+
         // Try to get from cache first
         if (cacheService.isRedisAvailable()) {
-            List<User> cachedUsers = cacheService.getCachedDepartmentUsers(departmentId);
+            List<UserEntity> cachedUsers = cacheService.getCachedDepartmentUsers(departmentId);
             if (cachedUsers != null) {
                 log.debug("Retrieved department users from cache: " + departmentId);
                 return cachedUsers;
             }
         }
-        
+
         // Get from database and cache the result
-        List<User> users = userRepository.findByDepartmentId(departmentId);
+        List<UserEntity> users = userRepository.findByDepartmentId(departmentId);
         if (cacheService.isRedisAvailable()) {
             cacheService.cacheDepartmentUsers(departmentId, users);
         }
@@ -517,7 +517,7 @@ public class UserService {
      * @param query the search query
      * @return List of matching users
      */
-    public List<User> searchUsers(String query) {
+    public List<UserEntity> searchUsers(String query) {
         log.info("Searching users with query: " + query);
         return userRepository.searchByUsernameOrEmail(query);
     }

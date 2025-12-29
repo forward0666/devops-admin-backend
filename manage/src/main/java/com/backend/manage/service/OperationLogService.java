@@ -1,6 +1,6 @@
 package com.backend.manage.service;
 
-import com.backend.manage.model.OperationLog;
+import com.backend.manage.entity.OperationLogEntity;
 import com.backend.manage.repository.OperationLogRepository;
 import com.backend.manage.util.JsonUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -27,7 +27,7 @@ public class OperationLogService {
     private final ObjectMapper objectMapper;
 
     @Async
-    public void logOperation(OperationLog operationLog) {
+    public void logOperation(OperationLogEntity operationLog) {
         try {
             // 使用Java 21的模式匹配简化条件检查
             if (operationLog.getOperationId() == null) {
@@ -68,7 +68,7 @@ public class OperationLogService {
                 details = objectMapper.writeValueAsString(detailsMap);
             }
 
-            OperationLog operationLog = OperationLog.builder()
+            OperationLogEntity operationLog = OperationLogEntity.builder()
                     .operationId(UUID.randomUUID().toString())
                     .userId(userId)
                     .username(username)
@@ -80,13 +80,9 @@ public class OperationLogService {
                     .url(url)
                     .ipAddress(ipAddress)
                     .userAgent(userAgent)
-                    .requestBody(JsonUtil.toJson(requestBody))
-                    .responseBody(JsonUtil.toJson(responseBody))
-                    .success(success)
+                    .requestBody(requestBody instanceof Map ? (Map<String, Object>) requestBody : null)
                     .errorMessage(errorMessage)
                     .createdAt(LocalDateTime.now())
-                    .module("MANAGE")
-                    .details(details)
                     .build();
 
             logOperation(operationLog);
@@ -95,24 +91,12 @@ public class OperationLogService {
         }
     }
 
-    public Page<OperationLog> getOperationLogs(int page, int size, String sortBy, String sortDir) {
+    public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir) {
         return operationLogRepository.findOperationLogs(page, size, sortBy, sortDir);
     }
 
-    public List<OperationLog> getRecentOperationLogs(int limit) {
+    public List<OperationLogEntity> getRecentOperationLogs(int limit) {
         return operationLogRepository.findTop5ByOrderByCreatedAtDesc();
-    }
-
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
-            return xRealIp;
-        }
-        return request.getRemoteAddr();
     }
 
     public void cleanupExpiredLogs(int i) {

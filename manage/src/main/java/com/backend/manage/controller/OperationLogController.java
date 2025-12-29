@@ -1,6 +1,6 @@
 package com.backend.manage.controller;
 
-import com.backend.manage.model.OperationLog;
+import com.backend.manage.entity.OperationLogEntity;
 import com.backend.manage.service.OperationLogService;
 import com.backend.manage.util.AccessValidator;
 import com.backend.manage.util.JwtUtil;
@@ -42,7 +42,7 @@ public class OperationLogController {
 
         validateAdminAccess(request);
         int springDataPage = Math.max(0, page - 1);
-        Page<OperationLog> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir);
+        Page<OperationLogEntity> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir);
         return ResponseUtil.page("获取操作日志成功", logs, page);
     }
 
@@ -53,7 +53,7 @@ public class OperationLogController {
             @RequestParam(defaultValue = "5") int limit) {
 
         validateAdminAccess(request);
-        List<OperationLog> logs = operationLogService.getRecentOperationLogs(limit);
+        List<OperationLogEntity> logs = operationLogService.getRecentOperationLogs(limit);
         return ResponseUtil.success("获取最近操作日志成功", logs);
     }
 }

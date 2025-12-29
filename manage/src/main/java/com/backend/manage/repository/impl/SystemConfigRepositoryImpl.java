@@ -1,7 +1,7 @@
 package com.backend.manage.repository.impl;
 
 import com.backend.manage.mapper.SystemConfigMapper;
-import com.backend.manage.model.SystemConfig;
+import com.backend.manage.entity.SystemConfigEntity;
 import com.backend.manage.repository.SystemConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +26,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     @Override
     public String getConfigValue(String key, String defaultValue) {
         try {
-            SystemConfig config = systemConfigMapper.findByKey(key);
+            SystemConfigEntity config = systemConfigMapper.findByKey(key);
             return config != null ? config.getConfigValue() : defaultValue;
         } catch (Exception e) {
             logger.error("Error getting config value for key: {}", key, e);
@@ -37,14 +37,14 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     @Override
     public void setConfigValue(String key, String value) {
         try {
-            SystemConfig existingConfig = systemConfigMapper.findByKey(key);
+            SystemConfigEntity existingConfig = systemConfigMapper.findByKey(key);
             if (existingConfig != null) {
                 existingConfig.setConfigValue(value);
                 existingConfig.setUpdatedAt(LocalDateTime.now());
                 systemConfigMapper.update(existingConfig);
                 logger.info("Updated config: {} = {}", key, value);
             } else {
-                SystemConfig newConfig = new SystemConfig();
+                SystemConfigEntity newConfig = new SystemConfigEntity();
                 newConfig.setConfigKey(key);
                 newConfig.setConfigValue(value);
                 newConfig.setConfigType("STRING");
@@ -64,7 +64,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     @Override
     public <T> T getConfigObject(String key, Class<T> clazz, T defaultValue) {
         try {
-            SystemConfig config = systemConfigMapper.findByKey(key);
+            SystemConfigEntity config = systemConfigMapper.findByKey(key);
             if (config == null || config.getConfigValue() == null) {
                 return defaultValue;
             }
@@ -78,7 +78,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     @Override
     public <T> T getConfigObject(String key, TypeReference<T> typeRef, T defaultValue) {
         try {
-            SystemConfig config = systemConfigMapper.findByKey(key);
+            SystemConfigEntity config = systemConfigMapper.findByKey(key);
             if (config == null || config.getConfigValue() == null) {
                 return defaultValue;
             }
@@ -101,7 +101,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     }
 
     @Override
-    public List<SystemConfig> getAllConfigs() {
+    public List<SystemConfigEntity> getAllConfigs() {
         try {
             return systemConfigMapper.findAll();
         } catch (Exception e) {
@@ -111,7 +111,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     }
 
     @Override
-    public List<SystemConfig> getPublicConfigs() {
+    public List<SystemConfigEntity> getPublicConfigs() {
         try {
             return systemConfigMapper.findPublicConfigs();
         } catch (Exception e) {
@@ -121,7 +121,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     }
 
     @Override
-    public SystemConfig getConfigByKey(String key) {
+    public SystemConfigEntity getConfigByKey(String key) {
         try {
             return systemConfigMapper.findByKey(key);
         } catch (Exception e) {
@@ -131,7 +131,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     }
 
     @Override
-    public SystemConfig createConfig(SystemConfig config) {
+    public SystemConfigEntity createConfig(SystemConfigEntity config) {
         try {
             config.setCreatedAt(LocalDateTime.now());
             config.setUpdatedAt(LocalDateTime.now());
@@ -145,7 +145,7 @@ public class SystemConfigRepositoryImpl implements SystemConfigRepository {
     }
 
     @Override
-    public SystemConfig updateConfig(SystemConfig config) {
+    public SystemConfigEntity updateConfig(SystemConfigEntity config) {
         try {
             config.setUpdatedAt(LocalDateTime.now());
             systemConfigMapper.update(config);

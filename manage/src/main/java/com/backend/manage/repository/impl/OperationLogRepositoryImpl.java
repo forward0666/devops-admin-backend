@@ -1,6 +1,6 @@
 package com.backend.manage.repository.impl;
 
-import com.backend.manage.model.OperationLog;
+import com.backend.manage.entity.OperationLogEntity;
 import com.backend.manage.repository.OperationLogRepository;
 import com.backend.manage.util.MongoQueryUtil;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,7 +30,7 @@ public class OperationLogRepositoryImpl implements OperationLogRepository {
      * 分页查询操作日志
      */
     @Override
-    public Page<OperationLog> findOperationLogs(int page, int size, String sortBy, String sortDir) {
+    public Page<OperationLogEntity> findOperationLogs(int page, int size, String sortBy, String sortDir) {
         try {
             InputStream input = getClass().getResourceAsStream("/mongo/operationLogRepository.json");
             JsonNode root = objectMapper.readTree(input);
@@ -41,11 +41,11 @@ public class OperationLogRepositoryImpl implements OperationLogRepository {
 
             // 分页
             query.skip(page * size).limit(size);
-            List<OperationLog> logs = mongoTemplate.find(query, OperationLog.class);
+            List<OperationLogEntity> logs = mongoTemplate.find(query, OperationLogEntity.class);
 
             // 总数统计
             Query countQuery = MongoQueryUtil.buildQueryFromJson(node.get("filter"), null, null, null);
-            long total = mongoTemplate.count(countQuery, OperationLog.class);
+            long total = mongoTemplate.count(countQuery, OperationLogEntity.class);
             log.info("✅findOperationLogs: page={}, size={}, sortBy={}, sortDir={}", page, size, sortBy, sortDir);
             Pageable pageable = PageRequest.of(page, size,
                     Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
@@ -62,8 +62,8 @@ public class OperationLogRepositoryImpl implements OperationLogRepository {
      * 获取最近 5 条操作日志
      */
     @Override
-    public List<OperationLog> findTop5ByOrderByCreatedAtDesc() {
-        List<OperationLog> logs = findOperationLogs(0, 5, "createdAt", "desc").getContent();
+    public List<OperationLogEntity> findTop5ByOrderByCreatedAtDesc() {
+        List<OperationLogEntity> logs = findOperationLogs(0, 5, "createdAt", "desc").getContent();
         log.info("✅findTop5ByOrderByCreatedAtDesc - fetched {} logs: {}", logs.size(), logs);
         return logs;
     }
@@ -72,7 +72,7 @@ public class OperationLogRepositoryImpl implements OperationLogRepository {
      * 保存操作日志
      */
     @Override
-    public OperationLog save(OperationLog operationLog) {
+    public OperationLogEntity save(OperationLogEntity operationLog) {
         return mongoTemplate.save(operationLog);
     }
 }

@@ -1,10 +1,10 @@
 package com.backend.manage.service;
 
-import com.backend.manage.model.Department;
-import com.backend.manage.model.Menu;
-import com.backend.manage.model.Position;
-import com.backend.manage.model.Role;
-import com.backend.manage.model.User;
+import com.backend.manage.entity.DepartmentEntity;
+import com.backend.manage.entity.MenuEntity;
+import com.backend.manage.entity.PositionEntity;
+import com.backend.manage.entity.RoleEntity;
+import com.backend.manage.entity.UserEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.data.redis.core.*;
@@ -73,27 +73,27 @@ public class CacheService {
     }
 
     /* ================= 用户缓存 ================= */
-    public void cacheUser(User user) {
+    public void cacheUser(UserEntity user) {
         if (!redisOk() || user == null || user.getId() == null) return;
         redisTemplate.opsForValue().set(USER_PREFIX + user.getId(), user, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public User getCachedUser(Long userId) {
+    public UserEntity getCachedUser(Long userId) {
         if (!redisOk() || userId == null) return null;
         Object v = redisTemplate.opsForValue().get(USER_PREFIX + userId);
-        return (v instanceof User u) ? u : null;
+        return (v instanceof UserEntity u) ? u : null;
     }
 
-    public void cacheUsersList(List<User> users) {
+    public void cacheUsersList(List<UserEntity> users) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(USERS_LIST, users, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<User> getCachedUsersList() {
+    public List<UserEntity> getCachedUsersList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(USERS_LIST);
-        return (v instanceof List<?>) ? (List<User>) v : null;
+        return (v instanceof List<?>) ? (List<UserEntity>) v : null;
     }
 
     public void clearUserCache(Long userId) {
@@ -107,27 +107,27 @@ public class CacheService {
     }
 
     /* ================= 部门缓存 ================= */
-    public void cacheDepartment(Department dept) {
+    public void cacheDepartment(DepartmentEntity dept) {
         if (!redisOk() || dept == null || dept.getId() == null) return;
         redisTemplate.opsForValue().set(DEPT_PREFIX + dept.getId(), dept, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public Department getCachedDepartment(Long id) {
+    public DepartmentEntity getCachedDepartment(Long id) {
         if (!redisOk() || id == null) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_PREFIX + id);
-        return (v instanceof Department d) ? d : null;
+        return (v instanceof DepartmentEntity d) ? d : null;
     }
 
-    public void cacheDepartmentsList(List<Department> list) {
+    public void cacheDepartmentsList(List<DepartmentEntity> list) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(DEPT_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<Department> getCachedDepartmentsList() {
+    public List<DepartmentEntity> getCachedDepartmentsList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_LIST);
-        return (v instanceof List<?>) ? (List<Department>) v : null;
+        return (v instanceof List<?>) ? (List<DepartmentEntity>) v : null;
     }
 
     public void clearDepartmentCache(Long id) {
@@ -141,52 +141,52 @@ public class CacheService {
     }
 
     /* ================= 部门用户缓存 ================= */
-    public void cacheDepartmentUsers(Long deptId, List<User> users) {
+    public void cacheDepartmentUsers(Long deptId, List<UserEntity> users) {
         if (!redisOk() || deptId == null) return;
         redisTemplate.opsForValue().set(DEPT_USERS + deptId, users, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<User> getCachedDepartmentUsers(Long deptId) {
+    public List<UserEntity> getCachedDepartmentUsers(Long deptId) {
         if (!redisOk() || deptId == null) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_USERS + deptId);
-        return (v instanceof List<?>) ? (List<User>) v : null;
+        return (v instanceof List<?>) ? (List<UserEntity>) v : null;
     }
 
     /* ================= 菜单缓存 ================= */
-    public void cacheMenu(Menu menu) {
+    public void cacheMenu(MenuEntity menu) {
         if (!redisOk() || menu == null || menu.getId() == null) return;
         redisTemplate.opsForValue().set(MENU_PREFIX + menu.getId(), menu, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public Menu getCachedMenu(Long id) {
+    public MenuEntity getCachedMenu(Long id) {
         if (!redisOk() || id == null) return null;
         Object v = redisTemplate.opsForValue().get(MENU_PREFIX + id);
-        return (v instanceof Menu m) ? m : null;
+        return (v instanceof MenuEntity m) ? m : null;
     }
 
-    public void cacheMenusList(List<Menu> list) {
+    public void cacheMenusList(List<MenuEntity> list) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(MENU_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<Menu> getCachedMenusList() {
+    public List<MenuEntity> getCachedMenusList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(MENU_LIST);
-        return (v instanceof List<?>) ? (List<Menu>) v : null;
+        return (v instanceof List<?>) ? (List<MenuEntity>) v : null;
     }
 
-    public void cacheRootMenusList(List<Menu> list) {
+    public void cacheRootMenusList(List<MenuEntity> list) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(MENU_ROOT, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<Menu> getCachedRootMenusList() {
+    public List<MenuEntity> getCachedRootMenusList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(MENU_ROOT);
-        return (v instanceof List<?>) ? (List<Menu>) v : null;
+        return (v instanceof List<?>) ? (List<MenuEntity>) v : null;
     }
 
     public void clearMenuCache(Long id) {
@@ -201,27 +201,27 @@ public class CacheService {
     }
 
     /* ================= 角色缓存 ================= */
-    public void cacheRole(Role role) {
+    public void cacheRole(RoleEntity role) {
         if (!redisOk() || role == null || role.getId() == null) return;
         redisTemplate.opsForValue().set(ROLE_PREFIX + role.getId(), role, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public Role getCachedRole(Long id) {
+    public RoleEntity getCachedRole(Long id) {
         if (!redisOk() || id == null) return null;
         Object v = redisTemplate.opsForValue().get(ROLE_PREFIX + id);
-        return (v instanceof Role r) ? r : null;
+        return (v instanceof RoleEntity r) ? r : null;
     }
 
-    public void cacheRolesList(List<Role> list) {
+    public void cacheRolesList(List<RoleEntity> list) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(ROLE_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<Role> getCachedRolesList() {
+    public List<RoleEntity> getCachedRolesList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(ROLE_LIST);
-        return (v instanceof List<?>) ? (List<Role>) v : null;
+        return (v instanceof List<?>) ? (List<RoleEntity>) v : null;
     }
 
     public void clearRoleCache(Long id) {
@@ -235,27 +235,27 @@ public class CacheService {
     }
 
     /* ================= 职位缓存 ================= */
-    public void cachePosition(Position position) {
+    public void cachePosition(PositionEntity position) {
         if (!redisOk() || position == null || position.getId() == null) return;
         redisTemplate.opsForValue().set(POSITION_PREFIX + position.getId(), position, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public Position getCachedPosition(Long id) {
+    public PositionEntity getCachedPosition(Long id) {
         if (!redisOk() || id == null) return null;
         Object v = redisTemplate.opsForValue().get(POSITION_PREFIX + id);
-        return (v instanceof Position p) ? p : null;
+        return (v instanceof PositionEntity p) ? p : null;
     }
 
-    public void cachePositionsList(List<Position> list) {
+    public void cachePositionsList(List<PositionEntity> list) {
         if (!redisOk()) return;
         redisTemplate.opsForValue().set(POSITION_LIST, list, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<Position> getCachedPositionsList() {
+    public List<PositionEntity> getCachedPositionsList() {
         if (!redisOk()) return null;
         Object v = redisTemplate.opsForValue().get(POSITION_LIST);
-        return (v instanceof List<?>) ? (List<Position>) v : null;
+        return (v instanceof List<?>) ? (List<PositionEntity>) v : null;
     }
 
     public void clearPositionCache(Long id) {
@@ -305,7 +305,7 @@ public class CacheService {
                     ScanOptions.scanOptions().match(prefix + "*").count(1000).build()
             )) {
                 while (cursor.hasNext()) {
-                    connection.del(cursor.next());
+                    connection.unlink(cursor.next());
                 }
             }
             return null;

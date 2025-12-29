@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.backend.manage.mapper.RoleMapper">
 
-    <resultMap id="roleResultMap" type="com.backend.manage.model.Role">
+    <resultMap id="roleResultMap" type="com.backend.manage.entity.RoleEntity">
         <id property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="code" column="code"/>
@@ -36,12 +36,12 @@
         WHERE code = #{code} AND deleted_at IS NULL
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.model.Role" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.manage.entity.RoleEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO roles (name, code, description, status, user_count, created_by, updated_by, created_at, updated_at)
         VALUES (#{name}, #{code}, #{description}, #{status}, #{userCount}, #{createdBy}, #{updatedBy}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.backend.manage.model.Role">
+    <update id="update" parameterType="com.backend.manage.entity.RoleEntity">
         UPDATE roles
         SET name = #{name},
             code = #{code},
@@ -75,21 +75,5 @@
         FROM roles
         WHERE code = #{code} AND id != #{id} AND deleted_at IS NULL
     </select>
-
-    <select id="findPermissionsByRoleId" resultType="string">
-        SELECT permission_code
-        FROM role_permissions
-        WHERE role_id = #{roleId}
-    </select>
-
-    <insert id="insertRolePermission">
-        INSERT INTO role_permissions (role_id, permission_code, created_at)
-        VALUES (#{roleId}, #{permissionCode}, NOW())
-    </insert>
-
-    <delete id="deleteRolePermissions">
-        DELETE FROM role_permissions
-        WHERE role_id = #{roleId}
-    </delete>
 
 </mapper>

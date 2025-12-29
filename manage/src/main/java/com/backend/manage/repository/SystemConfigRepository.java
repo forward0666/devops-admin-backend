@@ -1,6 +1,6 @@
 package com.backend.manage.repository;
 
-import com.backend.manage.model.SystemConfig;
+import com.backend.manage.entity.SystemConfigEntity;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.List;
@@ -85,50 +85,50 @@ public interface SystemConfigRepository {
      * 
      * Get all configurations
      */
-    List<SystemConfig> getAllConfigs();
+    List<SystemConfigEntity> getAllConfigs();
 
     /**
      * 获取公开配置（非敏感配置）
      * 返回可以公开访问的系统配置项，过滤掉敏感信息
-     * 
+     *
      * @return 公开配置的列表
-     * 
+     *
      * Get public configurations only
      */
-    List<SystemConfig> getPublicConfigs();
+    List<SystemConfigEntity> getPublicConfigs();
 
     /**
      * 根据配置键获取配置对象
      * 返回完整的配置对象，包含配置键、值、描述等信息
-     * 
+     *
      * @param key 配置键
      * @return 配置对象，如果不存在返回null
-     * 
+     *
      * Get configuration by key
      */
-    SystemConfig getConfigByKey(String key);
+    SystemConfigEntity getConfigByKey(String key);
 
     /**
      * 创建新的配置项
      * 用于新增系统配置，需要提供完整的配置信息
-     * 
+     *
      * @param config 配置对象
      * @return 创建后的配置对象
-     * 
+     *
      * Create new configuration
      */
-    SystemConfig createConfig(SystemConfig config);
+    SystemConfigEntity createConfig(SystemConfigEntity config);
 
     /**
      * 更新现有配置项
      * 用于修改已存在的系统配置信息
-     * 
+     *
      * @param config 配置对象
      * @return 更新后的配置对象
-     * 
+     *
      * Update existing configuration
      */
-    SystemConfig updateConfig(SystemConfig config);
+    SystemConfigEntity updateConfig(SystemConfigEntity config);
 
     /**
      * 根据配置键删除配置项

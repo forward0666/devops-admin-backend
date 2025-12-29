@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.backend.manage.mapper.MenuMapper">
 
-    <resultMap id="MenuResultMap" type="com.backend.manage.model.Menu">
+    <resultMap id="MenuResultMap" type="com.backend.manage.entity.MenuEntity">
         <id property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="path" column="path"/>
@@ -44,12 +44,12 @@
         ORDER BY sort
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.model.Menu" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.manage.entity.MenuEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO menus (name, path, icon, type, sort, status, parent_id, created_at, updated_at)
         VALUES (#{name}, #{path}, #{icon}, #{type}, #{sort}, #{status}, #{parentId}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.backend.manage.model.Menu">
+    <update id="update" parameterType="com.backend.manage.entity.MenuEntity">
         UPDATE menus
         SET name = #{name}, path = #{path}, icon = #{icon}, type = #{type},
             sort = #{sort}, status = #{status}, parent_id = #{parentId}, updated_at = #{updatedAt}

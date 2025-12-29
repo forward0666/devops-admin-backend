@@ -1,6 +1,6 @@
 package com.backend.manage.repository;
 
-import com.backend.manage.model.User;
+import com.backend.manage.entity.UserEntity;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,7 +13,7 @@ import java.util.Optional;
  * Repository interface for User entity
  */
 public interface UserRepository {
-    
+
     /**
      * 根据用户名查找用户
      * 用于用户登录、用户信息查询等场景
@@ -23,10 +23,10 @@ public interface UserRepository {
      * 
      * Find a user by username
      * 
-     * @param username the username to search for
+     * @param username to search for
      * @return an Optional containing the user if found, or empty if not found
      */
-    Optional<User> findByUsername(String username);
+    Optional<UserEntity> findByUsername(String username);
     
     /**
      * 用户认证 - 验证用户名和密码
@@ -38,11 +38,11 @@ public interface UserRepository {
      * 
      * Authenticate a user with username and password
      * 
-     * @param username the username
-     * @param password the password
+     * @param username
+     * @param password
      * @return an Optional containing the authenticated user if successful, or empty if authentication fails
      */
-    Optional<User> authenticate(String username, String password);
+    Optional<UserEntity> authenticate(String username, String password);
     
     /**
      * 查找所有用户
@@ -54,7 +54,7 @@ public interface UserRepository {
      * 
      * @return List of all users
      */
-    List<User> findAll();
+    List<UserEntity> findAll();
     
     /**
      * 根据用户ID查找用户（仅查找活跃用户）
@@ -65,10 +65,10 @@ public interface UserRepository {
      * 
      * Find a user by ID (active users only)
      * 
-     * @param id the user ID
+     * @param id
      * @return an Optional containing the user if found, or empty if not found
      */
-    Optional<User> findById(Long id);
+    Optional<UserEntity> findById(Long id);
     
     /**
      * 根据用户ID查找用户（包含非活跃用户）
@@ -79,10 +79,10 @@ public interface UserRepository {
      * 
      * Find a user by ID including inactive users (for update operations)
      * 
-     * @param id the user ID
+     * @param id
      * @return an Optional containing the user if found, or empty if not found
      */
-    Optional<User> findByIdIncludeInactive(Long id);
+    Optional<UserEntity> findByIdIncludeInactive(Long id);
     
     /**
      * 保存用户（创建或更新）
@@ -93,10 +93,10 @@ public interface UserRepository {
      * 
      * Save a user (create or update)
      * 
-     * @param user the user to save
-     * @return the saved user
+     * @param user
+     * @return
      */
-    User save(User user);
+    UserEntity save(UserEntity user);
     
     /**
      * 根据用户ID删除用户
@@ -106,7 +106,8 @@ public interface UserRepository {
      * 
      * Delete a user by ID
      * 
-     * @param id the user ID to delete
+     * @param id
+     *   user ID to delete
      */
     void deleteById(Long id);
     
@@ -119,10 +120,10 @@ public interface UserRepository {
      * 
      * Find users by department ID
      * 
-     * @param departmentId the department ID
+     * @param departmentId
      * @return List of users in the department
      */
-    List<User> findByDepartmentId(Long departmentId);
+    List<UserEntity> findByDepartmentId(Long departmentId);
     
     /**
      * 搜索用户 - 根据用户名、邮箱、手机号或Telegram用户名
@@ -133,10 +134,10 @@ public interface UserRepository {
      * 
      * Search users by username, email, phone, or Telegram username
      * 
-     * @param query the search query
+     * @param query
      * @return List of matching users
      */
-    List<User> searchByUsernameOrEmail(String query);
+    List<UserEntity> searchByUsernameOrEmail(String query);
     
     /**
      * 检查邮箱是否已存在
@@ -147,7 +148,7 @@ public interface UserRepository {
      * 
      * Check if email exists
      * 
-     * @param email the email to check
+     * @param email to check
      * @return true if email exists, false otherwise
      */
     boolean existsByEmail(String email);
@@ -161,7 +162,7 @@ public interface UserRepository {
      * 
      * Check if phone exists
      * 
-     * @param phone the phone to check
+     * @param phone to check
      * @return true if phone exists, false otherwise
      */
     boolean existsByPhone(String phone);
@@ -175,7 +176,7 @@ public interface UserRepository {
      * 
      * Check if Telegram username exists
      * 
-     * @param tgUsername the Telegram username to check
+     * @param tgUsername to check
      * @return true if Telegram username exists, false otherwise
      */
     boolean existsByTgUsername(String tgUsername);
@@ -189,7 +190,7 @@ public interface UserRepository {
      * 
      * Check if employee ID exists
      * 
-     * @param employeeId the employee ID to check
+     * @param employeeId to check
      * @return true if employee ID exists, false otherwise
      */
     boolean existsByEmployeeId(String employeeId);

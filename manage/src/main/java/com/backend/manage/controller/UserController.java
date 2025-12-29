@@ -1,8 +1,8 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponse;
-import com.backend.manage.model.User;
+import com.backend.manage.dto.ApiResponseDto;
+import com.backend.manage.entity.UserEntity;
 import com.backend.manage.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -44,12 +44,12 @@ public class UserController {
      * @return ApiResponse包含用户列表，成功时返回用户数据，失败时返回错误信息
      */
     @GetMapping
-    public ApiResponse<List<User>> getAllUsers() {
+    public ApiResponseDto<List<UserEntity>> getAllUsers() {
         try {
-            List<User> users = userService.getAllUsers();
-            return ApiResponse.success("Users retrieved successfully", users);
+            List<UserEntity> users = userService.getAllUsers();
+            return ApiResponseDto.success("Users retrieved successfully", users);
         } catch (Exception e) {
-            return ApiResponse.error("Failed to retrieve users: " + e.getMessage());
+            return ApiResponseDto.error("Failed to retrieve users: " + e.getMessage());
         }
     }
 
@@ -66,16 +66,16 @@ public class UserController {
      * @return ApiResponse包含用户对象，成功时返回用户数据，用户不存在时返回错误信息
      */
     @GetMapping("/{id}")
-    public ApiResponse<User> getUserById(@PathVariable Long id) {
+    public ApiResponseDto<UserEntity> getUserById(@PathVariable Long id) {
         try {
-            User user = userService.getUserById(id);
+            UserEntity user = userService.getUserById(id);
             if (user != null) {
-                return ApiResponse.success("User retrieved successfully", user);
+                return ApiResponseDto.success("User retrieved successfully", user);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to retrieve user: " + e.getMessage());
+            return ApiResponseDto.error("Failed to retrieve user: " + e.getMessage());
         }
     }
 
@@ -106,17 +106,17 @@ public class UserController {
         resourceType = "USER",
         description = "创建新用户"
     )
-    public ApiResponse<User> createUser(@RequestBody Map<String, Object> userRequest) {
+    public ApiResponseDto<UserEntity> createUser(@RequestBody Map<String, Object> userRequest) {
         try {
             // 验证必填字段
             if (!userRequest.containsKey("username") || userRequest.get("username") == null) {
-                return ApiResponse.error("Username is required");
+                return ApiResponseDto.error("Username is required");
             }
             if (!userRequest.containsKey("password") || userRequest.get("password") == null) {
-                return ApiResponse.error("Password is required");
+                return ApiResponseDto.error("Password is required");
             }
             if (!userRequest.containsKey("role") || userRequest.get("role") == null) {
-                return ApiResponse.error("Role is required");
+                return ApiResponseDto.error("Role is required");
             }
 
             // 提取请求参数
@@ -136,12 +136,12 @@ public class UserController {
                 Long.valueOf(userRequest.get("createdBy").toString()) : null;
 
             // 调用服务层创建用户
-            User createdUser = userService.createUser(username, password, email, phone, tgUsername, 
-                                                    fullName, avatarUrl, position, employeeId, 
+            UserEntity createdUser = userService.createUser(username, password, email, phone, tgUsername,
+                                                    fullName, avatarUrl, position, employeeId,
                                                     role, departmentId, createdBy);
-            return ApiResponse.success("User created successfully", createdUser);
+            return ApiResponseDto.success("User created successfully", createdUser);
         } catch (Exception e) {
-            return ApiResponse.error("Failed to create user: " + e.getMessage());
+            return ApiResponseDto.error("Failed to create user: " + e.getMessage());
         }
     }
 
@@ -175,7 +175,7 @@ public class UserController {
         resourceIdIndex = 0,
         description = "更新用户信息"
     )
-    public ApiResponse<User> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> userRequest) {
+    public ApiResponseDto<UserEntity> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> userRequest) {
         try {
             // 提取更新参数
             String email = (String) userRequest.get("email");
@@ -194,16 +194,16 @@ public class UserController {
                 Long.valueOf(userRequest.get("updatedBy").toString()) : null;
 
             // 调用服务层更新用户
-            User updatedUser = userService.updateUser(id, email, phone, tgUsername, fullName, 
-                                                    avatarUrl, position, employeeId, role, 
+            UserEntity updatedUser = userService.updateUser(id, email, phone, tgUsername, fullName,
+                                                    avatarUrl, position, employeeId, role,
                                                     departmentId, active, updatedBy);
             if (updatedUser != null) {
-                return ApiResponse.success("User updated successfully", updatedUser);
+                return ApiResponseDto.success("User updated successfully", updatedUser);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to update user: " + e.getMessage());
+            return ApiResponseDto.error("Failed to update user: " + e.getMessage());
         }
     }
 
@@ -221,18 +221,18 @@ public class UserController {
      * @return ApiResponse指示操作结果，成功时返回成功信息，用户不存在时返回错误信息
      */
     @PostMapping("/{id}/login")
-    public ApiResponse<Void> updateLoginInfo(@PathVariable Long id, @RequestBody Map<String, String> loginRequest) {
+    public ApiResponseDto<Void> updateLoginInfo(@PathVariable Long id, @RequestBody Map<String, String> loginRequest) {
         try {
             String ipAddress = loginRequest.get("ipAddress");
 
             boolean updated = userService.updateLoginInfo(id, ipAddress);
             if (updated) {
-                return ApiResponse.success("Login info updated successfully", null);
+                return ApiResponseDto.success("Login info updated successfully", null);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to update login info: " + e.getMessage());
+            return ApiResponseDto.error("Failed to update login info: " + e.getMessage());
         }
     }
 
@@ -249,16 +249,16 @@ public class UserController {
      * @return ApiResponse指示操作结果，成功时返回成功信息，用户不存在时返回错误信息
      */
     @PostMapping("/{id}/verify-email")
-    public ApiResponse<Void> verifyEmail(@PathVariable Long id) {
+    public ApiResponseDto<Void> verifyEmail(@PathVariable Long id) {
         try {
             boolean verified = userService.verifyEmail(id);
             if (verified) {
-                return ApiResponse.success("Email verified successfully", null);
+                return ApiResponseDto.success("Email verified successfully", null);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to verify email: " + e.getMessage());
+            return ApiResponseDto.error("Failed to verify email: " + e.getMessage());
         }
     }
 
@@ -275,16 +275,16 @@ public class UserController {
      * @return ApiResponse指示操作结果，成功时返回成功信息，用户不存在时返回错误信息
      */
     @PostMapping("/{id}/verify-phone")
-    public ApiResponse<Void> verifyPhone(@PathVariable Long id) {
+    public ApiResponseDto<Void> verifyPhone(@PathVariable Long id) {
         try {
             boolean verified = userService.verifyPhone(id);
             if (verified) {
-                return ApiResponse.success("Phone verified successfully", null);
+                return ApiResponseDto.success("Phone verified successfully", null);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to verify phone: " + e.getMessage());
+            return ApiResponseDto.error("Failed to verify phone: " + e.getMessage());
         }
     }
 
@@ -317,16 +317,16 @@ public class UserController {
         resourceIdIndex = 0,
         description = "删除用户"
     )
-    public ApiResponse<Void> deleteUser(@PathVariable Long id) {
+    public ApiResponseDto<Void> deleteUser(@PathVariable Long id) {
         try {
             boolean deleted = userService.deleteUser(id);
             if (deleted) {
-                return ApiResponse.success("User deleted successfully", null);
+                return ApiResponseDto.success("User deleted successfully", null);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to delete user: " + e.getMessage());
+            return ApiResponseDto.error("Failed to delete user: " + e.getMessage());
         }
     }
 
@@ -362,23 +362,23 @@ public class UserController {
         description = "用户修改密码",
         logRequest = false
     )
-    public ApiResponse<Void> changePassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest) {
+    public ApiResponseDto<Void> changePassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest) {
         try {
             String oldPassword = passwordRequest.get("oldPassword");
             String newPassword = passwordRequest.get("newPassword");
 
             if (oldPassword == null || newPassword == null) {
-                return ApiResponse.error("Both old and new passwords are required");
+                return ApiResponseDto.error("Both old and new passwords are required");
             }
 
             boolean changed = userService.changePassword(id, oldPassword, newPassword);
             if (changed) {
-                return ApiResponse.success("Password changed successfully", null);
+                return ApiResponseDto.success("Password changed successfully", null);
             } else {
-                return ApiResponse.error("Failed to change password. Please check your old password.");
+                return ApiResponseDto.error("Failed to change password. Please check your old password.");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to change password: " + e.getMessage());
+            return ApiResponseDto.error("Failed to change password: " + e.getMessage());
         }
     }
 
@@ -414,22 +414,22 @@ public class UserController {
         description = "管理员重置用户密码",
         logRequest = false
     )
-    public ApiResponse<Void> resetPassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest) {
+    public ApiResponseDto<Void> resetPassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest) {
         try {
             String newPassword = passwordRequest.get("newPassword");
 
             if (newPassword == null) {
-                return ApiResponse.error("New password is required");
+                return ApiResponseDto.error("New password is required");
             }
 
             boolean reset = userService.resetPassword(id, newPassword);
             if (reset) {
-                return ApiResponse.success("Password reset successfully", null);
+                return ApiResponseDto.success("Password reset successfully", null);
             } else {
-                return ApiResponse.error("User not found");
+                return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponse.error("Failed to reset password: " + e.getMessage());
+            return ApiResponseDto.error("Failed to reset password: " + e.getMessage());
         }
     }
 
@@ -447,12 +447,12 @@ public class UserController {
      * @return ApiResponse包含用户列表，成功时返回用户数据，失败时返回错误信息
      */
     @GetMapping("/department/{departmentId}")
-    public ApiResponse<List<User>> getUsersByDepartment(@PathVariable Long departmentId) {
+    public ApiResponseDto<List<UserEntity>> getUsersByDepartment(@PathVariable Long departmentId) {
         try {
-            List<User> users = userService.getUsersByDepartment(departmentId);
-            return ApiResponse.success("Users retrieved successfully", users);
+            List<UserEntity> users = userService.getUsersByDepartment(departmentId);
+            return ApiResponseDto.success("Users retrieved successfully", users);
         } catch (Exception e) {
-            return ApiResponse.error("Failed to retrieve users: " + e.getMessage());
+            return ApiResponseDto.error("Failed to retrieve users: " + e.getMessage());
         }
     }
 
@@ -470,12 +470,12 @@ public class UserController {
      * @return ApiResponse包含用户列表，成功时返回匹配的用户数据，失败时返回错误信息
      */
     @GetMapping("/search")
-    public ApiResponse<List<User>> searchUsers(@RequestParam String query) {
+    public ApiResponseDto<List<UserEntity>> searchUsers(@RequestParam String query) {
         try {
-            List<User> users = userService.searchUsers(query);
-            return ApiResponse.success("Users retrieved successfully", users);
+            List<UserEntity> users = userService.searchUsers(query);
+            return ApiResponseDto.success("Users retrieved successfully", users);
         } catch (Exception e) {
-            return ApiResponse.error("Failed to search users: " + e.getMessage());
+            return ApiResponseDto.error("Failed to search users: " + e.getMessage());
         }
     }
 }

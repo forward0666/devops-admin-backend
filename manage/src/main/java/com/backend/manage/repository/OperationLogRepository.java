@@ -1,6 +1,6 @@
 package com.backend.manage.repository;
 
-import com.backend.manage.model.OperationLog;
+import com.backend.manage.entity.OperationLogEntity;
 import org.springframework.data.domain.Page;
 import java.util.List;
 
@@ -14,8 +14,8 @@ public interface OperationLogRepository {
      * @param sortDir 排序方向，asc 或 desc
      * @return 分页结果
      */
-    Page<OperationLog> findOperationLogs(int page, int size, String sortBy, String sortDir);
-    List<OperationLog> findTop5ByOrderByCreatedAtDesc(); // 获取最近操作日志
+    Page<OperationLogEntity> findOperationLogs(int page, int size, String sortBy, String sortDir);
+    List<OperationLogEntity> findTop5ByOrderByCreatedAtDesc(); // 获取最近操作日志
 
-    OperationLog save(OperationLog operationLog);
+    OperationLogEntity save(OperationLogEntity operationLog);
 }
