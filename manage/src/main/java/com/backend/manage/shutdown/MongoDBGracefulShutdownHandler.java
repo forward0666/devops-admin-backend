@@ -1,4 +1,4 @@
-package shutdown;
+package com.backend.manage.shutdown;
 
 import com.mongodb.client.MongoClient;
 import jakarta.annotation.PreDestroy;

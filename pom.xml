@@ -30,29 +30,26 @@
         <module>manage</module>                       <!-- 管理服务模块 -->
     </modules>
 
-    <!-- 全局属性配置 -->
-<!--    <properties>-->
-<!--        <java.version>21</java.version>                           &lt;!&ndash; Java版本：21 &ndash;&gt;-->
-<!--        <spring-boot.version>3.2.5</spring-boot.version>           &lt;!&ndash; Spring Boot版本：3.2.5 &ndash;&gt;-->
-<!--        <spring-cloud.version>2023.0.1</spring-cloud.version>      &lt;!&ndash; Spring Cloud版本：2023.0.1 &ndash;&gt;-->
-<!--        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>&lt;!&ndash; Spring Cloud Alibaba版本 &ndash;&gt;-->
-<!--        &lt;!&ndash; 统一使用 UTF-8 编码进行编译 &ndash;&gt;-->
-<!--        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>      &lt;!&ndash; 源代码编码：UTF-8 &ndash;&gt;-->
-<!--        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>&lt;!&ndash; 报告输出编码：UTF-8 &ndash;&gt;-->
-<!--    </properties>-->
-
     <properties>
         <java.version>21</java.version>
         <spring-boot.version>3.2.5</spring-boot.version>
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
-        <kafka.version>3.2.0</kafka.version>
-        <clickhouse.version>0.8.2</clickhouse.version>
-        <lombok.version>1.18.30</lombok.version>
+        <kafka.version>3.2.4</kafka.version>
+        <clickhouse.version>0.2.6</clickhouse.version>
+<!--        <clickhouse-new.version>0.8.2</clickhouse-new.version>-->
+        <lombok.version>1.18.32</lombok.version>
+        <mybatis-plus.version>3.5.12</mybatis-plus.version>
+        <guava.version>33.3.1-jre</guava.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <jjwt.version>0.11.5</jjwt.version>
+        <kaptcha.version>2.3.2</kaptcha.version>
+        <springdoc.version>2.5.0</springdoc.version>
+        <r2dbc-mysql.version>1.4.0</r2dbc-mysql.version>
+        <jackson-datatype-jsr310.version>2.16.1</jackson-datatype-jsr310.version>
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
     </properties>
 
     <!-- 依赖管理：统一管理所有子模块的依赖版本 -->
@@ -82,6 +79,20 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- 内部模块 -->
+            <dependency>
+                <groupId>com.backend</groupId>
+                <artifactId>utils-core</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.backend</groupId>
+                <artifactId>utils-webflux</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
             <!-- Kafka -->
             <dependency>
                 <groupId>org.springframework.kafka</groupId>
@@ -90,11 +101,17 @@
             </dependency>
 
             <!-- ClickHouse -->
+<!--            <dependency>-->
+<!--                <groupId>com.clickhouse</groupId>-->
+<!--                <artifactId>clickhouse-jdbc</artifactId>-->
+<!--                <version>${clickhouse-new.version}</version>-->
+<!--                <classifier>shaded-all</classifier>-->
+<!--            </dependency>-->
+
             <dependency>
-                <groupId>com.clickhouse</groupId>
+                <groupId>ru.yandex.clickhouse</groupId>
                 <artifactId>clickhouse-jdbc</artifactId>
                 <version>${clickhouse.version}</version>
-                <classifier>shaded-all</classifier>
             </dependency>
 
             <!-- Lombok -->
@@ -103,6 +120,72 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
+            </dependency>
+
+            <!-- MyBatis Plus -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Guava -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+
+            <!-- Caffeine -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- JWT -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <!-- Kaptcha -->
+            <dependency>
+                <groupId>com.github.penggle</groupId>
+                <artifactId>kaptcha</artifactId>
+                <version>${kaptcha.version}</version>
+            </dependency>
+
+            <!-- SpringDoc OpenAPI -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- R2DBC MySQL -->
+            <dependency>
+                <groupId>io.asyncer</groupId>
+                <artifactId>r2dbc-mysql</artifactId>
+                <version>${r2dbc-mysql.version}</version>
+            </dependency>
+
+            <!-- Jackson JSR310 -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson-datatype-jsr310.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

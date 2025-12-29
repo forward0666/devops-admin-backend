@@ -1,4 +1,4 @@
-package shutdown;
+package com.backend.bigdata.shutdown;
 
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
