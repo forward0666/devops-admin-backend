@@ -179,5 +179,4 @@ public interface DepartmentRepository {
      * @param activeProjects
      * @param completedProjects
      */
-    void updateProjectCounts(Long departmentId, int activeProjects, int completedProjects);
 }

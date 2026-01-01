@@ -47,6 +47,9 @@
             code = #{code},
             description = #{description},
             status = #{status},
+            <if test="userCount != null">
+            user_count = #{userCount},
+            </if>
             updated_by = #{updatedBy},
             updated_at = #{updatedAt}
         WHERE id = #{id}

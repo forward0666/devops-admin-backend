@@ -48,6 +48,12 @@ public record PermissionResponseDto(
         List<String> menuNames,
 
         /**
+         * 菜单权限类型映射
+         * Key: menuId, Value: permissionType (view/edit/all)
+         */
+        List<MenuPermissionType> menuPermissionTypes,
+
+        /**
          * 创建时间
          */
         LocalDateTime createdAt,
@@ -57,6 +63,23 @@ public record PermissionResponseDto(
          */
         LocalDateTime updatedAt
 ) {
+
+    /**
+     * 菜单权限类型记录
+     * 用于表示每个菜单的权限类型
+     */
+    public record MenuPermissionType(
+            /**
+             * 菜单 ID
+             */
+            Long menuId,
+
+            /**
+             * 权限类型 (view-查看, edit-编辑, all-全部)
+             */
+            String permissionType
+    ) {}
+
     /**
      * 创建权限响应的便捷方法
      *
@@ -80,8 +103,10 @@ public record PermissionResponseDto(
                 roleCode,
                 menuIds,
                 menuNames,
+                List.of(),
                 LocalDateTime.now(),
                 LocalDateTime.now()
         );
     }
 }
+

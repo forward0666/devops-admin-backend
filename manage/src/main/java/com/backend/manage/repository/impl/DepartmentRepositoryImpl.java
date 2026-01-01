@@ -55,12 +55,6 @@ public class DepartmentRepositoryImpl implements DepartmentRepository {
         if (department.getUserCount() == null) {
             department.setUserCount(0);
         }
-        if (department.getActiveProjects() == null) {
-            department.setActiveProjects(0);
-        }
-        if (department.getCompletedProjects() == null) {
-            department.setCompletedProjects(0);
-        }
         
         int result = departmentMapper.insert(department);
         if (result > 0) {
@@ -143,20 +137,7 @@ public class DepartmentRepositoryImpl implements DepartmentRepository {
             log.warn("Failed to update user count for department ID: {}", departmentId);
         }
     }
-    
-    @Override
-    public void updateProjectCounts(Long departmentId, int activeProjects, int completedProjects) {
-        log.debug("Updating project counts for department ID: {} - Active: {}, Completed: {}", 
-                   departmentId, activeProjects, completedProjects);
-        
-        int result = departmentMapper.updateProjectCounts(departmentId, activeProjects, completedProjects);
-        if (result > 0) {
-            log.debug("Successfully updated project counts for department ID: {}", departmentId);
-        } else {
-            log.warn("Failed to update project counts for department ID: {}", departmentId);
-        }
-    }
-    
+
     /**
      * Check if department name exists excluding a specific ID (for updates)
      */

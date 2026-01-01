@@ -55,16 +55,6 @@ public class DepartmentEntity {
     private Integer userCount = 0;
 
     /**
-     * 活跃项目数量
-     */
-    private Integer activeProjects = 0;
-
-    /**
-     * 已完成项目数量
-     */
-    private Integer completedProjects = 0;
-
-    /**
      * 创建时间
      */
     private LocalDateTime createdAt;
@@ -94,8 +84,6 @@ public class DepartmentEntity {
         this.name = name;
         this.description = description;
         this.userCount = 0;
-        this.activeProjects = 0;
-        this.completedProjects = 0;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }

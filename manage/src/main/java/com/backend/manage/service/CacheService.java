@@ -322,11 +322,11 @@ public class CacheService {
         clearByPrefix(SETTINGS_PREFIX);
         clearByPrefix(ROLE_PREFIX);
         clearByPrefix(POSITION_PREFIX);
-        redisTemplate.delete(USERS_LIST);
-        redisTemplate.delete(DEPT_LIST);
-        redisTemplate.delete(MENU_LIST);
-        redisTemplate.delete(MENU_ROOT);
-        redisTemplate.delete(ROLE_LIST);
-        redisTemplate.delete(POSITION_LIST);
+        clearByPrefix(USERS_LIST);
+        clearByPrefix(DEPT_LIST);
+        clearByPrefix(MENU_LIST);
+        clearByPrefix(MENU_ROOT);
+        clearByPrefix(ROLE_LIST);
+        clearByPrefix(POSITION_LIST);
     }
 }

@@ -143,12 +143,6 @@ public class DepartmentService {
             if (department.getUserCount() == null) {
                 department.setUserCount(0);  // 初始化用户数量为0
             }
-            if (department.getActiveProjects() == null) {
-                department.setActiveProjects(0);  // 初始化活跃项目数为0
-            }
-            if (department.getCompletedProjects() == null) {
-                department.setCompletedProjects(0);  // 初始化完成项目数为0
-            }
             
             // 保存部门到数据库
             DepartmentEntity createdDepartment = departmentRepository.save(department);
@@ -310,70 +304,6 @@ public class DepartmentService {
             throw new RuntimeException("Failed to fetch department users", e);
         }
     }
-    
-    /**
-     * Get department statistics
-     * 
-     * @param departmentId department ID
-     * @return department statistics
-     */
-    public Map<String, Object> getDepartmentStatistics(Long departmentId) {
-        log.info("Fetching statistics for department ID: {}", departmentId);
-        
-        try {
-            DepartmentEntity department = getDepartmentById(departmentId);
-            if (department == null) {
-                return new HashMap<>();
-            }
-
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("totalUsers", department.getUserCount());
-            stats.put("activeProjects", department.getActiveProjects());
-            stats.put("completedProjects", department.getCompletedProjects());
-            stats.put("totalProjects", department.getActiveProjects() + department.getCompletedProjects());
-
-            // Calculate additional statistics
-            List<UserEntity> users = departmentRepository.findUsersByDepartmentId(departmentId);
-            long activeUsers = users.stream().filter(UserEntity::isActive).count();
-            long adminUsers = users.stream().filter(u -> "admin".equals(u.getRole())).count();
-            long editorUsers = users.stream().filter(u -> "editor".equals(u.getRole())).count();
-            long viewerUsers = users.stream().filter(u -> "viewer".equals(u.getRole())).count();
-            
-            stats.put("activeUsers", activeUsers);
-            stats.put("inactiveUsers", users.size() - activeUsers);
-            stats.put("adminUsers", adminUsers);
-            stats.put("editorUsers", editorUsers);
-            stats.put("viewerUsers", viewerUsers);
-            
-            return stats;
-            
-        } catch (Exception e) {
-            log.error("Error fetching statistics for department ID: {}", departmentId, e);
-            throw new RuntimeException("Failed to fetch department statistics", e);
-        }
-    }
-    
-    /**
-     * Update department project counts
-     * 
-     * @param departmentId department ID
-     * @param activeProjects number of active projects
-     * @param completedProjects number of completed projects
-     */
-    public void updateProjectCounts(Long departmentId, int activeProjects, int completedProjects) {
-        log.info("Updating project counts for department ID: {} - Active: {}, Completed: {}", 
-                   departmentId, activeProjects, completedProjects);
-        
-        try {
-            departmentRepository.updateProjectCounts(departmentId, activeProjects, completedProjects);
-            log.info("Successfully updated project counts for department ID: {}", departmentId);
-        } catch (Exception e) {
-            log.error("Error updating project counts for department ID: {}", departmentId, e);
-            throw new RuntimeException("Failed to update project counts", e);
-        }
-    }
-    
-    // Private helper methods
     
     private void populateDepartmentUsers(DepartmentEntity department) {
         try {

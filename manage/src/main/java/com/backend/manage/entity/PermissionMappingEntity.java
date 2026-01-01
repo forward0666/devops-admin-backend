@@ -59,6 +59,11 @@ public class PermissionMappingEntity {
     private String menuName;
 
     /**
+     * 权限类型 (view-查看, edit-编辑, all-全部)
+     */
+    private String permissionType;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

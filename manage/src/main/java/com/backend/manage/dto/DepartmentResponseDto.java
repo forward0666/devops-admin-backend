@@ -50,16 +50,6 @@ public record DepartmentResponseDto(
         Integer userCount,
 
         /**
-         * 活跃项目数量
-         */
-        Integer activeProjects,
-
-        /**
-         * 已完成项目数量
-         */
-        Integer completedProjects,
-
-        /**
          * 创建时间
          */
         LocalDateTime createdAt,
@@ -95,8 +85,6 @@ public record DepartmentResponseDto(
                 department.getManagerId(),
                 null, // managerName 需要单独查询
                 department.getUserCount(),
-                department.getActiveProjects(),
-                department.getCompletedProjects(),
                 department.getCreatedAt(),
                 department.getUpdatedAt(),
                 recentUsers

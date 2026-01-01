@@ -9,6 +9,7 @@
         <result property="roleCode" column="role_code"/>
         <result property="menuId" column="menu_id"/>
         <result property="menuName" column="menu_name"/>
+        <result property="permissionType" column="permission_type"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -38,6 +39,7 @@
             r.code AS role_code,
             rmp.menu_id,
             m.name AS menu_name,
+            rmp.permission_type AS permission_type,
             rmp.created_at,
             rmp.updated_at
         FROM role_menu_permissions rmp
@@ -54,6 +56,7 @@
             r.code AS role_code,
             rmp.menu_id,
             m.name AS menu_name,
+            rmp.permission_type AS permission_type,
             rmp.created_at,
             rmp.updated_at
         FROM role_menu_permissions rmp
@@ -64,15 +67,15 @@
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.PermissionMappingEntity">
-        INSERT INTO role_menu_permissions (role_id, menu_id, created_at, updated_at)
-        VALUES (#{roleId}, #{menuId}, #{createdAt}, #{updatedAt})
+        INSERT INTO role_menu_permissions (role_id, menu_id, permission_type, created_at, updated_at)
+        VALUES (#{roleId}, #{menuId}, #{permissionType}, #{createdAt}, #{updatedAt})
     </insert>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO role_menu_permissions (role_id, menu_id, created_at, updated_at)
+        INSERT INTO role_menu_permissions (role_id, menu_id, permission_type, created_at, updated_at)
         VALUES
         <foreach collection="mappings" item="mapping" separator=",">
-            (#{mapping.roleId}, #{mapping.menuId}, #{mapping.createdAt}, #{mapping.updatedAt})
+            (#{mapping.roleId}, #{mapping.menuId}, #{mapping.permissionType}, #{mapping.createdAt}, #{mapping.updatedAt})
         </foreach>
     </insert>
 

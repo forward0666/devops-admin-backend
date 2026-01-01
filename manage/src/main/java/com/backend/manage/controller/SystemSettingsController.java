@@ -40,6 +40,7 @@ import java.util.Map;
 public class SystemSettingsController {
 
     private final SystemSettingsService systemSettingsService;
+    private final com.backend.manage.service.CacheService cacheService;
 
     /**
      * 获取所有系统设置
@@ -605,5 +606,41 @@ public class SystemSettingsController {
         log.info("POST /settings/cache/clear - Clearing Redis cache for system settings");
         Map<String, Object> result = systemSettingsService.clearRedisCache();
         return ResponseEntity.ok(ApiResponseDto.success("Redis cache cleared successfully", result));
+    }
+
+    /**
+     * 清理所有Redis缓存
+     * 清除系统所有Redis缓存，包括部门、用户、角色、菜单等所有数据
+     * 
+     * 功能说明：
+     * - 清除所有类型的Redis缓存
+     * - 包括部门缓存（department:*, departments:list）
+     * - 包括用户缓存（user:*, users:list）
+     * - 包括角色缓存（role:*, roles:list）
+     * - 包括菜单缓存（menu:*, menus:list）
+     * - 包括职位缓存（position:*, positions:list）
+     * - 强制从数据库重新加载数据
+     * - 需要管理员权限访问
+     * 
+     * 返回格式：缓存清理结果Map
+     * 权限要求：系统管理员
+     * 日志记录：记录操作但不记录响应内容
+     */
+    @PostMapping("/cache/clear-all")
+    @OperationLog(
+            operationType = "CACHE_CLEAR_ALL",
+            operationName = "清理所有Redis缓存",
+            resourceType = "REDIS_CACHE",
+            description = "清理所有Redis缓存，包括部门、用户、角色、菜单等所有数据",
+            logRequest = false,
+            logResponse = false
+    )
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> clearAllRedisCache() {
+        log.info("POST /settings/cache/clear-all - Clearing all Redis cache");
+        cacheService.clearAllCache();
+        return ResponseEntity.ok(ApiResponseDto.success("All Redis cache cleared successfully", Map.of(
+                "timestamp", System.currentTimeMillis(),
+                "message", "All caches have been cleared"
+        )));
     }
 }

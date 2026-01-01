@@ -40,4 +40,29 @@ public class PermissionRequestDto {
      */
     @NotNull(message = "Menu IDs cannot be null")
     private List<Long> menuIds;
+
+    /**
+     * 菜单权限类型映射
+     * Key: menuId, Value: permissionType (view/edit/all)
+     */
+    private List<PermissionItem> permissions;
+
+    /**
+     * 权限项内部类
+     * 用于表示每个菜单的权限类型
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PermissionItem {
+        /**
+         * 菜单 ID
+         */
+        private Long menuId;
+
+        /**
+         * 权限类型 (view-查看, edit-编辑, all-全部)
+         */
+        private String permissionType;
+    }
 }

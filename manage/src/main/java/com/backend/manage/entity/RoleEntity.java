@@ -1,5 +1,6 @@
 package com.backend.manage.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -59,6 +60,7 @@ public class RoleEntity {
     /**
      * 用户数量
      */
+    @JsonProperty("userCount")
     private Integer userCount;
 
     /**

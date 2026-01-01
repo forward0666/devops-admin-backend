@@ -121,15 +121,4 @@ public interface DepartmentMapper {
      * @return 更新记录数
      */
     int updateUserCount(@Param("departmentId") Long departmentId);
-
-    /**
-     * 更新部门项目统计 - 更新部门的活跃项目和已完成项目数量
-     * @param departmentId 部门ID
-     * @param activeProjects 活跃项目数量
-     * @param completedProjects 已完成项目数量
-     * @return 更新记录数
-     */
-    int updateProjectCounts(@Param("departmentId") Long departmentId,
-                           @Param("activeProjects") int activeProjects,
-                           @Param("completedProjects") int completedProjects);
 }

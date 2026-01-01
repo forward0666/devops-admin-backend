@@ -49,16 +49,6 @@ public record DepartmentVo(
         Integer userCount,
 
         /**
-         * 活跃项目数量
-         */
-        Integer activeProjects,
-
-        /**
-         * 已完成项目数量
-         */
-        Integer completedProjects,
-
-        /**
          * 创建时间
          */
         LocalDateTime createdAt,

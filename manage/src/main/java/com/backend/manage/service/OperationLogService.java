@@ -81,6 +81,7 @@ public class OperationLogService {
                     .ipAddress(ipAddress)
                     .userAgent(userAgent)
                     .requestBody(requestBody instanceof Map ? (Map<String, Object>) requestBody : null)
+                    .status(success ? "success" : "failed")
                     .errorMessage(errorMessage)
                     .createdAt(LocalDateTime.now())
                     .build();

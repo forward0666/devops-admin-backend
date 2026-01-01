@@ -70,6 +70,12 @@ public class PermissionService {
                                 roleMappings.stream()
                                         .map(PermissionMappingEntity::getMenuName)
                                         .toList(),
+                                roleMappings.stream()
+                                        .map(mapping -> new PermissionResponseDto.MenuPermissionType(
+                                                mapping.getMenuId(),
+                                                mapping.getPermissionType() != null ? mapping.getPermissionType() : "view"
+                                        ))
+                                        .toList(),
                                 firstMapping.getCreatedAt(),
                                 firstMapping.getUpdatedAt()
                         );
@@ -96,7 +102,7 @@ public class PermissionService {
             var role = roleMapper.findById(roleId);
             if (role == null) {
                 log.warn("Role not found with ID: {}", roleId);
-                return new PermissionResponseDto(roleId, null, null, List.of(), List.of(), null, null);
+                return new PermissionResponseDto(roleId, null, null, List.of(), List.of(), List.of(), null, null);
             }
 
             List<PermissionMappingEntity> mappings = permissionMapper.findByRoleIdWithMenus(roleId);
@@ -106,6 +112,12 @@ public class PermissionService {
             List<String> menuNames = mappings.stream()
                     .map(PermissionMappingEntity::getMenuName)
                     .toList();
+            List<PermissionResponseDto.MenuPermissionType> menuPermissionTypes = mappings.stream()
+                    .map(mapping -> new PermissionResponseDto.MenuPermissionType(
+                            mapping.getMenuId(),
+                            mapping.getPermissionType() != null ? mapping.getPermissionType() : "view"
+                    ))
+                    .toList();
 
             // 使用 record 构造器创建不可变对象
             var response = new PermissionResponseDto(
@@ -114,6 +126,7 @@ public class PermissionService {
                     role.getCode(),
                     menuIds,
                     menuNames,
+                    menuPermissionTypes,
                     mappings.isEmpty() ? null : mappings.get(0).getCreatedAt(),
                     mappings.isEmpty() ? null : mappings.get(0).getUpdatedAt()
             );
@@ -159,17 +172,38 @@ public class PermissionService {
             // 插入新的权限映射 - Java 21: 使用 stream 创建列表
             if (request.getMenuIds() != null && !request.getMenuIds().isEmpty()) {
                 LocalDateTime now = LocalDateTime.now();
-                List<PermissionMappingEntity> mappings = request.getMenuIds().stream()
-                        .map(menuId -> {
-                            PermissionMappingEntity mapping = new PermissionMappingEntity();
-                            mapping.setRoleId(request.getRoleId());
-                            mapping.setMenuId(menuId);
-                            mapping.setCreatedAt(now);
-                            mapping.setUpdatedAt(now);
-                            return mapping;
-                        })
-                        .toList();
-                permissionMapper.batchInsert(mappings);
+
+                // 如果提供了 permissions 列表，使用它来设置 permissionType
+                // 否则默认为 'view'
+                if (request.getPermissions() != null && !request.getPermissions().isEmpty()) {
+                    // 使用 permissions 列表
+                    List<PermissionMappingEntity> mappings = request.getPermissions().stream()
+                            .map(permissionItem -> {
+                                PermissionMappingEntity mapping = new PermissionMappingEntity();
+                                mapping.setRoleId(request.getRoleId());
+                                mapping.setMenuId(permissionItem.getMenuId());
+                                mapping.setPermissionType(permissionItem.getPermissionType() != null ? permissionItem.getPermissionType() : "view");
+                                mapping.setCreatedAt(now);
+                                mapping.setUpdatedAt(now);
+                                return mapping;
+                            })
+                            .toList();
+                    permissionMapper.batchInsert(mappings);
+                } else {
+                    // 使用 menuIds 列表，默认 permissionType 为 'view'
+                    List<PermissionMappingEntity> mappings = request.getMenuIds().stream()
+                            .map(menuId -> {
+                                PermissionMappingEntity mapping = new PermissionMappingEntity();
+                                mapping.setRoleId(request.getRoleId());
+                                mapping.setMenuId(menuId);
+                                mapping.setPermissionType("view");
+                                mapping.setCreatedAt(now);
+                                mapping.setUpdatedAt(now);
+                                return mapping;
+                            })
+                            .toList();
+                    permissionMapper.batchInsert(mappings);
+                }
             }
 
             log.info("Successfully updated permission mapping for role: {}", role.getName());
