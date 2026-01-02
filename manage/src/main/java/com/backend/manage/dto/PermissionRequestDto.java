@@ -15,9 +15,10 @@ import java.util.List;
  * 1. 使用 Lombok @Data 注解自动生成 getter/setter
  * 2. 使用验证注解确保输入数据有效性
  * 3. 支持批量更新角色的菜单权限
+ * 4. 统一使用 menuId 进行权限检查
  *
  * @author Backend Team
- * @version 2.0.0
+ * @version 3.0.0
  */
 @Data
 @NoArgsConstructor
@@ -38,7 +39,6 @@ public class PermissionRequestDto {
      * 验证规则：不能为空
      * 该角色拥有的所有菜单权限
      */
-    @NotNull(message = "Menu IDs cannot be null")
     private List<Long> menuIds;
 
     /**

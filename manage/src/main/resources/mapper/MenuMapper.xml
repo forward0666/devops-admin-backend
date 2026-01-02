@@ -3,7 +3,7 @@
 <mapper namespace="com.backend.manage.mapper.MenuMapper">
 
     <resultMap id="MenuResultMap" type="com.backend.manage.entity.MenuEntity">
-        <id property="id" column="id"/>
+        <id property="menuId" column="menu_id"/>
         <result property="name" column="name"/>
         <result property="path" column="path"/>
         <result property="icon" column="icon"/>
@@ -16,13 +16,13 @@
     </resultMap>
 
     <select id="findById" parameterType="long" resultMap="MenuResultMap">
-        SELECT id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
+        SELECT menu_id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
         FROM menus
-        WHERE id = #{id}
+        WHERE menu_id = #{id}
     </select>
 
     <select id="findAll" resultMap="MenuResultMap">
-        SELECT m.id, m.name, m.path, m.icon, m.type, m.sort, m.status, m.parent_id, m.created_at, m.updated_at
+        SELECT m.menu_id, m.name, m.path, m.icon, m.type, m.sort, m.status, m.parent_id, m.created_at, m.updated_at
         FROM menus m
         ORDER BY
             CASE WHEN m.parent_id IS NULL THEN 0 ELSE 1 END,
@@ -31,40 +31,40 @@
     </select>
 
     <select id="findByParentId" parameterType="long" resultMap="MenuResultMap">
-        SELECT id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
+        SELECT menu_id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
         FROM menus
         WHERE parent_id = #{parentId}
         ORDER BY sort
     </select>
 
     <select id="findRootMenus" resultMap="MenuResultMap">
-        SELECT id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
+        SELECT menu_id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
         FROM menus
         WHERE parent_id IS NULL
         ORDER BY sort
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.entity.MenuEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO menus (name, path, icon, type, sort, status, parent_id, created_at, updated_at)
-        VALUES (#{name}, #{path}, #{icon}, #{type}, #{sort}, #{status}, #{parentId}, #{createdAt}, #{updatedAt})
+    <insert id="insert" parameterType="com.backend.manage.entity.MenuEntity" useGeneratedKeys="true" keyProperty="menuId">
+        INSERT INTO menus (menu_id, name, path, icon, type, sort, status, parent_id, created_at, updated_at)
+        VALUES (#{menuId}, #{name}, #{path}, #{icon}, #{type}, #{sort}, #{status}, #{parentId}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update" parameterType="com.backend.manage.entity.MenuEntity">
         UPDATE menus
         SET name = #{name}, path = #{path}, icon = #{icon}, type = #{type},
             sort = #{sort}, status = #{status}, parent_id = #{parentId}, updated_at = #{updatedAt}
-        WHERE id = #{id}
+        WHERE menu_id = #{menuId}
     </update>
 
     <delete id="deleteById" parameterType="long">
         DELETE FROM menus
-        WHERE id = #{id}
+        WHERE menu_id = #{id}
     </delete>
 
     <select id="existsById" parameterType="long" resultType="int">
         SELECT COUNT(*)
         FROM menus
-        WHERE id = #{id}
+        WHERE menu_id = #{id}
     </select>
 
     <select id="countByParentId" parameterType="long" resultType="int">

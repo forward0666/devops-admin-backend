@@ -3,37 +3,34 @@
 <mapper namespace="com.backend.manage.mapper.PermissionMapper">
 
     <resultMap id="PermissionMappingResultMap" type="com.backend.manage.entity.PermissionMappingEntity">
-        <id property="id" column="id"/>
-        <result property="roleId" column="role_id"/>
+        <id property="roleId" column="role_id"/>
+        <id property="menuId" column="menu_id"/>
         <result property="roleName" column="role_name"/>
         <result property="roleCode" column="role_code"/>
-        <result property="menuId" column="menu_id"/>
-        <result property="menuName" column="menu_name"/>
         <result property="permissionType" column="permission_type"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <select id="findById" resultMap="PermissionMappingResultMap">
-        SELECT * FROM role_menu_permissions
-        WHERE id = #{id}
+        SELECT role_id, menu_id, permission_type, created_at, updated_at FROM permissions
+        WHERE role_id = #{roleId} AND menu_id = #{menuId}
     </select>
 
     <select id="findByRoleId" resultMap="PermissionMappingResultMap">
-        SELECT * FROM role_menu_permissions
+        SELECT * FROM permissions
         WHERE role_id = #{roleId}
         ORDER BY menu_id ASC
     </select>
 
     <select id="findByMenuId" resultMap="PermissionMappingResultMap">
-        SELECT * FROM role_menu_permissions
+        SELECT * FROM permissions
         WHERE menu_id = #{menuId}
         ORDER BY role_id ASC
     </select>
 
     <select id="findAllWithDetails" resultMap="PermissionMappingResultMap">
         SELECT
-            rmp.id,
             rmp.role_id,
             r.name AS role_name,
             r.code AS role_code,
@@ -42,15 +39,14 @@
             rmp.permission_type AS permission_type,
             rmp.created_at,
             rmp.updated_at
-        FROM role_menu_permissions rmp
+        FROM permissions rmp
         LEFT JOIN roles r ON rmp.role_id = r.id
-        LEFT JOIN menus m ON rmp.menu_id = m.id
-        ORDER BY r.id ASC, m.id ASC
+        LEFT JOIN menus m ON rmp.menu_id = m.menu_id
+        ORDER BY r.id ASC, m.menu_id ASC
     </select>
 
     <select id="findByRoleIdWithMenus" resultMap="PermissionMappingResultMap">
         SELECT
-            rmp.id,
             rmp.role_id,
             r.name AS role_name,
             r.code AS role_code,
@@ -59,20 +55,20 @@
             rmp.permission_type AS permission_type,
             rmp.created_at,
             rmp.updated_at
-        FROM role_menu_permissions rmp
+        FROM permissions rmp
         LEFT JOIN roles r ON rmp.role_id = r.id
-        LEFT JOIN menus m ON rmp.menu_id = m.id
+        LEFT JOIN menus m ON rmp.menu_id = m.menu_id
         WHERE rmp.role_id = #{roleId}
-        ORDER BY m.sort ASC, m.id ASC
+        ORDER BY m.sort ASC, m.menu_id ASC
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.PermissionMappingEntity">
-        INSERT INTO role_menu_permissions (role_id, menu_id, permission_type, created_at, updated_at)
+        INSERT INTO permissions (role_id, menu_id, permission_type, created_at, updated_at)
         VALUES (#{roleId}, #{menuId}, #{permissionType}, #{createdAt}, #{updatedAt})
     </insert>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO role_menu_permissions (role_id, menu_id, permission_type, created_at, updated_at)
+        INSERT INTO permissions (role_id, menu_id, permission_type, created_at, updated_at)
         VALUES
         <foreach collection="mappings" item="mapping" separator=",">
             (#{mapping.roleId}, #{mapping.menuId}, #{mapping.permissionType}, #{mapping.createdAt}, #{mapping.updatedAt})
@@ -80,22 +76,22 @@
     </insert>
 
     <delete id="deleteById">
-        DELETE FROM role_menu_permissions
-        WHERE id = #{id}
+        DELETE FROM permissions
+        WHERE role_id = #{roleId} AND menu_id = #{menuId}
     </delete>
 
     <delete id="deleteByRoleId">
-        DELETE FROM role_menu_permissions
+        DELETE FROM permissions
         WHERE role_id = #{roleId}
     </delete>
 
     <delete id="deleteByMenuId">
-        DELETE FROM role_menu_permissions
+        DELETE FROM permissions
         WHERE menu_id = #{menuId}
     </delete>
 
     <select id="countByRoleId" resultType="int">
-        SELECT COUNT(*) FROM role_menu_permissions
+        SELECT COUNT(*) FROM permissions
         WHERE role_id = #{roleId}
     </select>
 

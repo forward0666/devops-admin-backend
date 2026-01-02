@@ -67,7 +67,7 @@ public class MenuService {
     /**
      * 根据ID获取菜单
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
-     * @param id 菜单ID
+     * @param id 菜单ID（统一使用 id 进行查询）
      * @return 菜单对象
      */
     public MenuEntity getMenuById(Long id) {
@@ -88,8 +88,8 @@ public class MenuService {
         }
 
         try {
-            // 从数据库查询菜单信息
-            var menu = menuMapper.findById(id);
+            // 统一使用 id 查找菜单
+            MenuEntity menu = menuMapper.findById(id);
 
             // 缓存到Redis
             if (menu != null && cacheService.isRedisAvailable()) {
@@ -114,8 +114,11 @@ public class MenuService {
         log.info("Creating new menu: {}", menu.getName());
 
         // 验证父菜单是否存在
-        if (menu.getParentId() != null && menuMapper.existsById(menu.getParentId()) == 0) {
-            throw new IllegalArgumentException("Parent menu not found with ID: " + menu.getParentId());
+        if (menu.getParentId() != null) {
+            MenuEntity parentMenu = menuMapper.findById(menu.getParentId());
+            if (parentMenu == null) {
+                throw new IllegalArgumentException("Parent menu not found with ID: " + menu.getParentId());
+            }
         }
 
         // 设置默认值 - Java 21: 使用 switch 表达式
@@ -131,7 +134,7 @@ public class MenuService {
         // 清除菜单列表缓存
         clearMenuCache();
 
-        log.info("Successfully created menu with ID: {}", menu.getId());
+        log.info("Successfully created menu with ID: {}", menu.getMenuId());
         return menu;
     }
 
@@ -143,19 +146,20 @@ public class MenuService {
      * @throws IllegalArgumentException 如果菜单不存在或父菜单无效
      */
     public MenuEntity updateMenu(MenuEntity menu) {
-        log.info("Updating menu with ID: {}", menu.getId());
+        log.info("Updating menu with ID: {}", menu.getMenuId());
 
         // 验证菜单是否存在
-        if (menuMapper.existsById(menu.getId()) == 0) {
-            throw new IllegalArgumentException("Menu not found with ID: " + menu.getId());
+        if (menuMapper.existsById(menu.getMenuId()) == 0) {
+            throw new IllegalArgumentException("Menu not found with ID: " + menu.getMenuId());
         }
 
         // 验证父菜单是否存在（如果设置了父菜单）
         if (menu.getParentId() != null) {
-            if (menu.getParentId().equals(menu.getId())) {
+            if (menu.getParentId().equals(menu.getMenuId())) {
                 throw new IllegalArgumentException("Menu cannot be its own parent");
             }
-            if (menuMapper.existsById(menu.getParentId()) == 0) {
+            MenuEntity parentMenu = menuMapper.findById(menu.getParentId());
+            if (parentMenu == null) {
                 throw new IllegalArgumentException("Parent menu not found with ID: " + menu.getParentId());
             }
         }
@@ -167,10 +171,10 @@ public class MenuService {
             // 清除菜单相关缓存
             clearMenuCache();
 
-            log.info("Successfully updated menu with ID: {}", menu.getId());
+            log.info("Successfully updated menu with ID: {}", menu.getMenuId());
             return menu;
         } else {
-            log.error("Failed to update menu with ID: {}", menu.getId());
+            log.error("Failed to update menu with ID: {}", menu.getMenuId());
             return null;
         }
     }
@@ -262,14 +266,14 @@ public class MenuService {
             return;
         }
 
-        // 创建ID到菜单的映射 - Java 21: 使用 stream 简化
-        Map<Long, MenuEntity> menuMap = menus.stream()
-                .collect(Collectors.toMap(MenuEntity::getId, menu -> menu));
+        // 创建 id 到菜单的映射（用于查找父菜单）- Java 21: 使用 stream 简化
+        Map<Long, MenuEntity> idMap = menus.stream()
+                .collect(Collectors.toMap(MenuEntity::getMenuId, menu -> menu));
 
         // 为每个菜单设置父级菜单名称
         menus.forEach(menu -> {
             if (menu.getParentId() != null) {
-                var parent = menuMap.get(menu.getParentId());
+                var parent = idMap.get(menu.getParentId());
                 if (parent != null) {
                     menu.setParentName(parent.getName());
                 }

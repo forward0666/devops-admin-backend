@@ -13,9 +13,10 @@ import java.util.List;
  * 3. 包含创建和更新时间用于审计
  * 4. 自动生成 getter 方法（如 roleId(), menuIds()）
  * 5. 自动实现 equals(), hashCode(), toString()
+ * 6. 统一使用 menuId 进行权限检查
  *
  * @author Backend Team
- * @version 2.0.0
+ * @version 3.0.0
  */
 public record PermissionResponseDto(
         /**

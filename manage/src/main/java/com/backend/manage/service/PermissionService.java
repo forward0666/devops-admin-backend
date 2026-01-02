@@ -131,7 +131,7 @@ public class PermissionService {
                     mappings.isEmpty() ? null : mappings.get(0).getUpdatedAt()
             );
 
-            log.info("Successfully retrieved permission mapping for role: {}", role.getName());
+            log.info("Successfully retrieved permission mapping for role: {}, menuIds: {}", role.getName(), menuIds);
             return response;
         } catch (Exception e) {
             log.error("Error retrieving permission mapping for role ID: {}", roleId, e);
@@ -170,40 +170,36 @@ public class PermissionService {
             permissionMapper.deleteByRoleId(request.getRoleId());
 
             // 插入新的权限映射 - Java 21: 使用 stream 创建列表
-            if (request.getMenuIds() != null && !request.getMenuIds().isEmpty()) {
-                LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = LocalDateTime.now();
 
-                // 如果提供了 permissions 列表，使用它来设置 permissionType
-                // 否则默认为 'view'
-                if (request.getPermissions() != null && !request.getPermissions().isEmpty()) {
-                    // 使用 permissions 列表
-                    List<PermissionMappingEntity> mappings = request.getPermissions().stream()
-                            .map(permissionItem -> {
-                                PermissionMappingEntity mapping = new PermissionMappingEntity();
-                                mapping.setRoleId(request.getRoleId());
-                                mapping.setMenuId(permissionItem.getMenuId());
-                                mapping.setPermissionType(permissionItem.getPermissionType() != null ? permissionItem.getPermissionType() : "view");
-                                mapping.setCreatedAt(now);
-                                mapping.setUpdatedAt(now);
-                                return mapping;
-                            })
-                            .toList();
-                    permissionMapper.batchInsert(mappings);
-                } else {
-                    // 使用 menuIds 列表，默认 permissionType 为 'view'
-                    List<PermissionMappingEntity> mappings = request.getMenuIds().stream()
-                            .map(menuId -> {
-                                PermissionMappingEntity mapping = new PermissionMappingEntity();
-                                mapping.setRoleId(request.getRoleId());
-                                mapping.setMenuId(menuId);
-                                mapping.setPermissionType("view");
-                                mapping.setCreatedAt(now);
-                                mapping.setUpdatedAt(now);
-                                return mapping;
-                            })
-                            .toList();
-                    permissionMapper.batchInsert(mappings);
-                }
+            if (request.getPermissions() != null && !request.getPermissions().isEmpty()) {
+                // 使用 permissions 列表（包含 menuId 和 permissionType）
+                List<PermissionMappingEntity> mappings = request.getPermissions().stream()
+                        .map(permissionItem -> {
+                            PermissionMappingEntity mapping = new PermissionMappingEntity();
+                            mapping.setRoleId(request.getRoleId());
+                            mapping.setMenuId(permissionItem.getMenuId());
+                            mapping.setPermissionType(permissionItem.getPermissionType() != null ? permissionItem.getPermissionType() : "view");
+                            mapping.setCreatedAt(now);
+                            mapping.setUpdatedAt(now);
+                            return mapping;
+                        })
+                        .toList();
+                permissionMapper.batchInsert(mappings);
+            } else if (request.getMenuIds() != null && !request.getMenuIds().isEmpty()) {
+                // 使用 menuIds 列表（默认权限为 view）
+                List<PermissionMappingEntity> mappings = request.getMenuIds().stream()
+                        .map(menuId -> {
+                            PermissionMappingEntity mapping = new PermissionMappingEntity();
+                            mapping.setRoleId(request.getRoleId());
+                            mapping.setMenuId(menuId);
+                            mapping.setPermissionType("view");
+                            mapping.setCreatedAt(now);
+                            mapping.setUpdatedAt(now);
+                            return mapping;
+                        })
+                        .toList();
+                permissionMapper.batchInsert(mappings);
             }
 
             log.info("Successfully updated permission mapping for role: {}", role.getName());

@@ -28,7 +28,7 @@ public interface MenuMapper {
 
     /**
      * 根据父菜单ID查找子菜单
-     * @param parentId 父菜单ID
+     * @param parentId 父菜单ID（内部主键）
      * @return 子菜单列表
      */
     List<MenuEntity> findByParentId(@Param("parentId") Long parentId);
@@ -49,21 +49,21 @@ public interface MenuMapper {
 
     /**
      * 根据ID删除菜单
-     * @param id 菜单ID
+     * @param id 菜单ID（内部主键）
      * @return 删除记录数
      */
     int deleteById(@Param("id") Long id);
 
     /**
      * 检查菜单是否存在
-     * @param id 菜单ID
+     * @param id 菜单ID（内部主键）
      * @return 存在返回1，不存在返回0
      */
     int existsById(@Param("id") Long id);
 
     /**
      * 统计子菜单数量
-     * @param parentId 父菜单ID
+     * @param parentId 父菜单ID（内部主键）
      * @return 子菜单数量
      */
     int countByParentId(@Param("parentId") Long parentId);

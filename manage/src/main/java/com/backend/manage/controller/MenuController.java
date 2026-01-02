@@ -45,7 +45,7 @@ public class MenuController {
 
     /**
      * 根据ID获取菜单详情接口
-     * @param id 菜单ID
+     * @param id 菜单ID（可以是内部 id 或 directoryId）
      * @return ResponseEntity包含操作结果
      */
     @GetMapping("/{id}")
@@ -54,7 +54,7 @@ public class MenuController {
         try {
             var menu = menuService.getMenuById(id);
             if (menu != null) {
-                log.info("Successfully retrieved menu: {}", menu.getName());
+                log.info("Successfully retrieved menu: {}, id: {}", menu.getName(), menu.getMenuId());
                 return ResponseEntity.ok(ApiResponseDto.success("Menu retrieved successfully", menu));
             } else {
                 log.warn("Menu not found with ID: {}", id);
@@ -84,7 +84,7 @@ public class MenuController {
         log.info("POST /menus - Creating new menu: {}", menu.getName());
         try {
             var createdMenu = menuService.createMenu(menu);
-            log.info("Successfully created menu with ID: {}", createdMenu.getId());
+            log.info("Successfully created menu with ID: {}", createdMenu.getMenuId());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponseDto.success("Menu created successfully", createdMenu));
         } catch (IllegalArgumentException e) {
@@ -115,7 +115,7 @@ public class MenuController {
     public ResponseEntity<ApiResponseDto<MenuEntity>> updateMenu(@PathVariable Long id, @RequestBody MenuEntity menu) {
         log.info("PUT /menus/{} - Updating menu", id);
         try {
-            menu.setId(id);
+            menu.setMenuId(id);
             var updatedMenu = menuService.updateMenu(menu);
             if (updatedMenu != null) {
                 log.info("Successfully updated menu: {}", updatedMenu.getName());

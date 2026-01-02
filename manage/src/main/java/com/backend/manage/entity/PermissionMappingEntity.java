@@ -13,30 +13,31 @@ import java.time.LocalDateTime;
  * 用于表示角色与菜单之间的访问权限映射关系
  *
  * 设计特点：
- * 1. 使用 @Table 注解映射到数据库表 permission_mapping
+ * 1. 使用 @Table 注解映射到数据库表 permissions
  * 2. 使用 @Id 注解标记主键
  * 3. 使用 Lombok @Data 注解自动生成 getter/setter
  * 4. 记录角色与菜单的关联关系
  * 5. 包含审计字段
+ * 6. 统一使用 menuId 进行权限检查
  *
  * @author Backend Team
- * @version 2.0.0
+ * @version 3.0.0
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("permission_mapping")
+@Table("permissions")
 public class PermissionMappingEntity {
     /**
-     * 主键 ID
+     * 角色 ID（复合主键的一部分）
      */
     @Id
-    private Long id;
+    private Long roleId;
 
     /**
-     * 角色 ID
+     * 菜单 ID（复合主键的一部分，同时用于权限检查）
      */
-    private Long roleId;
+    private Long menuId;
 
     /**
      * 角色名称
@@ -47,11 +48,6 @@ public class PermissionMappingEntity {
      * 角色代码
      */
     private String roleCode;
-
-    /**
-     * 菜单 ID
-     */
-    private Long menuId;
 
     /**
      * 菜单名称

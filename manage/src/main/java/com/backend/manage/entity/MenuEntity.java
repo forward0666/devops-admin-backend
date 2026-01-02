@@ -19,20 +19,21 @@ import java.util.List;
  * 3. 使用 Lombok @Data 注解自动生成 getter/setter
  * 4. 支持树形结构（通过 parentId）
  * 5. 包含排序和状态字段
+ * 6. 统一使用 id 进行权限检查
  *
  * @author Backend Team
- * @version 2.0.0
+ * @version 3.0.0
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("menu")
+@Table("menus")
 public class MenuEntity {
     /**
-     * 主键 ID
+     * 主键菜单 ID（同时用于权限检查）
      */
     @Id
-    private Long id;
+    private Long menuId;
 
     /**
      * 菜单名称
@@ -102,7 +103,7 @@ public class MenuEntity {
      * @param type 菜单类型
      * @param sort 排序号
      * @param status 状态
-     * @param parentId 父菜单 ID
+     * @param parentId 父菜单 ID（统一使用 id 进行权限检查）
      */
     public MenuEntity(String name, String path, String icon, String type, Integer sort, String status, Long parentId) {
         this.name = name;

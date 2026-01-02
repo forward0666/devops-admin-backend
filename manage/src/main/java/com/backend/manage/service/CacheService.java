@@ -155,8 +155,8 @@ public class CacheService {
 
     /* ================= 菜单缓存 ================= */
     public void cacheMenu(MenuEntity menu) {
-        if (!redisOk() || menu == null || menu.getId() == null) return;
-        redisTemplate.opsForValue().set(MENU_PREFIX + menu.getId(), menu, CACHE_MIN, TimeUnit.MINUTES);
+        if (!redisOk() || menu == null || menu.getMenuId() == null) return;
+        redisTemplate.opsForValue().set(MENU_PREFIX + menu.getMenuId(), menu, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     public MenuEntity getCachedMenu(Long id) {
