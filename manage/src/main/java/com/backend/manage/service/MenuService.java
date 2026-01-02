@@ -67,29 +67,29 @@ public class MenuService {
     /**
      * 根据ID获取菜单
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
-     * @param id 菜单ID（统一使用 id 进行查询）
+     * @param menuId 菜单ID（统一使用 id 进行查询）
      * @return 菜单对象
      */
-    public MenuEntity getMenuById(Long id) {
-        log.info("Fetching menu by ID: {}", id);
+    public MenuEntity getMenuById(Long menuId) {
+        log.info("Fetching menu by ID: {}", menuId);
 
-        if (id == null) {
+        if (menuId == null) {
             log.warn("菜单ID不能为空");
             return null;
         }
 
         // 优先从Redis缓存获取菜单信息
         if (cacheService.isRedisAvailable()) {
-            var cachedMenu = cacheService.getCachedMenu(id);
+            var cachedMenu = cacheService.getCachedMenu(menuId);
             if (cachedMenu != null) {
-                log.debug("从缓存中获取菜单成功: {}", id);
+                log.debug("从缓存中获取菜单成功: {}", menuId);
                 return cachedMenu;
             }
         }
 
         try {
             // 统一使用 id 查找菜单
-            MenuEntity menu = menuMapper.findById(id);
+            MenuEntity menu = menuMapper.findById(menuId);
 
             // 缓存到Redis
             if (menu != null && cacheService.isRedisAvailable()) {

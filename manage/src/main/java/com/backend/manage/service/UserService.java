@@ -5,6 +5,7 @@ import com.backend.manage.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@Transactional
 public class UserService {
 
     // 使用Java 21的构造器注入，避免@Autowired
@@ -38,6 +40,7 @@ public class UserService {
      *
      * @return 所有用户的列表
      */
+    @Transactional(readOnly = true)
     public List<UserEntity> getAllUsers() {
         log.info("正在获取所有用户列表");
         
@@ -63,10 +66,11 @@ public class UserService {
     /**
      * 根据用户ID获取用户信息
      * 优先从Redis缓存获取，缓存不存在时从数据库查询并缓存结果
-     * 
+     *
      * @param id 用户ID
      * @return 用户对象，如果不存在则返回null
      */
+    @Transactional(readOnly = true)
     public UserEntity getUserById(Long id) {
         log.info("正在根据ID获取用户: " + id);
         
@@ -92,10 +96,11 @@ public class UserService {
     /**
      * 根据用户ID获取用户信息（包括非活跃用户）
      * 主要用于操作日志记录等需要访问所有用户的场景
-     * 
+     *
      * @param id 用户ID
      * @return 用户对象，如果不存在则返回null
      */
+    @Transactional(readOnly = true)
     public UserEntity getUserByIdIncludeInactive(Long id) {
         log.info("正在获取用户信息（包括非活跃用户）: " + id);
         
@@ -181,12 +186,18 @@ public class UserService {
 
         // 保存用户到数据库
         UserEntity savedUser = userRepository.save(user);
-        
-        // 创建用户后清除相关缓存，确保数据一致性
+
+        // 创建用户后清除相关缓存（优化：只清除必要的缓存）
         if (cacheService.isRedisAvailable()) {
-            cacheService.clearAllUserCache();
+            cacheService.clearUserCache(savedUser.getId());
+            cacheService.clearAllUserListCache();
+
+            // 清除部门用户缓存（如果用户属于某个部门）
+            if (departmentId != null) {
+                cacheService.clearDepartmentUsersCache(departmentId);
+            }
         }
-        
+
         log.info("用户创建成功: " + username);
         return savedUser;
     }
@@ -267,16 +278,21 @@ public class UserService {
             user.setUpdatedAt(LocalDateTime.now());
 
             UserEntity updatedUser = userRepository.save(user);
-            
-            // Clear cache after updating user
+
+            // Clear cache after updating user（优化：只清除必要的缓存）
             if (cacheService.isRedisAvailable()) {
-                cacheService.clearAllUserCache();
-                // Clear department cache if department changed
+                cacheService.clearUserCache(id);
+                cacheService.clearAllUserListCache();
+
+                // 清除旧部门和新部门的用户缓存
                 if (departmentId != null && !departmentId.equals(user.getDepartmentId())) {
-                    cacheService.clearByPrefix("department:users:");
+                    if (user.getDepartmentId() != null) {
+                        cacheService.clearDepartmentUsersCache(user.getDepartmentId());
+                    }
+                    cacheService.clearDepartmentUsersCache(departmentId);
                 }
             }
-            
+
             log.info("User updated successfully: " + id);
             return updatedUser;
         }
@@ -307,16 +323,17 @@ public class UserService {
             Long departmentId = user.getDepartmentId();
             
             userRepository.deleteById(id);
-            
-            // Clear cache after deleting user
+
+            // Clear cache after deleting user（修复：使用正确的方法）
             if (cacheService.isRedisAvailable()) {
-                cacheService.clearAllUserCache();
-                // Clear department cache if user was in a department
+                cacheService.clearAllUserListCache();
+
+                // 清除部门用户缓存（使用正确的方法名）
                 if (departmentId != null) {
-                    cacheService.clearByPrefix("department:users:" + departmentId);
+                    cacheService.clearDepartmentUsersCache(departmentId);
                 }
             }
-            
+
             log.info("User deleted successfully: " + id);
             return true;
         }
@@ -513,10 +530,11 @@ public class UserService {
 
     /**
      * Search users by username or email
-     * 
+     *
      * @param query the search query
      * @return List of matching users
      */
+    @Transactional(readOnly = true)
     public List<UserEntity> searchUsers(String query) {
         log.info("Searching users with query: " + query);
         return userRepository.searchByUsernameOrEmail(query);

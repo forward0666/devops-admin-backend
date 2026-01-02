@@ -46,7 +46,8 @@ public class CacheService {
     private static final String POSITION_LIST = "positions:list";
 
     private static final long CACHE_MIN = 30;      // 通用缓存分钟
-    private static final long TOKEN_MIN = 1440;    // Token缓存分钟
+    private static final long USER_LIST_CACHE_MIN = 10;  // 用户列表缓存分钟（更短）
+    private static final long TOKEN_MIN = 60;      // Token缓存分钟（减少到1小时）
     private static final long SETTINGS_MIN = 60;   // 系统设置缓存分钟
 
     /* ================= Redis 健康检查 ================= */
@@ -86,7 +87,12 @@ public class CacheService {
 
     public void cacheUsersList(List<UserEntity> users) {
         if (!redisOk()) return;
-        redisTemplate.opsForValue().set(USERS_LIST, users, CACHE_MIN, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(USERS_LIST, users, USER_LIST_CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public void clearAllUserListCache() {
+        if (!redisOk()) return;
+        redisTemplate.delete(USERS_LIST);
     }
 
     @SuppressWarnings("unchecked")
@@ -151,6 +157,11 @@ public class CacheService {
         if (!redisOk() || deptId == null) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_USERS + deptId);
         return (v instanceof List<?>) ? (List<UserEntity>) v : null;
+    }
+
+    public void clearDepartmentUsersCache(Long deptId) {
+        if (!redisOk() || deptId == null) return;
+        redisTemplate.delete(DEPT_USERS + deptId);
     }
 
     /* ================= 菜单缓存 ================= */

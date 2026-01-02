@@ -48,6 +48,11 @@ public class OperationLogAspect {
         // 获取请求信息
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         HttpServletRequest request = attributes != null ? attributes.getRequest() : null;
+
+        if (request == null) {
+            log.warn("No request context available, skipping operation logging");
+            return joinPoint.proceed();
+        }
         
         // 获取用户信息
         Long userId = null;

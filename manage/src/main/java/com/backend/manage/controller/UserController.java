@@ -4,6 +4,7 @@ import com.backend.manage.annotation.OperationLog;
 import com.backend.manage.dto.ApiResponseDto;
 import com.backend.manage.entity.UserEntity;
 import com.backend.manage.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,7 @@ import java.util.Map;
  * @RequestMapping("/users") - 设置控制器的基础请求路径为"/users"
  * @Autowired - 自动注入UserService依赖，处理业务逻辑
  */
+@Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
@@ -49,7 +51,8 @@ public class UserController {
             List<UserEntity> users = userService.getAllUsers();
             return ApiResponseDto.success("Users retrieved successfully", users);
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to retrieve users: " + e.getMessage());
+            log.error("Failed to retrieve users", e);
+            return ApiResponseDto.error("Failed to retrieve users");
         }
     }
 
@@ -75,7 +78,8 @@ public class UserController {
                 return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to retrieve user: " + e.getMessage());
+            log.error("Failed to retrieve user: " + id, e);
+            return ApiResponseDto.error("Failed to retrieve user");
         }
     }
 
@@ -141,7 +145,8 @@ public class UserController {
                                                     role, departmentId, createdBy);
             return ApiResponseDto.success("User created successfully", createdUser);
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to create user: " + e.getMessage());
+            log.error("Failed to create user", e);
+            return ApiResponseDto.error("Failed to create user");
         }
     }
 
@@ -203,7 +208,8 @@ public class UserController {
                 return ApiResponseDto.error("User not found");
             }
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to update user: " + e.getMessage());
+            log.error("Failed to update user: " + id, e);
+            return ApiResponseDto.error("Failed to update user");
         }
     }
 
@@ -375,10 +381,11 @@ public class UserController {
             if (changed) {
                 return ApiResponseDto.success("Password changed successfully", null);
             } else {
-                return ApiResponseDto.error("Failed to change password. Please check your old password.");
+                return ApiResponseDto.error("Failed to change password");
             }
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to change password: " + e.getMessage());
+            log.error("Failed to change password for user: " + id, e);
+            return ApiResponseDto.error("Failed to change password");
         }
     }
 

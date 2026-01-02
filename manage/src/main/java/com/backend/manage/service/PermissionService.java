@@ -42,6 +42,7 @@ public class PermissionService {
 
     /**
      * 获取所有权限映射
+     *
      * @return 权限映射响应列表
      */
     public List<PermissionResponseDto> getAllPermissionMappings() {
@@ -92,6 +93,7 @@ public class PermissionService {
 
     /**
      * 根据角色ID获取权限映射
+     *
      * @param roleId 角色ID
      * @return 权限映射响应
      */
@@ -141,6 +143,7 @@ public class PermissionService {
 
     /**
      * 更新角色的权限映射
+     *
      * @param request 权限请求
      * @return 是否成功
      */
@@ -215,6 +218,7 @@ public class PermissionService {
 
     /**
      * 删除角色的权限映射
+     *
      * @param roleId 角色ID
      * @return 是否成功
      */
@@ -244,6 +248,7 @@ public class PermissionService {
     /**
      * 规范化权限类型
      * 处理 null、空字符串或字符串 "null" 的情况
+     *
      * @param permissionType 原始权限类型
      * @return 规范化后的权限类型（view/edit/all）
      */
@@ -260,3 +265,4 @@ public class PermissionService {
             }
         };
     }
+}

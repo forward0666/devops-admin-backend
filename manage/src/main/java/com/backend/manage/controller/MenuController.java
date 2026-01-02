@@ -48,7 +48,7 @@ public class MenuController {
      * @param id 菜单ID（可以是内部 id 或 directoryId）
      * @return ResponseEntity包含操作结果
      */
-    @GetMapping("/{id}")
+    @GetMapping("/{menuId}")
     public ResponseEntity<ApiResponseDto<MenuEntity>> getMenuById(@PathVariable Long id) {
         log.info("GET /menus/{} - Fetching menu by ID", id);
         try {

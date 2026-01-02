@@ -101,4 +101,16 @@ public class ApiResponseDto<T> {
     public static <T> ApiResponseDto<T> error(int code, String message) {
         return new ApiResponseDto<>(code, message, null);
     }
+
+    /**
+     * 创建错误响应（带额外数据）
+     *
+     * @param <T> 数据类型
+     * @param message 错误消息
+     * @param data 额外的错误数据
+     * @return ApiResponseDto<T> 错误响应对象
+     */
+    public static <T> ApiResponseDto<T> error(String message, T data) {
+        return new ApiResponseDto<>(500, message, data);
+    }
 }

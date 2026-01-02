@@ -196,6 +196,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * Extract user information from JWT token
      */
+    @SuppressWarnings("unchecked")
     private Map<String, Object> extractTokenInfo(String token) {
         try {
             // This is a simple JWT parsing without signature verification
