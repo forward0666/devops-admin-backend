@@ -18,7 +18,7 @@
     <select id="findById" parameterType="long" resultMap="MenuResultMap">
         SELECT menu_id, name, path, icon, type, sort, status, parent_id, created_at, updated_at
         FROM menus
-        WHERE menu_id = #{id}
+        WHERE menu_id = #{menuId}
     </select>
 
     <select id="findAll" resultMap="MenuResultMap">
@@ -58,13 +58,13 @@
 
     <delete id="deleteById" parameterType="long">
         DELETE FROM menus
-        WHERE menu_id = #{id}
+        WHERE menu_id = #{menuId}
     </delete>
 
     <select id="existsById" parameterType="long" resultType="int">
         SELECT COUNT(*)
         FROM menus
-        WHERE menu_id = #{id}
+        WHERE menu_id = #{menuId}
     </select>
 
     <select id="countByParentId" parameterType="long" resultType="int">

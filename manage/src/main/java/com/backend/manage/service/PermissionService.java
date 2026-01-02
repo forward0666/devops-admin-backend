@@ -73,7 +73,7 @@ public class PermissionService {
                                 roleMappings.stream()
                                         .map(mapping -> new PermissionResponseDto.MenuPermissionType(
                                                 mapping.getMenuId(),
-                                                mapping.getPermissionType() != null ? mapping.getPermissionType() : "view"
+                                                normalizePermissionType(mapping.getPermissionType())
                                         ))
                                         .toList(),
                                 firstMapping.getCreatedAt(),
@@ -115,7 +115,7 @@ public class PermissionService {
             List<PermissionResponseDto.MenuPermissionType> menuPermissionTypes = mappings.stream()
                     .map(mapping -> new PermissionResponseDto.MenuPermissionType(
                             mapping.getMenuId(),
-                            mapping.getPermissionType() != null ? mapping.getPermissionType() : "view"
+                            normalizePermissionType(mapping.getPermissionType())
                     ))
                     .toList();
 
@@ -240,4 +240,23 @@ public class PermissionService {
             throw new RuntimeException("Failed to delete permission mapping: " + e.getMessage(), e);
         }
     }
-}
+
+    /**
+     * 规范化权限类型
+     * 处理 null、空字符串或字符串 "null" 的情况
+     * @param permissionType 原始权限类型
+     * @return 规范化后的权限类型（view/edit/all）
+     */
+    private String normalizePermissionType(String permissionType) {
+        if (permissionType == null || permissionType.trim().isEmpty() || "null".equalsIgnoreCase(permissionType)) {
+            return "view";
+        }
+        // 验证是否为有效的权限类型
+        return switch (permissionType.toLowerCase()) {
+            case "view", "edit", "all" -> permissionType.toLowerCase();
+            default -> {
+                log.warn("Invalid permission type: {}, defaulting to 'view'", permissionType);
+                yield "view";
+            }
+        };
+    }

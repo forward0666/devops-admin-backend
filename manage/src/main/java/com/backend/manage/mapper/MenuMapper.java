@@ -14,11 +14,11 @@ import java.util.List;
 public interface MenuMapper {
 
     /**
-     * 根据ID查找菜单
-     * @param id 菜单ID
+     * 根据菜单ID查找菜单
+     * @param menuId 菜单ID
      * @return 菜单对象
      */
-    MenuEntity findById(@Param("id") Long id);
+    MenuEntity findById(@Param("menuId") Long menuId);
 
     /**
      * 查找所有菜单
@@ -48,18 +48,18 @@ public interface MenuMapper {
     int update(MenuEntity MenuEntity);
 
     /**
-     * 根据ID删除菜单
-     * @param id 菜单ID（内部主键）
+     * 根据菜单ID删除菜单
+     * @param menuId 菜单ID
      * @return 删除记录数
      */
-    int deleteById(@Param("id") Long id);
+    int deleteById(@Param("menuId") Long menuId);
 
     /**
      * 检查菜单是否存在
-     * @param id 菜单ID（内部主键）
+     * @param menuId 菜单ID
      * @return 存在返回1，不存在返回0
      */
-    int existsById(@Param("id") Long id);
+    int existsById(@Param("menuId") Long menuId);
 
     /**
      * 统计子菜单数量
