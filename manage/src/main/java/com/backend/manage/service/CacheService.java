@@ -297,15 +297,33 @@ public class CacheService {
     }
 
     /* ================= prefix 清理（SCAN） ================= */
+//    public void clearByPrefix(String prefix) {
+//        if (!redisOk()) return;
+//
+//        redisTemplate.execute((RedisCallback<Void>) connection -> {
+//            try (Cursor<byte[]> cursor = connection.scan(
+//                    ScanOptions.scanOptions().match(prefix + "*").count(1000).build()
+//            )) {
+//                while (cursor.hasNext()) {
+//                    connection.unlink(cursor.next());
+//                }
+//            }
+//            return null;
+//        });
+//    }
     public void clearByPrefix(String prefix) {
         if (!redisOk()) return;
 
         redisTemplate.execute((RedisCallback<Void>) connection -> {
-            try (Cursor<byte[]> cursor = connection.scan(
-                    ScanOptions.scanOptions().match(prefix + "*").count(1000).build()
-            )) {
+            ScanOptions options = ScanOptions.scanOptions()
+                    .match(prefix + "*")
+                    .count(1000)
+                    .build();
+
+            try (Cursor<byte[]> cursor = connection.keyCommands().scan(options)) {
                 while (cursor.hasNext()) {
-                    connection.unlink(cursor.next());
+                    byte[] key = cursor.next();
+                    connection.keyCommands().del(key); // Redis 3.2.5 只能用 DEL
                 }
             }
             return null;
