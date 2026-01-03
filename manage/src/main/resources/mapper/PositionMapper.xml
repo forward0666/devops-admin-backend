@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.backend.manage.mapper.PositionMapper">
+<mapper namespace="com.backend.manage.mapper.system.PositionMapper">
 
-    <resultMap id="positionResultMap" type="com.backend.manage.entity.PositionEntity">
+    <resultMap id="positionResultMap" type="com.backend.manage.entity.system.PositionEntity">
         <id property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="code" column="code"/>
@@ -54,12 +54,12 @@
         ORDER BY p.level ASC
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.entity.PositionEntity" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.manage.entity.system.PositionEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO positions (name, code, department_id, level, description, status, user_count, created_by, updated_by, created_at, updated_at)
         VALUES (#{name}, #{code}, #{departmentId}, #{level}, #{description}, #{status}, #{userCount}, #{createdBy}, #{updatedBy}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.backend.manage.entity.PositionEntity">
+    <update id="update" parameterType="com.backend.manage.entity.system.PositionEntity">
         UPDATE positions
         SET name = #{name},
             code = #{code},

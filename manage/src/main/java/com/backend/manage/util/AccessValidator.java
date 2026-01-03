@@ -1,7 +1,7 @@
 package com.backend.manage.util;
 
 import com.backend.manage.exception.AccessDeniedException;
-import com.backend.manage.service.PermissionService;
+import com.backend.manage.service.system.PermissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 

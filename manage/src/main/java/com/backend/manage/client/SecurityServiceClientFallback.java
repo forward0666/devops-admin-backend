@@ -1,7 +1,7 @@
 package com.backend.manage.client;
 
-import com.backend.manage.dto.JwtGenerateRequestDto;
-import com.backend.manage.dto.JwtResponseDto;
+import com.backend.manage.dto.login.JwtGenerateRequestDto;
+import com.backend.manage.dto.login.JwtResponseDto;
 import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;

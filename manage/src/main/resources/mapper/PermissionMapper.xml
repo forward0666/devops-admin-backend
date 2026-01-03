@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.backend.manage.mapper.PermissionMapper">
+<mapper namespace="com.backend.manage.mapper.system.PermissionMapper">
 
-    <resultMap id="PermissionMappingResultMap" type="com.backend.manage.entity.PermissionMappingEntity">
+    <resultMap id="PermissionMappingResultMap" type="com.backend.manage.entity.system.PermissionMappingEntity">
         <id property="roleId" column="role_id"/>
         <id property="menuId" column="menu_id"/>
         <result property="roleName" column="role_name"/>
@@ -62,7 +62,7 @@
         ORDER BY m.sort ASC, m.menu_id ASC
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.entity.PermissionMappingEntity">
+    <insert id="insert" parameterType="com.backend.manage.entity.system.PermissionMappingEntity">
         INSERT INTO permissions (role_id, menu_id, permission_type, created_at, updated_at)
         VALUES (#{roleId}, #{menuId}, #{permissionType}, #{createdAt}, #{updatedAt})
     </insert>

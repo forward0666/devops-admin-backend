@@ -1,7 +1,8 @@
-package com.backend.manage.config;
+package com.backend.manage.filter;
 
 import com.backend.manage.client.SecurityServiceClient;
 import com.backend.manage.service.CacheService;
+import com.backend.manage.service.login.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,6 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     @Autowired
     private CacheService cacheService;
+    @Autowired
+    private AuthService authService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

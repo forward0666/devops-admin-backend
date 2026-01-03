@@ -1,9 +1,9 @@
 package com.backend.manage.aspect;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.service.DepartmentService;
-import com.backend.manage.service.OperationLogService;
-import com.backend.manage.service.UserService;
+import com.backend.manage.service.system.DepartmentService;
+import com.backend.manage.service.audits.OperationLogService;
+import com.backend.manage.service.system.UserService;
 import com.backend.manage.util.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
