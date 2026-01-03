@@ -1,0 +1,93 @@
+package com.backend.manage.dto.system;
+
+import com.backend.manage.entity.system.DepartmentEntity;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 部门响应数据传输对象
+ * 用于返回部门详细信息
+ *
+ * 设计特点：
+ * 1. 使用 Java 21 record 实现不可变数据结构
+ * 2. 包含部门基本信息和统计数据
+ * 3. 包含最近加入的用户列表
+ * 4. 提供静态工厂方法 fromDepartment() 用于转换
+ *
+ * @author Backend Team
+ * @version 2.0.0
+ */
+public record DepartmentResponseDto(
+        /**
+         * 部门唯一标识符
+         */
+        Long id,
+
+        /**
+         * 部门名称
+         */
+        String name,
+
+        /**
+         * 部门描述
+         */
+        String description,
+
+        /**
+         * 部门经理 ID
+         */
+        Long managerId,
+
+        /**
+         * 部门经理姓名
+         */
+        String managerName,
+
+        /**
+         * 部门用户数量
+         */
+        Integer userCount,
+
+        /**
+         * 创建时间
+         */
+        LocalDateTime createdAt,
+
+        /**
+         * 更新时间
+         */
+        LocalDateTime updatedAt,
+
+        /**
+         * 最近加入的用户列表
+         */
+        List<UserSummaryDto> recentUsers
+) {
+    /**
+     * 从部门模型转换为响应对象
+     *
+     * @param department 部门模型
+     * @return 部门响应对象
+     */
+    public static DepartmentResponseDto fromDepartment(DepartmentEntity department) {
+        // Convert recent users to summary format
+        var recentUsers = department.getRecentUsers() != null
+            ? department.getRecentUsers().stream()
+                .map(UserSummaryDto::fromUser)
+                .toList()
+            : null;
+
+        return new DepartmentResponseDto(
+                department.getId(),
+                department.getName(),
+                department.getDescription(),
+                department.getManagerId(),
+                null, // managerName 需要单独查询
+                department.getUserCount(),
+                department.getCreatedAt(),
+                department.getUpdatedAt(),
+                recentUsers
+        );
+    }
+}
