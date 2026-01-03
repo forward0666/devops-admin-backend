@@ -30,9 +30,9 @@ public class PermissionController {
     /**
      * 获取所有权限映射
      */
-    @GetMapping("/mappings")
-    public ResponseEntity<ApiResponseDto<List<PermissionResponseDto>>> getAllPermissionMappings() {
-        log.info("GET /permissions/mappings - Fetching all permission mappings");
+    @GetMapping
+    public ResponseEntity<ApiResponseDto<List<PermissionResponseDto>>> getAllPermissions() {
+        log.info("GET /permissions - Fetching all permission mappings");
         try {
             var mappings = permissionService.getAllPermissionMappings();
             log.info("Successfully retrieved {} permission mappings", mappings.size());

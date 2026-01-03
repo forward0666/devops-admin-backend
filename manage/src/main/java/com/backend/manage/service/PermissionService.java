@@ -182,7 +182,8 @@ public class PermissionService {
                             PermissionMappingEntity mapping = new PermissionMappingEntity();
                             mapping.setRoleId(request.getRoleId());
                             mapping.setMenuId(permissionItem.getMenuId());
-                            mapping.setPermissionType(permissionItem.getPermissionType() != null ? permissionItem.getPermissionType() : "view");
+                            // 允许 permissionType 为 null（表示无权限）
+                            mapping.setPermissionType(permissionItem.getPermissionType());
                             mapping.setCreatedAt(now);
                             mapping.setUpdatedAt(now);
                             return mapping;

@@ -1,5 +1,8 @@
 package com.backend.manage.client;
 
+import com.backend.manage.dto.JwtGenerateRequestDto;
+import com.backend.manage.dto.JwtResponseDto;
+import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,36 +12,31 @@ import java.util.Map;
  */
 //@Component
 public class SecurityServiceClientFallback implements SecurityServiceClient {
-    
+
     @Override
     public Map<String, Object> verifyCode(Map<String, String> request) {
         // Development mode fallback - allow verification to pass
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("message", "Fallback: Verification code accepted (development mode)");
-        
+
         return result;
     }
-    
+
     @Override
-    public Map<String, Object> generateToken(Map<String, Object> request) {
+    public JwtResponseDto generateToken(JwtGenerateRequestDto request) {
         // Development mode fallback - generate mock token
-        Map<String, Object> result = new HashMap<>();
-        String username = request.get("subject") != null ? request.get("subject").toString() : "unknown";
+        String username = request != null ? request.subject() : "unknown";
         String mockToken = "mock-jwt-token-" + username + "-" + System.currentTimeMillis();
-        result.put("token", mockToken);
-        result.put("success", true);
-        result.put("message", "Token generated (fallback)");
-        
-        return result;
+        return JwtResponseDto.success("Token generated (fallback)", mockToken);
     }
-    
+
     @Override
     public Map<String, Object> validateToken(Map<String, String> request) {
         // Development mode fallback - validate mock tokens
         Map<String, Object> result = new HashMap<>();
         String token = request.get("token");
-        
+
         if (token != null && token.startsWith("mock-jwt-token-")) {
             result.put("valid", true);
             result.put("success", true);
@@ -48,7 +46,8 @@ public class SecurityServiceClientFallback implements SecurityServiceClient {
             result.put("success", false);
             result.put("message", "Invalid token (fallback)");
         }
-        
+
         return result;
     }
 }
+

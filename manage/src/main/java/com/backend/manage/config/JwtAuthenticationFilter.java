@@ -49,15 +49,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String authHeader = request.getHeader("Authorization");
-        
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            
+
             try {
+                // Extract username from token for cache key
+                String username = extractUsernameFromToken(token);
+
                 // First check if token exists in Redis
                 Boolean isValidToken = null;
                 if (cacheService.isRedisAvailable()) {
-                    isValidToken = cacheService.getCachedTokenValidation(token);
+                    isValidToken = cacheService.getCachedTokenValidation(username, token);
                     if (isValidToken != null) {
                         log.info("Token validation from Redis cache: {}，path: {}", isValidToken,path);
                         if (!isValidToken) {
@@ -67,7 +70,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
                     }
                 }
-                
+
                 // If not in Redis or Redis is unavailable, use security service via Feign
                 Map<String, Object> tokenData = null;
                 if (isValidToken == null) {
@@ -75,21 +78,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         // Call security service via Feign client
                         Map<String, String> requestBody = new HashMap<>();
                         requestBody.put("token", token);
-                        
+
                         log.info("Validating token with security service via Feign");
                         Map<String, Object> serviceResponse = securityServiceClient.validateToken(requestBody);
-                        
+
                         if (serviceResponse != null) {
                             Boolean valid = (Boolean) serviceResponse.get("valid");
                             if (Boolean.TRUE.equals(valid)) {
                                 log.info("Token validation successful via security service");
-                                
+
                                 // Extract token data
                                 tokenData = extractTokenInfo(token);
-                                
+
                                 // Store validation result in Redis
                                 if (cacheService.isRedisAvailable()) {
-                                    cacheService.cacheTokenValidation(token, true);
+                                    cacheService.cacheTokenValidation(username, token, true);
                                     log.info("Stored token validation result in Redis");
                                 }
                             } else {
@@ -114,13 +117,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 
                 if (tokenData != null) {
                     // Try to get username from different possible fields
-                    String username = null;
+                    String extractedUsername = null;
                     if (tokenData.containsKey("username")) {
-                        username = (String) tokenData.get("username");
+                        extractedUsername = (String) tokenData.get("username");
                     } else if (tokenData.containsKey("sub")) {
-                        username = (String) tokenData.get("sub");
+                        extractedUsername = (String) tokenData.get("sub");
                     } else if (tokenData.containsKey("subject")) {
-                        username = (String) tokenData.get("subject");
+                        extractedUsername = (String) tokenData.get("subject");
                     }
                     
                     // Try to get role from different possible fields
@@ -145,7 +148,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                     
                     log.debug("Extracted role from token: {}", role);
-                    
+
                     // Get userId
                     Object userIdObj = tokenData.get("userId");
                     Integer userId = null;
@@ -160,15 +163,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             log.warn("Could not parse userId as integer: {}", userIdObj);
                         }
                     }
-                    
+
                     // Get email
                     String email = (String) tokenData.get("email");
-                    
-                    log.info("JWT validation successful for user: {} with role: {}", username, role);
-                    
+
+                    log.info("JWT validation successful for user: {} with role: {}", extractedUsername, role);
+
                     // Add user info to request attributes for controllers
                     request.setAttribute("userId", userId);
-                    request.setAttribute("username", username);
+                    request.setAttribute("username", extractedUsername);
                     request.setAttribute("userRole", role);
                     request.setAttribute("userEmail", email);
                     request.setAttribute("isAuthenticated", true);
@@ -194,6 +197,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
     
     /**
+     * Extract username from JWT token
+     */
+    private String extractUsernameFromToken(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                return null;
+            }
+
+            // Decode payload (base64)
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
+
+            // Try to get username from different possible fields
+            if (claims.containsKey("username")) {
+                return (String) claims.get("username");
+            } else if (claims.containsKey("sub")) {
+                return (String) claims.get("sub");
+            } else if (claims.containsKey("subject")) {
+                return (String) claims.get("subject");
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("Error extracting username from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Extract user information from JWT token
      */
     @SuppressWarnings("unchecked")
@@ -205,26 +237,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (parts.length != 3) {
                 return null;
             }
-            
+
             // Decode payload (base64)
             String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
             Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
-            
+
             log.info("Extracted token claims: {}", claims);
-            
+
             Map<String, Object> userInfo = new HashMap<>();
             userInfo.put("valid", true);
-            
+
             // Copy all claims to the userInfo map
             userInfo.putAll(claims);
-            
+
             // Ensure standard fields are present
             if (!userInfo.containsKey("username") && userInfo.containsKey("sub")) {
                 userInfo.put("username", claims.get("sub"));
             }
-            
+
             return userInfo;
-            
+
         } catch (Exception e) {
             log.error("Error extracting token info: {}", e.getMessage());
             return null;

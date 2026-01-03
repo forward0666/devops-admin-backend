@@ -1,5 +1,6 @@
 package com.backend.manage.handler;
 
+import com.backend.manage.exception.AccessDeniedException;
 import com.backend.manage.util.ResponseUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,6 +22,18 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 处理权限拒绝异常（不打印堆栈）
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException e) {
+        String message = e.getMessage();
+        if ("未授权访问".equals(message)) {
+            return ResponseUtil.error(message, 401);
+        }
+        return ResponseUtil.error(message, 403);
+    }
 
     /**
      * 处理数据完整性违规异常（如重复键）
@@ -99,7 +112,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
         log.error("Runtime exception: {}", e.getMessage(), e);
-        
+
         if ("未授权访问".equals(e.getMessage())) {
             return ResponseUtil.error(e.getMessage(), 401);
         } else if (e.getMessage().contains("权限不足")) {

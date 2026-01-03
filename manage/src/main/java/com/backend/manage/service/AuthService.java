@@ -5,13 +5,13 @@ import com.backend.manage.dto.LoginRequestDto;
 import com.backend.manage.dto.LoginResponseDto;
 import com.backend.manage.entity.UserEntity;
 import com.backend.manage.repository.UserRepository;
+import com.backend.manage.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 认证服务类
@@ -36,6 +36,9 @@ public class AuthService {
 
     @Autowired
     private CacheService cacheService; // 缓存服务，用于Redis缓存操作
+
+    @Autowired
+    private JwtUtil jwtUtil; // JWT工具类
 
     /**
      * 用户登录认证
@@ -139,39 +142,41 @@ public class AuthService {
         try {
             log.info("通过安全服务为用户生成JWT令牌: {}", user.getUsername());
 
-            var requestBody = new HashMap<String, Object>();
-            requestBody.put("subject", user.getUsername()); // JWT主题，通常为用户名
+            // 构建JWT声明（claims），包含用户信息
+            // 使用HashMap而不是Map.of，因为可能存在null字段
+            var claims = new HashMap<String, Object>();
+            claims.put("userId", user.getId());
+            claims.put("role", user.getRole() != null ? user.getRole() : "");
+            claims.put("email", user.getEmail() != null ? user.getEmail() : "");
+            claims.put("username", user.getUsername());
 
-            // 构建JWT声明（claims），包含用户信息 - Java 21: 使用 Map.of()
-            var claims = Map.<String, Object>of(
-                    "userId", user.getId(),
-                    "role", user.getRole(),
-                    "email", user.getEmail(),
-                    "username", user.getUsername()
-            );
-            requestBody.put("claims", claims);
+            var request = com.backend.manage.dto.JwtGenerateRequestDto.of(user.getUsername(), claims);
+
+            log.info("JWT生成请求体: subject={}, claims={}", user.getUsername(), claims);
 
             // 调用安全服务生成令牌
-            var response = securityServiceClient.generateToken(requestBody);
+            var response = securityServiceClient.generateToken(request);
 
-            if (response != null && response.get("token") != null) {
-                var token = (String) response.get("token");
+            log.info("JWT生成响应: success={}, message={}", response.success(), response.message());
+
+            if (response != null && response.success() && response.token() != null) {
+                var token = response.token();
                 log.info("通过安全服务成功生成JWT令牌");
 
                 // 如果Redis可用，将令牌验证结果缓存
                 if (cacheService.isRedisAvailable()) {
-                    cacheService.cacheTokenValidation(token, true);
+                    cacheService.cacheTokenValidation(user.getUsername(), token, true);
                     log.info("令牌已存储在Redis缓存中供验证使用");
                 }
 
                 return token;
             }
 
-            throw new RuntimeException("从安全服务生成令牌失败");
+            throw new RuntimeException("从安全服务生成令牌失败: " + (response != null ? response.message() : "No response"));
 
         } catch (Exception e) {
-            log.warn("通过安全服务生成JWT令牌时出错: {}", e.getMessage());
-            throw new RuntimeException("令牌生成服务不可用");
+            log.error("通过安全服务生成JWT令牌时出错", e);
+            throw new RuntimeException("令牌生成服务不可用: " + e.getMessage());
         }
     }
 
@@ -247,9 +252,12 @@ public class AuthService {
             // 清理令牌（移除Bearer前缀）
             var cleanToken = token.replace("Bearer ", "");
 
+            // 从token中获取username用于缓存key
+            String username = jwtUtil.getUsernameFromToken(cleanToken);
+
             // 如果Redis可用，首先检查缓存
             if (cacheService.isRedisAvailable()) {
-                var cachedResult = cacheService.getCachedTokenValidation(cleanToken);
+                var cachedResult = cacheService.getCachedTokenValidation(username, cleanToken);
                 if (cachedResult != null) {
                     log.debug("从缓存中获取令牌验证结果: {}", cachedResult);
                     return cachedResult;
@@ -277,7 +285,7 @@ public class AuthService {
 
             // 缓存验证结果
             if (cacheService.isRedisAvailable()) {
-                cacheService.cacheTokenValidation(cleanToken, isValid);
+                cacheService.cacheTokenValidation(username, cleanToken, isValid);
             }
 
             return isValid;

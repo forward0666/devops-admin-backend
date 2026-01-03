@@ -280,14 +280,16 @@ public class CacheService {
     }
 
     /* ================= Token 缓存 ================= */
-    public void cacheTokenValidation(String token, boolean valid) {
+    public void cacheTokenValidation(String username, String token, boolean valid) {
         if (!redisOk() || token == null) return;
-        redisTemplate.opsForValue().set(TOKEN_PREFIX + DigestUtils.sha256Hex(token), valid, TOKEN_MIN, TimeUnit.MINUTES);
+        String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
+        redisTemplate.opsForValue().set(key, valid, TOKEN_MIN, TimeUnit.MINUTES);
     }
 
-    public Boolean getCachedTokenValidation(String token) {
+    public Boolean getCachedTokenValidation(String username, String token) {
         if (!redisOk() || token == null) return null;
-        Object v = redisTemplate.opsForValue().get(TOKEN_PREFIX + DigestUtils.sha256Hex(token));
+        String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
+        Object v = redisTemplate.opsForValue().get(key);
         return (v instanceof Boolean b) ? b : null;
     }
 
