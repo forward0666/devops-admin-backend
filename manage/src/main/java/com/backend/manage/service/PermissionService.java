@@ -2,7 +2,6 @@ package com.backend.manage.service;
 
 import com.backend.manage.dto.PermissionRequestDto;
 import com.backend.manage.dto.PermissionResponseDto;
-import com.backend.manage.entity.MenuEntity;
 import com.backend.manage.entity.PermissionMappingEntity;
 import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.mapper.MenuMapper;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +38,9 @@ public class PermissionService {
     @Autowired
     private MenuMapper menuMapper;
 
+    @Autowired
+    private CacheService cacheService;
+
     /**
      * 获取所有权限映射
      *
@@ -48,6 +49,13 @@ public class PermissionService {
     public List<PermissionResponseDto> getAllPermissionMappings() {
         log.info("Fetching all permission mappings");
         try {
+            // 尝试从缓存获取
+            if (cacheService.isRedisAvailable()) {
+                // 这里使用菜单列表缓存，因为getAllPermissionMappings需要获取所有权限
+                // 单个权限映射缓存主要用于根据角色ID获取
+                // 权限映射列表通常不缓存全量数据，直接查询数据库
+            }
+
             List<PermissionMappingEntity> mappings = permissionMapper.findAllWithDetails();
 
             // Java 21: 使用 Collectors.groupingBy 和 record pattern
@@ -107,7 +115,25 @@ public class PermissionService {
                 return new PermissionResponseDto(roleId, null, null, List.of(), List.of(), List.of(), null, null);
             }
 
-            List<PermissionMappingEntity> mappings = permissionMapper.findByRoleIdWithMenus(roleId);
+            // 尝试从缓存获取
+            List<PermissionMappingEntity> mappings = null;
+            if (cacheService.isRedisAvailable()) {
+                mappings = cacheService.getCachedPermissionMappingsByRole(roleId);
+                if (mappings != null) {
+                    log.info("Retrieved permission mappings from cache for role: {}", role.getName());
+                }
+            }
+
+            // 如果缓存未命中，从数据库查询
+            if (mappings == null) {
+                mappings = permissionMapper.findByRoleIdWithMenus(roleId);
+                // 缓存查询结果
+                if (cacheService.isRedisAvailable()) {
+                    cacheService.cachePermissionMappingsByRole(roleId, mappings);
+                    log.info("Cached permission mappings for role: {}", role.getName());
+                }
+            }
+
             List<Long> menuIds = mappings.stream()
                     .map(PermissionMappingEntity::getMenuId)
                     .toList();
@@ -206,6 +232,9 @@ public class PermissionService {
                 permissionMapper.batchInsert(mappings);
             }
 
+            // 清除相关缓存
+            clearPermissionCaches(request.getRoleId());
+
             log.info("Successfully updated permission mapping for role: {}", role.getName());
             return true;
         } catch (IllegalArgumentException e) {
@@ -214,6 +243,18 @@ public class PermissionService {
         } catch (Exception e) {
             log.error("Error updating permission mapping for role ID: {}", request.getRoleId(), e);
             throw new RuntimeException("Failed to update permission mapping: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 清除权限相关缓存
+     */
+    private void clearPermissionCaches(Long roleId) {
+        if (cacheService.isRedisAvailable()) {
+            cacheService.clearPermissionMappingsByRoleCache(roleId);
+            // 同时也清除菜单缓存，因为权限变化了
+            cacheService.clearAllMenuCache();
+            log.info("Cleared permission and menu caches for role: {}", roleId);
         }
     }
 
@@ -236,6 +277,10 @@ public class PermissionService {
 
             int deleted = permissionMapper.deleteByRoleId(roleId);
             log.info("Successfully deleted {} permission mappings for role: {}", deleted, role.getName());
+
+            // 清除相关缓存
+            clearPermissionCaches(roleId);
+
             return true;
         } catch (IllegalArgumentException e) {
             log.warn("Invalid role ID for deletion: {}", e.getMessage());

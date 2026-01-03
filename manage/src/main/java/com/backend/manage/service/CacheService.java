@@ -2,6 +2,7 @@ package com.backend.manage.service;
 
 import com.backend.manage.entity.DepartmentEntity;
 import com.backend.manage.entity.MenuEntity;
+import com.backend.manage.entity.PermissionMappingEntity;
 import com.backend.manage.entity.PositionEntity;
 import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.entity.UserEntity;
@@ -44,6 +45,9 @@ public class CacheService {
 
     private static final String POSITION_PREFIX = "position:";
     private static final String POSITION_LIST = "positions:list";
+
+    private static final String PERMISSION_PREFIX = "permission:";
+    private static final String PERMISSION_ROLE_PREFIX = "permission:role:";
 
     private static final long CACHE_MIN = 30;      // 通用缓存分钟
     private static final long USER_LIST_CACHE_MIN = 10;  // 用户列表缓存分钟（更短）
@@ -293,6 +297,47 @@ public class CacheService {
         return (v instanceof Boolean b) ? b : null;
     }
 
+    /* ================= 权限映射缓存 ================= */
+    public void cachePermissionMapping(PermissionMappingEntity mapping) {
+        if (!redisOk() || mapping == null) return;
+        String key = PERMISSION_PREFIX + mapping.getRoleId() + ":" + mapping.getMenuId();
+        redisTemplate.opsForValue().set(key, mapping, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public void cachePermissionMappingsByRole(Long roleId, List<PermissionMappingEntity> mappings) {
+        if (!redisOk() || roleId == null) return;
+        redisTemplate.opsForValue().set(PERMISSION_ROLE_PREFIX + roleId, mappings, CACHE_MIN, TimeUnit.MINUTES);
+    }
+
+    public PermissionMappingEntity getCachedPermissionMapping(Long roleId, Long menuId) {
+        if (!redisOk() || roleId == null || menuId == null) return null;
+        String key = PERMISSION_PREFIX + roleId + ":" + menuId;
+        Object v = redisTemplate.opsForValue().get(key);
+        return (v instanceof PermissionMappingEntity m) ? m : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<PermissionMappingEntity> getCachedPermissionMappingsByRole(Long roleId) {
+        if (!redisOk() || roleId == null) return null;
+        Object v = redisTemplate.opsForValue().get(PERMISSION_ROLE_PREFIX + roleId);
+        return (v instanceof List<?>) ? (List<PermissionMappingEntity>) v : null;
+    }
+
+    public void clearPermissionMappingCache(Long roleId, Long menuId) {
+        if (!redisOk() || roleId == null || menuId == null) return;
+        redisTemplate.delete(PERMISSION_PREFIX + roleId + ":" + menuId);
+    }
+
+    public void clearPermissionMappingsByRoleCache(Long roleId) {
+        if (!redisOk() || roleId == null) return;
+        redisTemplate.delete(PERMISSION_ROLE_PREFIX + roleId);
+    }
+
+    public void clearAllPermissionMappingCache() {
+        clearByPrefix(PERMISSION_PREFIX);
+        clearByPrefix(PERMISSION_ROLE_PREFIX);
+    }
+
     /* ================= 系统设置 ================= */
     public void cacheSystemSettings(String key, Object value) {
         if (!redisOk() || key == null) return;
@@ -353,6 +398,8 @@ public class CacheService {
         clearByPrefix(SETTINGS_PREFIX);
         clearByPrefix(ROLE_PREFIX);
         clearByPrefix(POSITION_PREFIX);
+        clearByPrefix(PERMISSION_PREFIX);
+        clearByPrefix(PERMISSION_ROLE_PREFIX);
         clearByPrefix(USERS_LIST);
         clearByPrefix(DEPT_LIST);
         clearByPrefix(MENU_LIST);
