@@ -20,7 +20,7 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@RequestMapping("/operationLogs")
+@RequestMapping("/operationLog")
 @RequiredArgsConstructor
 @Tag(name = "Operation Log Management", description = "操作日志管理接口")
 public class OperationLogController {
@@ -38,7 +38,6 @@ public class OperationLogController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
-        // 使用基于菜单权限的验证，menuId 301 对应审计日志-操作日志
         AccessValidator.validateMenuPermission(request, jwtUtil, permissionService, 301L);
         int springDataPage = Math.max(0, page - 1);
         Page<OperationLogEntity> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir);
@@ -51,10 +50,8 @@ public class OperationLogController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "5") int limit) {
 
-        // 使用基于菜单权限的验证，menuId 301 对应审计日志-操作日志
         AccessValidator.validateMenuPermission(request, jwtUtil, permissionService, 301L);
         List<OperationLogEntity> logs = operationLogService.getRecentOperationLogs(limit);
         return ResponseUtil.success("获取最近操作日志成功", logs);
     }
 }
-
