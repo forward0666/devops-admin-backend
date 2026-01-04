@@ -68,6 +68,26 @@ public class CacheService {
         });
     }
 
+    /* ================= 清理所有缓存 ================= */
+    public void clearAllCache() {
+        if (!redisOk()) return;
+
+        // 清理所有业务相关的缓存
+        clearByPrefix("user:");
+        clearByPrefix("users:");
+        clearByPrefix("role:");
+        clearByPrefix("roles:");
+        clearByPrefix("department:");
+        clearByPrefix("departments:");
+        clearByPrefix("menu:");
+        clearByPrefix("menus:");
+        clearByPrefix("position:");
+        clearByPrefix("positions:");
+        clearByPrefix("permission:");
+        clearByPrefix("token:");
+        clearByPrefix("settings:");
+    }
+
     public void cacheTokenValidation(String username, String token, boolean valid) {
         if (!isRedisAvailable() || token == null) return;
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
@@ -79,8 +99,5 @@ public class CacheService {
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
         Object v = redisTemplate.opsForValue().get(key);
         return (v instanceof Boolean b) ? b : null;
-    }
-    public void clearAllCache() {
-        clearAllCache();
     }
 }

@@ -7,7 +7,7 @@ import com.backend.manage.dto.login.LoginResponseDto;
 import com.backend.manage.entity.system.UserEntity;
 import com.backend.manage.mapper.system.UserMapper;
 import com.backend.manage.service.CacheService;
-import com.backend.manage.service.settings.IPWhitelistService;
+import com.backend.manage.service.system.SecurityService;
 import com.backend.manage.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,7 @@ public class AuthService {
     private UserMapper userMapper; // 用户数据访问层
 
     @Autowired
-    private IPWhitelistService ipWhitelistService; // IP白名单服务
+    private SecurityService ipWhitelistService; // IP白名单服务
 
     @Autowired
     private CacheService cacheService; // 缓存服务，用于Redis缓存操作

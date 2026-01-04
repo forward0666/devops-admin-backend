@@ -521,7 +521,7 @@ public class UserService {
 
         // Try to get from cache first
         if (cacheService.isRedisAvailable()) {
-            List<UserEntity> cachedUsers = departmentCacheService.getCachedDepartmentUsers(departmentId);
+            List<UserEntity> cachedUsers = departmentCacheService.getDepartmentUsersCache(departmentId);
             if (cachedUsers != null) {
                 log.debug("Retrieved department users from cache: " + departmentId);
                 return cachedUsers;
@@ -531,7 +531,7 @@ public class UserService {
         // Get from database and cache the result
         List<UserEntity> users = userMapper.findByDepartmentId(departmentId);
         if (cacheService.isRedisAvailable()) {
-            departmentCacheService.cacheDepartmentUsers(departmentId, users);
+            departmentCacheService.departmentUsersCache(departmentId, users);
         }
         
         return users;

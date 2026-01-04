@@ -12,45 +12,31 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 菜单管理控制器
- * 处理菜单相关的CRUD操作和业务逻辑
- * 使用 Java 21 风格
- */
 @Slf4j
 @RestController
-@RequestMapping("/menus")
+@RequestMapping("/menu")
 public class MenuController {
 
     @Autowired
     private MenuService menuService;
 
-    /**
-     * 获取所有菜单列表接口
-     * @return ResponseEntity包含操作结果
-     */
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<MenuEntity>>> getAllMenus() {
-        log.info("GET /menus - Fetching all menus");
+        log.info("GET /menu - Fetching all menus");
         try {
-            var menus = menuService.getAllMenus();
-            log.info("Successfully retrieved {} menus", menus.size());
-            return ResponseEntity.ok(ApiResponseDto.success("Menus retrieved successfully", menus));
+            var allMenus = menuService.getAllMenus();
+            log.info("Successfully retrieved {} menus", allMenus.size());
+            return ResponseEntity.ok(ApiResponseDto.success("Menus retrieved successfully", allMenus));
         } catch (Exception e) {
-            log.error("Error retrieving menus", e);
+            log.error("Error retrieving allMenus", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve menus: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve allMenus: " + e.getMessage()));
         }
     }
 
-    /**
-     * 根据ID获取菜单详情接口
-     * @param id 菜单ID（可以是内部 id 或 directoryId）
-     * @return ResponseEntity包含操作结果
-     */
     @GetMapping("/{menuId}")
     public ResponseEntity<ApiResponseDto<MenuEntity>> getMenuById(@PathVariable Long id) {
-        log.info("GET /menus/{} - Fetching menu by ID", id);
+        log.info("GET /menu/{} - Fetching menu by ID", id);
         try {
             var menu = menuService.getMenuById(id);
             if (menu != null) {
@@ -62,17 +48,12 @@ public class MenuController {
                         .body(ApiResponseDto.error("Menu not found"));
             }
         } catch (Exception e) {
-            log.error("Error retrieving menu with ID: {}", id, e);
+            log.error("Error retrieving menu by ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve menu: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve menu by ID: " + e.getMessage()));
         }
     }
 
-    /**
-     * 创建新菜单接口
-     * @param menu 菜单对象
-     * @return ResponseEntity包含操作结果
-     */
     @PostMapping
     @OperationLog(
         operationType = "CREATE",
@@ -81,10 +62,10 @@ public class MenuController {
         description = "创建新菜单"
     )
     public ResponseEntity<ApiResponseDto<MenuEntity>> createMenu(@RequestBody MenuEntity menu) {
-        log.info("POST /menus - Creating new menu: {}", menu.getName());
+        log.info("POST /menu - Creating new menu: {}", menu.getName());
         try {
             var createdMenu = menuService.createMenu(menu);
-            log.info("Successfully created menu with ID: {}", createdMenu.getMenuId());
+            log.info("Successfully created menu by ID: {}", createdMenu.getMenuId());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponseDto.success("Menu created successfully", createdMenu));
         } catch (IllegalArgumentException e) {
@@ -92,18 +73,12 @@ public class MenuController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponseDto.error("Invalid menu data: " + e.getMessage()));
         } catch (Exception e) {
-            log.error("Error creating menu: {}", menu.getName(), e);
+            log.error("Error creating menu by ID: {}", menu.getMenuId(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to create menu: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to create menu by ID: " + e.getMessage()));
         }
     }
 
-    /**
-     * 更新菜单信息接口
-     * @param id 菜单ID
-     * @param menu 菜单对象
-     * @return ResponseEntity包含操作结果
-     */
     @PutMapping("/{id}")
     @OperationLog(
         operationType = "UPDATE",
@@ -113,34 +88,29 @@ public class MenuController {
         description = "更新菜单信息"
     )
     public ResponseEntity<ApiResponseDto<MenuEntity>> updateMenu(@PathVariable Long id, @RequestBody MenuEntity menu) {
-        log.info("PUT /menus/{} - Updating menu", id);
+        log.info("PUT /menu/{} - Updating menu by ID: {}", id, menu.getName());
         try {
             menu.setMenuId(id);
             var updatedMenu = menuService.updateMenu(menu);
             if (updatedMenu != null) {
-                log.info("Successfully updated menu: {}", updatedMenu.getName());
+                log.info("Successfully updated menu by ID: {}", updatedMenu.getMenuId());
                 return ResponseEntity.ok(ApiResponseDto.success("Menu updated successfully", updatedMenu));
             } else {
-                log.warn("Menu not found for update with ID: {}", id);
+                log.warn("Menu not found for update by ID: {}", id);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponseDto.error("Menu not found"));
             }
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid menu data for update: {}", e.getMessage());
+            log.warn("Invalid menu data for update by ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponseDto.error("Invalid menu data: " + e.getMessage()));
         } catch (Exception e) {
-            log.error("Error updating menu with ID: {}", id, e);
+            log.error("Error updating menu by ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to update menu: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to update menu by ID: " + e.getMessage()));
         }
     }
 
-    /**
-     * 删除菜单接口
-     * @param id 菜单ID
-     * @return ResponseEntity包含操作结果
-     */
     @DeleteMapping("/{id}")
     @OperationLog(
         operationType = "DELETE",
@@ -150,62 +120,39 @@ public class MenuController {
         description = "删除菜单"
     )
     public ResponseEntity<ApiResponseDto<Void>> deleteMenu(@PathVariable Long id) {
-        log.info("DELETE /menus/{} - Deleting menu", id);
+        log.info("DELETE /menu/{} - Deleting menu by ID: {}", id, id);
         try {
             boolean deleted = menuService.deleteMenu(id);
             if (deleted) {
-                log.info("Successfully deleted menu with ID: {}", id);
+                log.info("Successfully deleted menu by ID: {}", id);
                 return ResponseEntity.ok(ApiResponseDto.success("Menu deleted successfully", null));
             } else {
-                log.warn("Menu not found for deletion with ID: {}", id);
+                log.warn("Menu not found for deletion by ID: {}", id);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponseDto.error("Menu not found"));
             }
         } catch (IllegalStateException e) {
-            log.warn("Cannot delete menu with ID {}: {}", id, e.getMessage());
+            log.warn("Cannot delete menu by ID {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ApiResponseDto.error(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error deleting menu with ID: {}", id, e);
+            log.error("Error deleting menu by ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to delete menu: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to delete menu by ID: " + e.getMessage()));
         }
     }
 
-    /**
-     * 获取根菜单列表接口
-     * @return ResponseEntity包含操作结果
-     */
-    @GetMapping("/root")
-    public ResponseEntity<ApiResponseDto<List<MenuEntity>>> getRootMenus() {
-        log.info("GET /menus/root - Fetching root menus");
-        try {
-            var menus = menuService.getRootMenus();
-            log.info("Successfully retrieved {} root menus", menus.size());
-            return ResponseEntity.ok(ApiResponseDto.success("Root menus retrieved successfully", menus));
-        } catch (Exception e) {
-            log.error("Error retrieving root menus", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve root menus: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 根据父菜单ID获取子菜单接口
-     * @param parentId 父菜单ID
-     * @return ResponseEntity包含操作结果
-     */
     @GetMapping("/parent/{parentId}")
     public ResponseEntity<ApiResponseDto<List<MenuEntity>>> getChildMenus(@PathVariable Long parentId) {
-        log.info("GET /menus/parent/{} - Fetching child menus", parentId);
+        log.info("GET /menu/parent/{} - Fetching child menus by parent ID: {}", parentId, parentId);
         try {
             var menus = menuService.getChildMenus(parentId);
-            log.info("Successfully retrieved {} child menus", menus.size());
+            log.info("Successfully retrieved {} child menus by parent ID: {}", menus.size(), parentId);
             return ResponseEntity.ok(ApiResponseDto.success("Child menus retrieved successfully", menus));
         } catch (Exception e) {
-            log.error("Error retrieving child menus for parent ID: {}", parentId, e);
+            log.error("Error retrieving child menus by parent ID: {}", parentId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve child menus: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve child menus by parent ID: " + e.getMessage()));
         }
     }
 }

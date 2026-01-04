@@ -1,20 +1,18 @@
 package com.backend.manage.vo.system;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-public record DepartmentVo(
+public record RoleVo(
         Long id,
         String name,
+        String code,
         String description,
-        Long managerId,
-        String managerName,
-        List<Object> users,
-        List<Object> recentUsers,
+        String status,
         Integer userCount,
-        LocalDateTime createdAt,
+        String[] permissions,
         String formattedDate,
         String formattedDateTime,
         String statusColor,
-        String statusText
+        String statusText,
+        Integer permissionCount
 ) {}

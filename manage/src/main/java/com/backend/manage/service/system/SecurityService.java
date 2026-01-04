@@ -1,4 +1,4 @@
-package com.backend.manage.service.settings;
+package com.backend.manage.service.system;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,15 +12,14 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class IPWhitelistService {
+public class SecurityService {
 
     @Autowired
-    private SystemSettingsService systemSettingsService;
+    private SettingService systemSettingsService;
 
     /**
      * Check if the given IP address is allowed based on the whitelist configuration
      * 
-     * @param clientIP The client IP address to check
      * @return true if the IP is allowed, false otherwise
      */
 

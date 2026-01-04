@@ -30,18 +30,18 @@ public class DepartmentCacheService {
     private static final String DEPT_USERS = "department:users:";
     private static final long CACHE_MIN = 30;
 
-    public void cacheDepartment(DepartmentEntity dept) {
+    public void departmentCache(DepartmentEntity dept) {
         if (!cacheService.isRedisAvailable() || dept == null || dept.getId() == null) return;
         redisTemplate.opsForValue().set(DEPT_PREFIX + dept.getId(), dept, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public DepartmentEntity getCachedDepartment(Long id) {
+    public DepartmentEntity getDepartmentCache(Long id) {
         if (!cacheService.isRedisAvailable() || id == null) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_PREFIX + id);
         return (v instanceof DepartmentEntity d) ? d : null;
     }
 
-    public void cacheDepartmentsList(List<DepartmentEntity> list) {
+    public void departmentsCache(List<DepartmentEntity> list) {
         if (!cacheService.isRedisAvailable()) {
             log.warn("⚠️ Redis 不可用，无法缓存部门列表");
             return;
@@ -59,7 +59,7 @@ public class DepartmentCacheService {
     }
 
     @SuppressWarnings("unchecked")
-    public List<DepartmentEntity> getCachedDepartmentsList() {
+    public List<DepartmentEntity> getDepartmentCache() {
         if (!cacheService.isRedisAvailable()) {
             log.debug("⚠️ Redis 不可用，无法读取部门列表缓存");
             return null;
@@ -83,18 +83,18 @@ public class DepartmentCacheService {
         redisTemplate.delete(DEPT_PREFIX + id);
     }
 
-    public void clearAllDepartmentCache() {
+    public void clearDepartmentsCache() {
         cacheService.clearByPrefix(DEPT_PREFIX);
         redisTemplate.delete(DEPT_LIST);
     }
 
-    public void cacheDepartmentUsers(Long deptId, List<UserEntity> users) {
+    public void departmentUsersCache(Long deptId, List<UserEntity> users) {
         if (!cacheService.isRedisAvailable() || deptId == null) return;
         redisTemplate.opsForValue().set(DEPT_USERS + deptId, users, CACHE_MIN, TimeUnit.MINUTES);
     }
 
     @SuppressWarnings("unchecked")
-    public List<UserEntity> getCachedDepartmentUsers(Long deptId) {
+    public List<UserEntity> getDepartmentUsersCache(Long deptId) {
         if (!cacheService.isRedisAvailable() || deptId == null) return null;
         Object v = redisTemplate.opsForValue().get(DEPT_USERS + deptId);
         return (v instanceof List<?>) ? (List<UserEntity>) v : null;
@@ -103,5 +103,9 @@ public class DepartmentCacheService {
     public void clearDepartmentUsersCache(Long deptId) {
         if (!cacheService.isRedisAvailable() || deptId == null) return;
         redisTemplate.delete(DEPT_USERS + deptId);
+    }
+
+    public List<DepartmentEntity> getDepartmentsCache() {
+        return getDepartmentCache();
     }
 }

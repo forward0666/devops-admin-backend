@@ -1,18 +1,19 @@
 package com.backend.manage.vo.system;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-public record DepartmentVo(
+public record MenuVo(
         Long id,
+        Long menuId,
         String name,
-        String description,
-        Long managerId,
-        String managerName,
-        List<Object> users,
-        List<Object> recentUsers,
-        Integer userCount,
+        Long parentId,
+        String path,
+        String icon,
+        String type,
+        Integer sort,
+        String status,
         LocalDateTime createdAt,
+        LocalDateTime updatedAt,
         String formattedDate,
         String formattedDateTime,
         String statusColor,

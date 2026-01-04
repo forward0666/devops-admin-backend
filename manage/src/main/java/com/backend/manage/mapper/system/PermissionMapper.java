@@ -1,6 +1,6 @@
 package com.backend.manage.mapper.system;
 
-import com.backend.manage.entity.system.PermissionMappingEntity;
+import com.backend.manage.entity.system.PermissionEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,48 +18,48 @@ public interface PermissionMapper {
      * @param id 映射ID
      * @return 权限映射对象
      */
-    PermissionMappingEntity findById(@Param("id") Long id);
+    PermissionEntity findById(@Param("id") Long id);
 
     /**
      * 根据角色ID查找所有权限映射
      * @param roleId 角色ID
      * @return 权限映射列表
      */
-    List<PermissionMappingEntity> findByRoleId(@Param("roleId") Long roleId);
+    List<PermissionEntity> findByRoleId(@Param("roleId") Long roleId);
 
     /**
      * 根据菜单ID查找所有权限映射
      * @param menuId 菜单ID
      * @return 权限映射列表
      */
-    List<PermissionMappingEntity> findByMenuId(@Param("menuId") Long menuId);
+    List<PermissionEntity> findByMenuId(@Param("menuId") Long menuId);
 
     /**
      * 查找所有权限映射（包含角色和菜单信息）
      * @return 权限映射列表
      */
-    List<PermissionMappingEntity> findAllWithDetails();
+    List<PermissionEntity> findAllWithDetails();
 
     /**
      * 根据角色ID查找所有权限映射（包含菜单信息）
      * @param roleId 角色ID
      * @return 权限映射列表
      */
-    List<PermissionMappingEntity> findByRoleIdWithMenus(@Param("roleId") Long roleId);
+    List<PermissionEntity> findByRoleIdWithMenus(@Param("roleId") Long roleId);
 
     /**
      * 插入权限映射
      * @param mapping 权限映射对象
      * @return 插入记录数
      */
-    int insert(PermissionMappingEntity mapping);
+    int insert(PermissionEntity mapping);
 
     /**
      * 批量插入权限映射
      * @param mappings 权限映射列表
      * @return 插入记录数
      */
-    int batchInsert(@Param("mappings") List<PermissionMappingEntity> mappings);
+    int batchInsert(@Param("mappings") List<PermissionEntity> mappings);
 
     /**
      * 根据ID删除权限映射

@@ -13,25 +13,17 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
-/**
- * 角色管理控制器
- * 处理角色相关的CRUD操作和业务逻辑
- * 使用 Java 21 风格
- */
 @Slf4j
 @RestController
-@RequestMapping("/roles")
+@RequestMapping("/role")
 public class RoleController {
 
     @Autowired
     private RoleService roleService;
 
-    /**
-     * 获取所有角色列表接口
-     */
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<RoleEntity>>> getAllRoles() {
-        log.info("GET /roles - Fetching all roles");
+        log.info("GET /role - Fetching all roles");
         try {
             var roles = roleService.getAllRoles();
             log.info("Successfully retrieved {} roles", roles.size());
@@ -43,12 +35,9 @@ public class RoleController {
         }
     }
 
-    /**
-     * 根据ID获取角色详情接口
-     */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<RoleEntity>> getRoleById(@PathVariable Long id) {
-        log.info("GET /roles/{} - Fetching role by ID", id);
+        log.info("GET /role/{} - Fetching role by ID", id);
         try {
             var role = roleService.getRoleById(id);
             if (role != null) {
@@ -66,9 +55,6 @@ public class RoleController {
         }
     }
 
-    /**
-     * 创建新角色接口
-     */
     @PostMapping
     @OperationLog(
         operationType = "CREATE",
@@ -77,7 +63,7 @@ public class RoleController {
         description = "创建新角色"
     )
     public ResponseEntity<ApiResponseDto<RoleEntity>> createRole(@Valid @RequestBody RoleEntity role) {
-        log.info("POST /roles - Creating new role: {}", role.getName());
+        log.info("POST /role - Creating new role: {}", role.getName());
         try {
             var createdRole = roleService.createRole(role);
             log.info("Successfully created role with ID: {}", createdRole.getId());
@@ -94,9 +80,6 @@ public class RoleController {
         }
     }
 
-    /**
-     * 更新角色信息接口
-     */
     @PutMapping("/{id}")
     @OperationLog(
         operationType = "UPDATE",
@@ -106,7 +89,7 @@ public class RoleController {
         description = "更新角色信息"
     )
     public ResponseEntity<ApiResponseDto<RoleEntity>> updateRole(@PathVariable Long id, @Valid @RequestBody RoleEntity role) {
-        log.info("PUT /roles/{} - Updating role", id);
+        log.info("PUT /role/{} - Updating role", id);
         try {
             role.setId(id);
             var updatedRole = roleService.updateRole(role);
@@ -129,9 +112,6 @@ public class RoleController {
         }
     }
 
-    /**
-     * 删除角色接口
-     */
     @DeleteMapping("/{id}")
     @OperationLog(
         operationType = "DELETE",
@@ -141,7 +121,7 @@ public class RoleController {
         description = "删除角色"
     )
     public ResponseEntity<ApiResponseDto<Void>> deleteRole(@PathVariable Long id) {
-        log.info("DELETE /roles/{} - Deleting role", id);
+        log.info("DELETE /role/{} - Deleting role", id);
         try {
             boolean deleted = roleService.deleteRole(id);
             if (deleted) {

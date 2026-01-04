@@ -4,7 +4,7 @@ import com.backend.manage.dto.ApiResponseDto;
 import com.backend.manage.dto.login.LoginRequestDto;
 import com.backend.manage.dto.login.LoginResponseDto;
 import com.backend.manage.service.login.AuthService;
-import com.backend.manage.service.settings.IPWhitelistService;
+import com.backend.manage.service.system.SecurityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,7 +35,7 @@ public class AuthController {
     private AuthService authService;
 
     @Autowired
-    private IPWhitelistService ipWhitelistService;
+    private SecurityService ipWhitelistService;
 
     /**
      * 用户登录接口

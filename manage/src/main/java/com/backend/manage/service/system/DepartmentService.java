@@ -49,7 +49,7 @@ public class DepartmentService {
         // 优先从Redis缓存获取部门列表，提高性能
         if (cacheService.isRedisAvailable()) {
             log.debug("✅ Redis 可用，尝试读取缓存");
-            List<DepartmentEntity> cachedDepartments = departmentCacheService.getCachedDepartmentsList();
+            List<DepartmentEntity> cachedDepartments = departmentCacheService.getDepartmentsCache();
             if (cachedDepartments != null) {
                 log.debug("✅ 从缓存中获取部门列表成功，共 {} 个部门", cachedDepartments.size());
                 return cachedDepartments;
@@ -71,7 +71,7 @@ public class DepartmentService {
             // 将查询结果缓存到Redis中，提高后续查询性能
             if (cacheService.isRedisAvailable()) {
                 log.debug("📝 将 {} 个部门缓存到 Redis", departments.size());
-                departmentCacheService.cacheDepartmentsList(departments);
+                departmentCacheService.departmentsCache(departments);
             }
             
             log.info("成功获取 {} 个部门", departments.size());
@@ -100,10 +100,10 @@ public class DepartmentService {
         
         // 优先从Redis缓存获取部门信息
         if (cacheService.isRedisAvailable()) {
-            DepartmentEntity cachedDepartment = departmentCacheService.getCachedDepartment(id);
-            if (cachedDepartment != null) {
+            DepartmentEntity DepartmentCache = departmentCacheService.getDepartmentCache(id);
+            if (DepartmentCache != null) {
                 log.debug("从缓存中获取部门成功: {}", id);
-                return cachedDepartment;
+                return DepartmentCache;
             }
         }
 
@@ -116,7 +116,7 @@ public class DepartmentService {
                 
                 // 将查询结果缓存到Redis中
                 if (cacheService.isRedisAvailable()) {
-                    departmentCacheService.cacheDepartment(department);
+                    departmentCacheService.departmentCache(department);
                 }
                 
                 log.info("成功获取部门: {}", department.getName());
@@ -168,7 +168,7 @@ public class DepartmentService {
             
             // 创建新部门后清除相关缓存，确保数据一致性
             if (cacheService.isRedisAvailable()) {
-                departmentCacheService.clearAllDepartmentCache();
+                departmentCacheService.clearDepartmentsCache();
             }
             
             log.info("成功创建部门，ID: {}", createdDepartment.getId());
@@ -217,7 +217,7 @@ public class DepartmentService {
 
             // 更新部门后清除相关缓存，确保数据一致性
             if (cacheService.isRedisAvailable()) {
-                departmentCacheService.clearAllDepartmentCache();
+                departmentCacheService.clearDepartmentsCache();
             }
             
             log.info("成功更新部门: {}", updatedDepartment.getName());
@@ -266,7 +266,7 @@ public class DepartmentService {
             if (deleted) {
                 // 删除部门后清除相关缓存，确保数据一致性
                 if (cacheService.isRedisAvailable()) {
-                    departmentCacheService.clearAllDepartmentCache();
+                    departmentCacheService.clearDepartmentsCache();
                 }
                 
                 log.info("成功删除部门，ID: {}", id);

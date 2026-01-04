@@ -13,24 +13,17 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
-/**
- * 职位管理控制器
- * 处理职位相关的CRUD操作和业务逻辑
- */
 @Slf4j
 @RestController
-@RequestMapping("/positions")
+@RequestMapping("/position")
 public class PositionController {
 
     @Autowired
     private PositionService positionService;
 
-    /**
-     * 获取所有职位列表接口
-     */
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<PositionEntity>>> getAllPositions() {
-        log.info("GET /positions - Fetching all positions");
+        log.info("GET /position - Fetching all positions");
         try {
             List<PositionEntity> positions = positionService.getAllPositions();
             log.info("Successfully retrieved {} positions", positions.size());
@@ -42,12 +35,9 @@ public class PositionController {
         }
     }
 
-    /**
-     * 根据ID获取职位详情接口
-     */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<PositionEntity>> getPositionById(@PathVariable Long id) {
-        log.info("GET /positions/{} - Fetching position by ID", id);
+        log.info("GET /position/{} - Fetching position by ID", id);
         try {
             PositionEntity position = positionService.getPositionById(id);
             if (position != null) {
@@ -65,9 +55,6 @@ public class PositionController {
         }
     }
 
-    /**
-     * 创建新职位接口
-     */
     @PostMapping
     @OperationLog(
         operationType = "CREATE",
@@ -76,7 +63,7 @@ public class PositionController {
         description = "创建新职位"
     )
     public ResponseEntity<ApiResponseDto<PositionEntity>> createPosition(@Valid @RequestBody PositionEntity position) {
-        log.info("POST /positions - Creating new position: {}", position.getName());
+        log.info("POST /position - Creating new position: {}", position.getName());
         try {
             PositionEntity createdPosition = positionService.createPosition(position);
             log.info("Successfully created position with ID: {}", createdPosition.getId());
@@ -93,9 +80,6 @@ public class PositionController {
         }
     }
 
-    /**
-     * 更新职位信息接口
-     */
     @PutMapping("/{id}")
     @OperationLog(
         operationType = "UPDATE",
@@ -105,7 +89,7 @@ public class PositionController {
         description = "更新职位信息"
     )
     public ResponseEntity<ApiResponseDto<PositionEntity>> updatePosition(@PathVariable Long id, @Valid @RequestBody PositionEntity position) {
-        log.info("PUT /positions/{} - Updating position", id);
+        log.info("PUT /position/{} - Updating position", id);
         try {
             position.setId(id);
             PositionEntity updatedPosition = positionService.updatePosition(position);
@@ -128,9 +112,6 @@ public class PositionController {
         }
     }
 
-    /**
-     * 删除职位接口
-     */
     @DeleteMapping("/{id}")
     @OperationLog(
         operationType = "DELETE",
@@ -140,7 +121,7 @@ public class PositionController {
         description = "删除职位"
     )
     public ResponseEntity<ApiResponseDto<Void>> deletePosition(@PathVariable Long id) {
-        log.info("DELETE /positions/{} - Deleting position", id);
+        log.info("DELETE /position/{} - Deleting position", id);
         try {
             boolean deleted = positionService.deletePosition(id);
             if (deleted) {
@@ -162,12 +143,9 @@ public class PositionController {
         }
     }
 
-    /**
-     * 根据部门ID获取职位列表接口
-     */
     @GetMapping("/department/{departmentId}")
     public ResponseEntity<ApiResponseDto<List<PositionEntity>>> getPositionsByDepartmentId(@PathVariable Long departmentId) {
-        log.info("GET /positions/department/{} - Fetching positions by department ID", departmentId);
+        log.info("GET /position/department/{} - Fetching positions by department ID", departmentId);
         try {
             List<PositionEntity> positions = positionService.getPositionsByDepartmentId(departmentId);
             log.info("Successfully retrieved {} positions for department ID: {}", positions.size(), departmentId);

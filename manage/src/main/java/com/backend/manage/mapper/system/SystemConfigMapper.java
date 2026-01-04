@@ -1,6 +1,6 @@
-package com.backend.manage.mapper.settings;
+package com.backend.manage.mapper.system;
 
-import com.backend.manage.entity.settings.SystemConfigEntity;
+import com.backend.manage.entity.system.SystemConfigEntity;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;

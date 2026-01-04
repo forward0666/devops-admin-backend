@@ -1,6 +1,6 @@
 package com.backend.manage.service.system.cache;
 
-import com.backend.manage.entity.system.PermissionMappingEntity;
+import com.backend.manage.entity.system.PermissionEntity;
 import com.backend.manage.service.CacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,42 +28,42 @@ public class PermissionCacheService {
     private static final String PERMISSION_ROLE_PREFIX = "permission:role:";
     private static final long CACHE_MIN = 30;
 
-    public void cachePermissionMapping(PermissionMappingEntity mapping) {
+    public void permissionCache(PermissionEntity mapping) {
         if (!cacheService.isRedisAvailable() || mapping == null) return;
         String key = PERMISSION_PREFIX + mapping.getRoleId() + ":" + mapping.getMenuId();
         redisTemplate.opsForValue().set(key, mapping, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public void cachePermissionMappingsByRole(Long roleId, List<PermissionMappingEntity> mappings) {
+    public void permissionCacheByRole(Long roleId, List<PermissionEntity> mappings) {
         if (!cacheService.isRedisAvailable() || roleId == null) return;
         redisTemplate.opsForValue().set(PERMISSION_ROLE_PREFIX + roleId, mappings, CACHE_MIN, TimeUnit.MINUTES);
     }
 
-    public PermissionMappingEntity getCachedPermissionMapping(Long roleId, Long menuId) {
+    public PermissionEntity getPermissionCache(Long roleId, Long menuId) {
         if (!cacheService.isRedisAvailable() || roleId == null || menuId == null) return null;
         String key = PERMISSION_PREFIX + roleId + ":" + menuId;
         Object v = redisTemplate.opsForValue().get(key);
-        return (v instanceof PermissionMappingEntity m) ? m : null;
+        return (v instanceof PermissionEntity m) ? m : null;
     }
 
     @SuppressWarnings("unchecked")
-    public List<PermissionMappingEntity> getCachedPermissionMappingsByRole(Long roleId) {
+    public List<PermissionEntity> getPermissionsCacheByRole(Long roleId) {
         if (!cacheService.isRedisAvailable() || roleId == null) return null;
         Object v = redisTemplate.opsForValue().get(PERMISSION_ROLE_PREFIX + roleId);
-        return (v instanceof List<?>) ? (List<PermissionMappingEntity>) v : null;
+        return (v instanceof List<?>) ? (List<PermissionEntity>) v : null;
     }
 
-    public void clearPermissionMappingCache(Long roleId, Long menuId) {
+    public void clearPermissionCache(Long roleId, Long menuId) {
         if (!cacheService.isRedisAvailable() || roleId == null || menuId == null) return;
         redisTemplate.delete(PERMISSION_PREFIX + roleId + ":" + menuId);
     }
 
-    public void clearPermissionMappingsByRoleCache(Long roleId) {
+    public void clearPermissionsCacheByRole(Long roleId) {
         if (!cacheService.isRedisAvailable() || roleId == null) return;
         redisTemplate.delete(PERMISSION_ROLE_PREFIX + roleId);
     }
 
-    public void clearAllPermissionMappingCache() {
+    public void clearAllPermissionCache() {
         cacheService.clearByPrefix(PERMISSION_PREFIX);
         cacheService.clearByPrefix(PERMISSION_ROLE_PREFIX);
     }

@@ -1,10 +1,12 @@
-package com.backend.manage.controller.settings;
+package com.backend.manage.controller.system;
 
 import com.backend.manage.annotation.OperationLog;
 import com.backend.manage.dto.ApiResponseDto;
-import com.backend.manage.service.settings.SystemSettingsService;
+import com.backend.manage.service.CacheService;
+import com.backend.manage.service.system.SettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,10 +39,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/settings")
 @RequiredArgsConstructor // 自动生成包含 final 字段的构造函数
-public class SystemSettingsController {
+public class SettingController {
 
-    private final SystemSettingsService systemSettingsService;
-    private final com.backend.manage.service.CacheService cacheService;
+    private final SettingService systemSettingsService;
+    @Autowired
+    private CacheService cacheService;
 
     /**
      * 获取所有系统设置
@@ -56,7 +59,7 @@ public class SystemSettingsController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @GetMapping("/system")
+    @GetMapping("/")
     @OperationLog(
             operationType = "SETTINGS_READ",
             operationName = "获取系统设置",
@@ -64,8 +67,8 @@ public class SystemSettingsController {
             description = "查看系统基本配置信息",
             logResponse = false
     )
-    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSystemSettings() {
-        log.info("GET /settings/system - Fetching system settings");
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSetting() {
+        log.info("GET /settings - Fetching settings");
         Map<String, Object> settings = systemSettingsService.getSystemSettings();
         return ResponseEntity.ok(ApiResponseDto.success("System settings retrieved successfully", settings));
     }
@@ -98,7 +101,7 @@ public class SystemSettingsController {
             // logRequest = true,
             // logResponse = true
     )
-    public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSystemSettings(@RequestBody Map<String, Object> settings) {
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSettings(@RequestBody Map<String, Object> settings) {
         log.info("PUT /settings/system - Updating system settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateSystemSettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("System settings updated successfully", updatedSettings));
@@ -120,13 +123,13 @@ public class SystemSettingsController {
      */
     @GetMapping("/security")
     @OperationLog(
-            operationType = "SECURITY_SETTINGS_READ",
+            operationType = "SECURITYS_READ",
             operationName = "获取安全设置",
             resourceType = "SECURITY_SETTINGS",
             description = "查看系统安全配置信息",
             logResponse = false
     )
-    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSecuritySettings() {
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSecuritys() {
         log.info("GET /settings/security - Fetching security settings");
         Map<String, Object> settings = systemSettingsService.getSecuritySettings();
         return ResponseEntity.ok(ApiResponseDto.success("Security settings retrieved successfully", settings));
@@ -160,7 +163,7 @@ public class SystemSettingsController {
             // logRequest = true,
             // logResponse = true
     )
-    public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSecuritySettings(@RequestBody Map<String, Object> settings) {
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSecurity(@RequestBody Map<String, Object> settings) {
         log.info("PUT /settings/security - Updating security settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateSecuritySettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("Security settings updated successfully", updatedSettings));

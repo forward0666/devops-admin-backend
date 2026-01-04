@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PermissionMappingEntity {
+public class PermissionEntity {
     /**
      * 角色 ID（复合主键的一部分）
      */
@@ -71,7 +71,7 @@ public class PermissionMappingEntity {
      * @param roleId 角色 ID
      * @param menuId 菜单 ID
      */
-    public PermissionMappingEntity(Long roleId, Long menuId) {
+    public PermissionEntity(Long roleId, Long menuId) {
         this.roleId = roleId;
         this.menuId = menuId;
         this.createdAt = LocalDateTime.now();

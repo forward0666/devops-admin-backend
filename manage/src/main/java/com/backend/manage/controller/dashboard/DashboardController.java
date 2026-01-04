@@ -43,7 +43,7 @@ public class DashboardController {
      * @param limit 返回记录的数量限制，默认为5，最大值为5
      * @return ResponseEntity包含操作结果，成功时返回活动记录数据，失败时返回错误信息
      */
-    @GetMapping("/recent-activities")
+    @GetMapping("/recentActivities")
     public ResponseEntity<Map<String, Object>> getRecentActivities(@RequestParam(defaultValue = "5") int limit) {
         try {
             log.info("Fetching recent activities from MongoDB, limit: {}", limit);

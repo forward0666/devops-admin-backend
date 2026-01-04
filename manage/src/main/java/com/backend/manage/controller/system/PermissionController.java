@@ -14,56 +14,42 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
-/**
- * 权限管理控制器
- * 处理角色与菜单的权限映射关系
- * 使用 Java 21 风格
- */
 @Slf4j
 @RestController
-@RequestMapping("/permissions")
+@RequestMapping("/permission")
 public class PermissionController {
 
     @Autowired
     private PermissionService permissionService;
 
-    /**
-     * 获取所有权限映射
-     */
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<PermissionResponseDto>>> getAllPermissions() {
-        log.info("GET /permissions - Fetching all permission mappings");
+        log.info("GET /permission - Fetching all permissions");
         try {
-            var mappings = permissionService.getAllPermissionMappings();
-            log.info("Successfully retrieved {} permission mappings", mappings.size());
-            return ResponseEntity.ok(ApiResponseDto.success("Permission mappings retrieved successfully", mappings));
+            var mappings = permissionService.getAllPermissions();
+            log.info("Successfully retrieved {} permissions", mappings.size());
+            return ResponseEntity.ok(ApiResponseDto.success("Permissions retrieved successfully", mappings));
         } catch (Exception e) {
-            log.error("Error retrieving permission mappings", e);
+            log.error("Error retrieving permissions", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve permission mappings: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve permissions: " + e.getMessage()));
         }
     }
 
-    /**
-     * 根据角色ID获取权限映射
-     */
     @GetMapping("/role/{roleId}")
     public ResponseEntity<ApiResponseDto<PermissionResponseDto>> getPermissionMappingByRoleId(
             @PathVariable Long roleId) {
         log.info("GET /permissions/role/{} - Fetching permission mapping", roleId);
         try {
-            var mapping = permissionService.getPermissionMappingByRoleId(roleId);
-            return ResponseEntity.ok(ApiResponseDto.success("Permission mapping retrieved successfully", mapping));
+            var mapping = permissionService.getPermissionsByRoleId(roleId);
+            return ResponseEntity.ok(ApiResponseDto.success("Permissions retrieved successfully", mapping));
         } catch (Exception e) {
-            log.error("Error retrieving permission mapping for role ID: {}", roleId, e);
+            log.error("Error retrieving permissions by role ID: {}", roleId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve permission mapping: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to retrieve permissions: " + e.getMessage()));
         }
     }
 
-    /**
-     * 更新角色的权限映射
-     */
     @PutMapping("/role/{roleId}")
     @OperationLog(
         operationType = "UPDATE",
@@ -78,23 +64,20 @@ public class PermissionController {
         log.info("PUT /permissions/role/{} - Updating permission mapping", roleId);
         try {
             request.setRoleId(roleId);
-            permissionService.updatePermissionMapping(request);
-            log.info("Successfully updated permission mapping for role ID: {}", roleId);
-            return ResponseEntity.ok(ApiResponseDto.success("Permission mapping updated successfully", null));
+            permissionService.updatePermissions(request);
+            log.info("Successfully updated permissions for role ID: {}", roleId);
+            return ResponseEntity.ok(ApiResponseDto.success("Permissions updated successfully", null));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid permission mapping data: {}", e.getMessage());
+            log.warn("Invalid permission data: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponseDto.error("Invalid permission mapping data: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Invalid permission data: " + e.getMessage()));
         } catch (Exception e) {
-            log.error("Error updating permission mapping for role ID: {}", roleId, e);
+            log.error("Error updating permissions for role ID: {}", roleId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to update permission mapping: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to update permissions: " + e.getMessage()));
         }
     }
 
-    /**
-     * 删除角色的权限映射
-     */
     @DeleteMapping("/role/{roleId}")
     @OperationLog(
         operationType = "DELETE",

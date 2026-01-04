@@ -17,7 +17,6 @@ import java.util.Map;
  */
 @FeignClient(name = "${security.service.name:security}",
              url = "${security.service.url:}",
-             fallback = SecurityServiceClientFallback.class,
              configuration = SecurityServiceClientConfig.class)
 public interface SecurityServiceClient {
 

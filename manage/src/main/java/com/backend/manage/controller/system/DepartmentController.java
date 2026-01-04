@@ -13,48 +13,21 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 
-/**
- * 部门管理控制器
- * 处理部门相关的CRUD操作和业务逻辑
- * 
- * 功能说明：
- * - 提供完整的部门管理API接口
- * - 支持部门的创建、查询、更新、删除操作
- * - 集成操作日志记录注解@OperationLog
- * - 使用统一的ApiResponse响应格式
- * - 支持RESTful API设计风格
- * - 包含部门用户管理和搜索功能
- * - 集成详细的日志记录和异常处理
- * - 支持数据验证和业务逻辑校验
- */
 @Slf4j
 @RestController
-@RequestMapping("/departments")
+@RequestMapping("/department")
 public class DepartmentController {
 
     @Autowired
     private DepartmentService departmentService;
 
-    /**
-     * 获取所有部门列表接口
-     * 
-     * 功能说明：
-     * - 查询系统中所有的部门信息
-     * - 返回完整的部门列表数据
-     * - 使用GET方法，无请求参数
-     * - 记录详细的请求日志和结果统计
-     * - 使用统一的ApiResponse响应格式
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @return ResponseEntity包含操作结果，成功时返回部门列表数据，失败时返回错误信息
-     */
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<DepartmentEntity>>> getAllDepartments() {
-        log.info("GET /departments - Fetching all departments");
+        log.info("GET /department - Fetching all departments");
         try {
-            List<DepartmentEntity> departments = departmentService.getAllDepartments();
-            log.info("Successfully retrieved {} departments", departments.size());
-            return ResponseEntity.ok(ApiResponseDto.success("Departments retrieved successfully", departments));
+            List<DepartmentEntity> department = departmentService.getAllDepartments();
+            log.info("Successfully retrieved {} departments", department.size());
+            return ResponseEntity.ok(ApiResponseDto.success("Departments retrieved successfully", department));
         } catch (Exception e) {
             log.error("Error retrieving departments", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -62,25 +35,9 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 根据ID获取部门详情接口
-     * 
-     * 功能说明：
-     * - 根据部门ID查询具体的部门信息
-     * - 支持路径参数传递部门ID
-     * - 返回指定部门的详细信息
-     * - 使用GET方法，支持路径参数
-     * - 记录详细的请求日志，包括部门ID
-     * - 使用统一的ApiResponse响应格式
-     * - 支持404 Not Found状态码处理部门不存在的情况
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @param id 部门ID，通过路径参数传递
-     * @return ResponseEntity包含操作结果，成功时返回部门详情数据，失败时返回错误信息
-     */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<DepartmentEntity>> getDepartmentById(@PathVariable Long id) {
-        log.info("GET /departments/{} - Fetching department by ID", id);
+        log.info("GET /department/{} - Fetching department by ID", id);
         try {
             DepartmentEntity department = departmentService.getDepartmentById(id);
             if (department != null) {
@@ -98,24 +55,6 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 创建新部门接口
-     * 
-     * 功能说明：
-     * - 创建新的部门信息
-     * - 接收JSON格式的部门数据，支持数据验证
-     * - 使用POST方法，请求体包含部门信息
-     * - 返回创建成功的部门数据
-     * - 记录详细的请求日志，包括部门名称
-     * - 使用统一的ApiResponse响应格式
-     * - 集成操作日志记录@OperationLog注解
-     * - 支持数据验证异常处理(IllegalArgumentException)
-     * - 返回201 Created状态码表示资源创建成功
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @param department 部门对象，通过请求体传递JSON数据，支持数据验证
-     * @return ResponseEntity包含操作结果，成功时返回创建的部门数据，失败时返回错误信息
-     */
     @PostMapping
     @OperationLog(
         operationType = "CREATE",
@@ -124,7 +63,7 @@ public class DepartmentController {
         description = "创建新部门"
     )
     public ResponseEntity<ApiResponseDto<DepartmentEntity>> createDepartment(@Valid @RequestBody DepartmentEntity department) {
-        log.info("POST /departments - Creating new department: {}", department.getName());
+        log.info("POST /department - Creating new department: {}", department.getName());
         try {
             DepartmentEntity createdDepartment = departmentService.createDepartment(department);
             log.info("Successfully created department with ID: {}", createdDepartment.getId());
@@ -141,25 +80,6 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 更新部门信息接口
-     * 
-     * 功能说明：
-     * - 更新指定部门的详细信息
-     * - 根据部门ID和更新的部门数据进行修改
-     * - 使用PUT方法，支持路径参数和请求体
-     * - 返回更新后的部门数据
-     * - 记录详细的请求日志，包括部门ID
-     * - 使用统一的ApiResponse响应格式
-     * - 集成操作日志记录@OperationLog注解
-     * - 支持数据验证异常处理(IllegalArgumentException)
-     * - 支持404 Not Found状态码处理部门不存在的情况
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @param id 部门ID，通过路径参数传递
-     * @param department 部门对象，通过请求体传递更新的JSON数据，支持数据验证
-     * @return ResponseEntity包含操作结果，成功时返回更新后的部门数据，失败时返回错误信息
-     */
     @PutMapping("/{id}")
     @OperationLog(
         operationType = "UPDATE",
@@ -169,7 +89,7 @@ public class DepartmentController {
         description = "更新部门信息"
     )
     public ResponseEntity<ApiResponseDto<DepartmentEntity>> updateDepartment(@PathVariable Long id, @Valid @RequestBody DepartmentEntity department) {
-        log.info("PUT /departments/{} - Updating department", id);
+        log.info("PUT /department/{} - Updating department", id);
         try {
             department.setId(id);
             DepartmentEntity updatedDepartment = departmentService.updateDepartment(department);
@@ -192,24 +112,6 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 删除部门接口
-     * 
-     * 功能说明：
-     * - 删除指定的部门信息
-     * - 根据部门ID进行删除操作
-     * - 使用DELETE方法，支持路径参数
-     * - 返回删除操作的成功状态
-     * - 记录详细的请求日志，包括部门ID
-     * - 使用统一的ApiResponse响应格式
-     * - 集成操作日志记录@OperationLog注解
-     * - 支持404 Not Found状态码处理部门不存在的情况
-     * - 支持409 Conflict状态码处理无法删除的情况(IllegalStateException)
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @param id 部门ID，通过路径参数传递
-     * @return ResponseEntity包含操作结果，成功时返回成功消息，失败时返回错误信息
-     */
     @DeleteMapping("/{id}")
     @OperationLog(
         operationType = "DELETE",
@@ -219,7 +121,7 @@ public class DepartmentController {
         description = "删除部门"
     )
     public ResponseEntity<ApiResponseDto<Void>> deleteDepartment(@PathVariable Long id) {
-        log.info("DELETE /departments/{} - Deleting department", id);
+        log.info("DELETE /department/{} - Deleting department", id);
         try {
             boolean deleted = departmentService.deleteDepartment(id);
             if (deleted) {
@@ -241,24 +143,9 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 获取部门下所有用户接口
-     * 
-     * 功能说明：
-     * - 查询指定部门下的所有用户信息
-     * - 根据部门ID获取该部门的所有用户列表
-     * - 使用GET方法，支持路径参数
-     * - 返回用户列表数据
-     * - 记录详细的请求日志，包括部门ID和用户数量
-     * - 使用统一的ApiResponse响应格式
-     * - 异常处理机制，返回友好的错误信息
-     * 
-     * @param id 部门ID，通过路径参数传递
-     * @return ResponseEntity包含操作结果，成功时返回用户列表数据，失败时返回错误信息
-     */
     @GetMapping("/{id}/users")
     public ResponseEntity<ApiResponseDto<List<Object>>> getDepartmentUsers(@PathVariable Long id) {
-        log.info("GET /departments/{}/users - Fetching users for department", id);
+        log.info("GET /department/{}/users - Fetching users for department", id);
         try {
             List<Object> users = departmentService.getDepartmentUsers(id);
             log.info("Successfully retrieved {} users for department ID: {}", users.size(), id);
@@ -270,26 +157,9 @@ public class DepartmentController {
         }
     }
 
-    /**
-     * 按名称搜索部门接口
-     * 
-     * 功能说明：
-     * - 根据部门名称进行模糊搜索
-     * - 支持查询参数传递搜索关键词
-     * - 使用GET方法，支持查询参数
-     * - 返回匹配的部门列表
-     * - 记录详细的请求日志，包括搜索关键词和匹配数量
-     * - 使用统一的ApiResponse响应格式
-     * - 支持400 Bad Request状态码处理空搜索关键词的情况
-     * - 异常处理机制，返回友好的错误信息
-     * - 使用流式处理进行内存中的模糊匹配
-     * 
-     * @param name 部门名称搜索关键词，通过查询参数传递
-     * @return ResponseEntity包含操作结果，成功时返回匹配的部门列表，失败时返回错误信息
-     */
     @GetMapping("/search")
     public ResponseEntity<ApiResponseDto<List<DepartmentEntity>>> searchDepartments(@RequestParam String name) {
-        log.info("GET /departments/search?name={} - Searching departments", name);
+        log.info("GET /department/search?name={} - Searching department by name", name);
         try {
             if (name == null || name.trim().isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -304,11 +174,9 @@ public class DepartmentController {
             log.info("Found {} departments matching search term: {}", filteredDepartments.size(), name);
             return ResponseEntity.ok(ApiResponseDto.success("Departments found", filteredDepartments));
         } catch (Exception e) {
-            log.error("Error searching departments with name: {}", name, e);
+            log.error("Error searching departments by name: {}", name, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to search departments: " + e.getMessage()));
+                    .body(ApiResponseDto.error("Failed to search department by name: " + e.getMessage()));
         }
     }
-
-
 }
