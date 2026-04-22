@@ -2,7 +2,6 @@ package com.backend.manage.controller.audits;
 
 import com.backend.manage.entity.audits.OperationLogEntity;
 import com.backend.manage.service.audits.OperationLogService;
-import com.backend.manage.service.system.PermissionService;
 import com.backend.manage.util.AccessValidator;
 import com.backend.manage.util.JwtUtil;
 import com.backend.manage.util.ResponseUtil;
@@ -27,7 +26,6 @@ public class OperationLogController {
 
     private final OperationLogService operationLogService;
     private final JwtUtil jwtUtil;
-    private final PermissionService permissionService;
 
     @GetMapping
     @Operation(summary = "获取操作日志列表")
@@ -38,7 +36,7 @@ public class OperationLogController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
-        AccessValidator.validateMenuPermission(request, jwtUtil, permissionService, 301L);
+        AccessValidator.validate(request, jwtUtil, "sys_admin", "admin", "devops");
         int springDataPage = Math.max(0, page - 1);
         Page<OperationLogEntity> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir);
         return ResponseUtil.page("获取操作日志成功", logs, page);
@@ -50,7 +48,7 @@ public class OperationLogController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "5") int limit) {
 
-        AccessValidator.validateMenuPermission(request, jwtUtil, permissionService, 301L);
+        AccessValidator.validate(request, jwtUtil, "sys_admin", "admin", "devops", "leader");
         List<OperationLogEntity> logs = operationLogService.getRecentOperationLogs(limit);
         return ResponseUtil.success("获取最近操作日志成功", logs);
     }
