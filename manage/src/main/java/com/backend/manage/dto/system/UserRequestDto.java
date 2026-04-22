@@ -43,4 +43,8 @@ public class UserRequestDto {
     private String role;
 
     private Long departmentId;
+
+    private Boolean active;
+    private Long createdBy;
+    private Long updatedBy;
 }

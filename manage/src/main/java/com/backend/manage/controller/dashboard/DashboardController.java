@@ -1,13 +1,18 @@
 package com.backend.manage.controller.dashboard;
 
+import com.backend.manage.dto.ApiResponseDto;
+import com.backend.manage.entity.system.UserEntity;
 import com.backend.manage.service.audits.OperationLogService;
+import com.backend.manage.service.system.DepartmentService;
+import com.backend.manage.service.system.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 仪表板控制器
@@ -27,7 +32,34 @@ import java.util.Map;
 public class DashboardController {
     
     private final OperationLogService operationLogService;
-    
+    private final UserService userService;
+    private final DepartmentService departmentService;
+
+    /**
+     * 获取统计数据接口
+     */
+    @GetMapping("/stats")
+    public ApiResponseDto<Map<String, Object>> getStats() {
+        try {
+            log.info("Fetching dashboard stats");
+
+            Map<String, Object> stats = new HashMap<>();
+            List<UserEntity> allUsers = userService.getAllUsers();
+
+            stats.put("totalUsers", allUsers.size());
+            stats.put("activeUsers", allUsers.stream().filter(UserEntity::isActive).count());
+            stats.put("totalDepartments", departmentService.getAllDepartments().size());
+            Map<String, Long> roleDistribution = allUsers.stream()
+                .collect(Collectors.groupingBy(UserEntity::getRole, Collectors.counting()));
+            stats.put("roleDistribution", roleDistribution);
+
+            return ApiResponseDto.success("获取统计数据成功", stats);
+        } catch (Exception e) {
+            log.error("Failed to fetch stats: {}", e.getMessage(), e);
+            return ApiResponseDto.error("获取统计数据失败");
+        }
+    }
+
     /**
      * 获取最近活动记录接口
      * 
@@ -44,31 +76,23 @@ public class DashboardController {
      * @return ResponseEntity包含操作结果，成功时返回活动记录数据，失败时返回错误信息
      */
     @GetMapping("/recentActivities")
-    public ResponseEntity<Map<String, Object>> getRecentActivities(@RequestParam(defaultValue = "5") int limit) {
+    public ApiResponseDto<List<?>> getRecentActivities(@RequestParam(defaultValue = "5") int limit) {
         try {
             log.info("Fetching recent activities from MongoDB, limit: {}", limit);
-            
+
             // 限制最大数量为5
             if (limit > 5) {
                 limit = 5;
             }
-            
+
             var activities = operationLogService.getRecentOperationLogs(limit);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("code", 200);
-            response.put("message", "获取最近活动记录成功");
-            response.put("data", activities);
-            
+
             log.info("Successfully fetched {} recent activities", activities.size());
-            return ResponseEntity.ok(response);
-            
+            return ApiResponseDto.success("获取最近活动记录成功", activities);
+
         } catch (Exception e) {
             log.error("Failed to fetch recent activities: {}", e.getMessage(), e);
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("code", 500);
-            errorResponse.put("message", "获取最近活动记录失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ApiResponseDto.error("获取最近活动记录失败: " + e.getMessage());
         }
     }
 }

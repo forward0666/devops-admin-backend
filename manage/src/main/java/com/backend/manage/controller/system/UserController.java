@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import com.backend.manage.dto.system.UserRequestDto;
+
 import java.util.List;
 import java.util.Map;
 
@@ -52,36 +54,24 @@ public class UserController {
         resourceType = "USER",
         description = "创建新用户"
     )
-    public ApiResponseDto<UserEntity> createUser(@RequestBody Map<String, Object> userRequest) {
+    public ApiResponseDto<UserEntity> createUser(@RequestBody UserRequestDto userRequest) {
         try {
-            if (!userRequest.containsKey("username") || userRequest.get("username") == null) {
+            if (userRequest.getUsername() == null) {
                 return ApiResponseDto.error("Username is required");
             }
-            if (!userRequest.containsKey("password") || userRequest.get("password") == null) {
+            if (userRequest.getPassword() == null) {
                 return ApiResponseDto.error("Password is required");
             }
-            if (!userRequest.containsKey("role") || userRequest.get("role") == null) {
+            if (userRequest.getRole() == null) {
                 return ApiResponseDto.error("Role is required");
             }
 
-            String username = (String) userRequest.get("username");
-            String password = (String) userRequest.get("password");
-            String email = (String) userRequest.get("email");
-            String phone = (String) userRequest.get("phone");
-            String tgUsername = (String) userRequest.get("tgUsername");
-            String fullName = (String) userRequest.get("fullName");
-            String avatarUrl = (String) userRequest.get("avatarUrl");
-            String position = (String) userRequest.get("position");
-            String employeeId = (String) userRequest.get("employeeId");
-            String role = (String) userRequest.get("role");
-            Long departmentId = userRequest.get("departmentId") != null ? 
-                Long.valueOf(userRequest.get("departmentId").toString()) : null;
-            Long createdBy = userRequest.get("createdBy") != null ? 
-                Long.valueOf(userRequest.get("createdBy").toString()) : null;
-
-            UserEntity createdUser = userService.createUser(username, password, email, phone, tgUsername,
-                                                    fullName, avatarUrl, position, employeeId,
-                                                    role, departmentId, createdBy);
+            UserEntity createdUser = userService.createUser(
+                    userRequest.getUsername(), userRequest.getPassword(),
+                    userRequest.getEmail(), userRequest.getPhone(), userRequest.getTgUsername(),
+                    userRequest.getFullName(), userRequest.getAvatarUrl(), userRequest.getPosition(),
+                    userRequest.getEmployeeId(), userRequest.getRole(),
+                    userRequest.getDepartmentId(), userRequest.getCreatedBy());
             return ApiResponseDto.success("User created successfully", createdUser);
         } catch (Exception e) {
             log.error("Failed to create user", e);
@@ -97,26 +87,12 @@ public class UserController {
         resourceIdIndex = 0,
         description = "更新用户信息"
     )
-    public ApiResponseDto<UserEntity> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> userRequest) {
+    public ApiResponseDto<UserEntity> updateUser(@PathVariable Long id, @RequestBody UserRequestDto userRequest) {
         try {
-            String email = (String) userRequest.get("email");
-            String phone = (String) userRequest.get("phone");
-            String tgUsername = (String) userRequest.get("tgUsername");
-            String fullName = (String) userRequest.get("fullName");
-            String avatarUrl = (String) userRequest.get("avatarUrl");
-            String position = (String) userRequest.get("position");
-            String employeeId = (String) userRequest.get("employeeId");
-            String role = (String) userRequest.get("role");
-            Long departmentId = userRequest.get("departmentId") != null ? 
-                Long.valueOf(userRequest.get("departmentId").toString()) : null;
-            Boolean active = userRequest.get("active") != null ? 
-                Boolean.valueOf(userRequest.get("active").toString()) : null;
-            Long updatedBy = userRequest.get("updatedBy") != null ? 
-                Long.valueOf(userRequest.get("updatedBy").toString()) : null;
-
-            UserEntity updatedUser = userService.updateUser(id, email, phone, tgUsername, fullName,
-                                                    avatarUrl, position, employeeId, role,
-                                                    departmentId, active, updatedBy);
+            UserEntity updatedUser = userService.updateUser(id, userRequest.getEmail(), userRequest.getPhone(),
+                    userRequest.getTgUsername(), userRequest.getFullName(), userRequest.getAvatarUrl(),
+                    userRequest.getPosition(), userRequest.getEmployeeId(), userRequest.getRole(),
+                    userRequest.getDepartmentId(), userRequest.getActive(), userRequest.getUpdatedBy());
             if (updatedUser != null) {
                 return ApiResponseDto.success("User updated successfully", updatedUser);
             } else {
