@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 public class SettingService {
 
     private final SystemConfigMapper systemConfigMapper;
+    private final com.backend.manage.service.CacheService cacheService;
 
     // IP Access Control
     private static final String ALLOWED_KEY = "security.ip.allowed_ips";
@@ -302,8 +303,12 @@ public class SettingService {
     }
 
     public Map<String, Object> clearRedisCache() {
-        log.info("Clearing Redis cache (not yet implemented - requires RedisTemplate)");
-        return new HashMap<>();
+        log.info("Clearing Redis cache");
+        cacheService.clearAllCache();
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("message", "All Redis cache cleared");
+        return result;
     }
 
     // ===== Helper Methods =====
