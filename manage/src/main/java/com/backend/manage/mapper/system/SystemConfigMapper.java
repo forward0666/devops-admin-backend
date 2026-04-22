@@ -52,4 +52,8 @@ public interface SystemConfigMapper {
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM system_configs WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key")
     List<SystemConfigEntity> searchByKeyPattern(@Param("pattern") String pattern);
+
+    @ResultMap("systemConfigResultMap")
+    @Select("SELECT * FROM system_configs WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key")
+    List<SystemConfigEntity> findByKeyPrefix(@Param("prefix") String prefix);
 }

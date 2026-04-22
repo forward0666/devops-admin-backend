@@ -38,6 +38,7 @@ public class UserEntity {
      * 密码
      * 加密存储
      */
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String password;
 
     /**

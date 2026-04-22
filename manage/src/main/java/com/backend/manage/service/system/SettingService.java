@@ -18,8 +18,62 @@ public class SettingService {
 
     private final SystemConfigMapper systemConfigMapper;
 
+    // IP Access Control
     private static final String ALLOWED_KEY = "security.ip.allowed_ips";
     private static final String BLOCKED_KEY = "security.ip.blocked_ips";
+
+    // System Settings
+    private static final String SYS_NAME_KEY = "system.name";
+    private static final String SYS_LOGO_KEY = "system.logo";
+    private static final String SYS_LANGUAGE_KEY = "system.language";
+    private static final String SYS_THEME_KEY = "system.theme";
+
+    // Password Policy
+    private static final String SEC_PASSWORD_MIN_LEN = "security.password.min_length";
+    private static final String SEC_PASSWORD_REQUIRE_UPPER = "security.password.require_uppercase";
+    private static final String SEC_PASSWORD_REQUIRE_NUMBER = "security.password.require_number";
+    private static final String SEC_PASSWORD_REQUIRE_SPECIAL = "security.password.require_special";
+    private static final String SEC_PASSWORD_EXPIRE_DAYS = "security.password.expire_days";
+
+    // Login Security
+    private static final String SEC_LOGIN_MAX_ATTEMPTS = "security.login.max_attempts";
+    private static final String SEC_LOGIN_LOCKOUT_MINUTES = "security.login.lockout_minutes";
+    private static final String SEC_LOGIN_CAPTCHA_ENABLED = "security.login.captcha_enabled";
+
+    // Default values
+    private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
+    static {
+        DEFAULTS.put(SYS_NAME_KEY, "DevOps Admin");
+        DEFAULTS.put(SYS_LOGO_KEY, "");
+        DEFAULTS.put(SYS_LANGUAGE_KEY, "zh-CN");
+        DEFAULTS.put(SYS_THEME_KEY, "light");
+        DEFAULTS.put(SEC_PASSWORD_MIN_LEN, "8");
+        DEFAULTS.put(SEC_PASSWORD_REQUIRE_UPPER, "true");
+        DEFAULTS.put(SEC_PASSWORD_REQUIRE_NUMBER, "true");
+        DEFAULTS.put(SEC_PASSWORD_REQUIRE_SPECIAL, "true");
+        DEFAULTS.put(SEC_PASSWORD_EXPIRE_DAYS, "90");
+        DEFAULTS.put(SEC_LOGIN_MAX_ATTEMPTS, "5");
+        DEFAULTS.put(SEC_LOGIN_LOCKOUT_MINUTES, "30");
+        DEFAULTS.put(SEC_LOGIN_CAPTCHA_ENABLED, "false");
+    }
+
+    private static final Map<String, String> KEY_DESCRIPTIONS = new LinkedHashMap<>();
+    static {
+        KEY_DESCRIPTIONS.put(SYS_NAME_KEY, "系统名称");
+        KEY_DESCRIPTIONS.put(SYS_LOGO_KEY, "系统Logo URL");
+        KEY_DESCRIPTIONS.put(SYS_LANGUAGE_KEY, "系统语言");
+        KEY_DESCRIPTIONS.put(SYS_THEME_KEY, "系统主题");
+        KEY_DESCRIPTIONS.put(SEC_PASSWORD_MIN_LEN, "密码最小长度");
+        KEY_DESCRIPTIONS.put(SEC_PASSWORD_REQUIRE_UPPER, "密码要求大写字母");
+        KEY_DESCRIPTIONS.put(SEC_PASSWORD_REQUIRE_NUMBER, "密码要求数字");
+        KEY_DESCRIPTIONS.put(SEC_PASSWORD_REQUIRE_SPECIAL, "密码要求特殊字符");
+        KEY_DESCRIPTIONS.put(SEC_PASSWORD_EXPIRE_DAYS, "密码过期天数");
+        KEY_DESCRIPTIONS.put(SEC_LOGIN_MAX_ATTEMPTS, "最大登录尝试次数");
+        KEY_DESCRIPTIONS.put(SEC_LOGIN_LOCKOUT_MINUTES, "登录锁定时间(分钟)");
+        KEY_DESCRIPTIONS.put(SEC_LOGIN_CAPTCHA_ENABLED, "启用登录验证码");
+        KEY_DESCRIPTIONS.put(ALLOWED_KEY, "IP白名单(逗号分隔)");
+        KEY_DESCRIPTIONS.put(BLOCKED_KEY, "IP黑名单(逗号分隔)");
+    }
 
     /**
      * 是否允许该 IP 访问
@@ -30,58 +84,103 @@ public class SettingService {
         List<String> allowedList = loadConfig(ALLOWED_KEY);
         List<String> blockedList = loadConfig(BLOCKED_KEY);
 
-        // 1️⃣ 黑名单优先
         if (matchAny(clientIp, blockedList)) {
             log.warn("IP {} is blocked by blacklist", clientIp);
             return false;
         }
 
-        // 2️⃣ 如果未配置白名单，默认放行
         if (allowedList.isEmpty()) {
             log.info("No whitelist configured, allow IP {}", clientIp);
             return true;
         }
 
-        // 3️⃣ 命中白名单才放行
         boolean allowed = matchAny(clientIp, allowedList);
         log.info("IP {} whitelist match result: {}", clientIp, allowed);
         return allowed;
     }
 
     public Map<String, Object> getSystemSettings() {
-        return new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<SystemConfigEntity> publicConfigs = systemConfigMapper.findPublicConfigs();
+        Set<String> publicKeys = publicConfigs.stream()
+                .map(SystemConfigEntity::getConfigKey)
+                .collect(Collectors.toSet());
+
+        for (SystemConfigEntity config : publicConfigs) {
+            result.put(config.getConfigKey(), config.getConfigValue());
+        }
+
+        // Also add non-public system.* configs
+        List<SystemConfigEntity> systemConfigs = systemConfigMapper.findByKeyPrefix("system.");
+        for (SystemConfigEntity config : systemConfigs) {
+            if (!publicKeys.contains(config.getConfigKey())) {
+                result.put(config.getConfigKey(), config.getConfigValue());
+            }
+        }
+
+        return result;
     }
 
     public Map<String, Object> updateSystemSettings(Map<String, Object> settings) {
         log.info("Updating system settings");
-        return new HashMap<>();
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
+        return getSystemSettings();
     }
 
     public Map<String, Object> getSecuritySettings() {
-        return new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("password", getPasswordPolicy());
+        result.put("login", getLoginSecuritySettings());
+        result.put("ip", getIPAccessControl());
+        return result;
     }
 
     public Map<String, Object> updateSecuritySettings(Map<String, Object> settings) {
         log.info("Updating security settings");
-        return new HashMap<>();
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
+        return getSecuritySettings();
     }
 
     public Map<String, Object> getPasswordPolicy() {
-        return new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("security.password.");
+        for (SystemConfigEntity config : configs) {
+            result.put(config.getConfigKey(), config.getConfigValue());
+        }
+        return result;
     }
 
     public Map<String, Object> updatePasswordPolicy(Map<String, Object> policy) {
         log.info("Updating password policy");
-        return new HashMap<>();
+        for (Map.Entry<String, Object> entry : policy.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
+        return getPasswordPolicy();
     }
 
     public Map<String, Object> getLoginSecuritySettings() {
-        return new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("security.login.");
+        for (SystemConfigEntity config : configs) {
+            result.put(config.getConfigKey(), config.getConfigValue());
+        }
+        return result;
     }
 
     public Map<String, Object> updateLoginSecuritySettings(Map<String, Object> settings) {
         log.info("Updating login security settings");
-        return new HashMap<>();
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
+        return getLoginSecuritySettings();
     }
 
     public Map<String, Object> getIPAccessControl() {
@@ -93,48 +192,134 @@ public class SettingService {
 
     public Map<String, Object> updateIPAccessControl(Map<String, Object> settings) {
         log.info("Updating IP access control");
-        return new HashMap<>();
-    }
-
-    public void resetToDefaults(String category) {
-        log.info("Resetting {} to defaults", category);
-    }
-
-    public Map<String, Object> exportAllSettings() {
-        return new HashMap<>();
-    }
-
-    public void importSettings(Map<String, Object> settings) {
-        log.info("Importing settings");
+        if (settings.containsKey("allowed_ips")) {
+            String value = String.join(",",
+                    ((List<String>) settings.get("allowed_ips")));
+            upsertConfig(ALLOWED_KEY, value, "string", KEY_DESCRIPTIONS.get(ALLOWED_KEY));
+        }
+        if (settings.containsKey("blocked_ips")) {
+            String value = String.join(",",
+                    ((List<String>) settings.get("blocked_ips")));
+            upsertConfig(BLOCKED_KEY, value, "string", KEY_DESCRIPTIONS.get(BLOCKED_KEY));
+        }
+        return getIPAccessControl();
     }
 
     public Map<String, Object> addIPToWhitelist(Map<String, Object> data) {
         log.info("Adding IP to whitelist");
-        return new HashMap<>();
+        String newIp = (String) data.get("ip");
+        if (!StringUtils.hasText(newIp)) {
+            return getIPAccessControl();
+        }
+        List<String> current = new ArrayList<>(loadConfig(ALLOWED_KEY));
+        current.add(newIp.trim());
+        String value = current.stream().distinct().collect(Collectors.joining(","));
+        upsertConfig(ALLOWED_KEY, value, "string", KEY_DESCRIPTIONS.get(ALLOWED_KEY));
+        return getIPAccessControl();
     }
 
     public Map<String, Object> removeIPFromWhitelist(Map<String, Object> data) {
         log.info("Removing IP from whitelist");
-        return new HashMap<>();
+        String ipToRemove = (String) data.get("ip");
+        if (!StringUtils.hasText(ipToRemove)) {
+            return getIPAccessControl();
+        }
+        List<String> current = new ArrayList<>(loadConfig(ALLOWED_KEY));
+        current.removeIf(ip -> ip.trim().equals(ipToRemove.trim()));
+        String value = current.stream().collect(Collectors.joining(","));
+        upsertConfig(ALLOWED_KEY, value, "string", KEY_DESCRIPTIONS.get(ALLOWED_KEY));
+        return getIPAccessControl();
     }
 
     public Map<String, Object> bulkUpdateIPWhitelist(Map<String, Object> data) {
         log.info("Bulk updating IP whitelist");
-        return new HashMap<>();
+        @SuppressWarnings("unchecked")
+        List<String> ips = (List<String>) data.get("ips");
+        if (ips != null) {
+            String value = ips.stream().map(String::trim).collect(Collectors.joining(","));
+            upsertConfig(ALLOWED_KEY, value, "string", KEY_DESCRIPTIONS.get(ALLOWED_KEY));
+        }
+        return getIPAccessControl();
     }
 
     public void clearIPWhitelist() {
         log.info("Clearing IP whitelist");
+        upsertConfig(ALLOWED_KEY, "", "string", KEY_DESCRIPTIONS.get(ALLOWED_KEY));
+    }
+
+    public void resetToDefaults(String category) {
+        log.info("Resetting {} to defaults", category);
+        String prefix;
+        switch (category.toLowerCase()) {
+            case "system":
+                prefix = "system.";
+                break;
+            case "security":
+                prefix = "security.";
+                break;
+            case "password":
+                prefix = "security.password.";
+                break;
+            case "login":
+                prefix = "security.login.";
+                break;
+            case "ip":
+                prefix = "security.ip.";
+                break;
+            default:
+                log.warn("Unknown category: {}", category);
+                return;
+        }
+        // Delete existing configs in this category
+        List<SystemConfigEntity> existing = systemConfigMapper.findByKeyPrefix(prefix);
+        for (SystemConfigEntity config : existing) {
+            systemConfigMapper.deleteByKey(config.getConfigKey());
+        }
+        // Re-insert defaults
+        for (Map.Entry<String, String> entry : DEFAULTS.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                upsertConfig(entry.getKey(), entry.getValue(), "string",
+                        KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+            }
+        }
+    }
+
+    public Map<String, Object> exportAllSettings() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<SystemConfigEntity> all = systemConfigMapper.findAll();
+        for (SystemConfigEntity config : all) {
+            result.put(config.getConfigKey(), config.getConfigValue());
+        }
+        return result;
+    }
+
+    public void importSettings(Map<String, Object> settings) {
+        log.info("Importing settings");
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
     }
 
     public Map<String, Object> clearRedisCache() {
-        log.info("Clearing Redis cache");
+        log.info("Clearing Redis cache (not yet implemented - requires RedisTemplate)");
         return new HashMap<>();
     }
 
-    /**
-     * 读取 system_configs
-     */
+    // ===== Helper Methods =====
+
+    private void upsertConfig(String key, String value, String type, String description) {
+        SystemConfigEntity existing = systemConfigMapper.findByKey(key);
+        if (existing != null) {
+            existing.setConfigValue(value);
+            existing.setUpdatedAt(java.time.LocalDateTime.now());
+            systemConfigMapper.update(existing);
+        } else {
+            SystemConfigEntity entity = new SystemConfigEntity(key, value, type, description, key.startsWith("system."));
+            systemConfigMapper.insert(entity);
+        }
+    }
+
     private List<String> loadConfig(String key) {
         SystemConfigEntity config = systemConfigMapper.findByKey(key);
         if (config == null || !StringUtils.hasText(config.getConfigValue())) {
@@ -146,9 +331,6 @@ public class SettingService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 判断 IP 是否命中任一规则
-     */
     private boolean matchAny(String ip, List<String> rules) {
         for (String rule : rules) {
             if (match(ip, rule)) {
@@ -158,33 +340,21 @@ public class SettingService {
         return false;
     }
 
-    /**
-     * 单条规则匹配
-     */
     private boolean match(String ip, String rule) {
         try {
-            // CIDR
             if (rule.contains("/")) {
                 return matchCidr(ip, rule);
             }
-
-            // IP 段
             if (rule.contains("-")) {
                 return matchRange(ip, rule);
             }
-
-            // 单 IP
             return ip.equals(rule);
-
         } catch (Exception e) {
             log.error("Invalid IP rule: {}", rule, e);
             return false;
         }
     }
 
-    /**
-     * CIDR 匹配
-     */
     private boolean matchCidr(String ip, String cidr) throws Exception {
         String[] parts = cidr.split("/");
         InetAddress inetAddress = InetAddress.getByName(parts[0]);
@@ -197,9 +367,6 @@ public class SettingService {
         return network == target;
     }
 
-    /**
-     * IP 段匹配
-     */
     private boolean matchRange(String ip, String range) throws Exception {
         String[] parts = range.split("-");
         long start = ipToLong(parts[0]);
@@ -208,9 +375,6 @@ public class SettingService {
         return target >= start && target <= end;
     }
 
-    /**
-     * IP 转 long
-     */
     private long ipToLong(String ip) throws Exception {
         byte[] bytes = InetAddress.getByName(ip).getAddress();
         long result = 0;
