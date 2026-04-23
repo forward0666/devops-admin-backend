@@ -88,14 +88,14 @@
     </select>
 
     <select id="findUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.system.UserEntity">
-        SELECT id, username, password, email, full_name, department_id, role, created_at, updated_at
+        SELECT id, username, email, phone, full_name, department_id, role, active, created_at, updated_at
         FROM users
         WHERE department_id = #{departmentId}
         ORDER BY created_at DESC
     </select>
 
     <select id="findRecentUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.system.UserEntity">
-        SELECT id, username, password, email, full_name, department_id, role, created_at, updated_at
+        SELECT id, username, email, phone, full_name, department_id, role, active, created_at, updated_at
         FROM users
         WHERE department_id = #{departmentId}
         ORDER BY created_at DESC
