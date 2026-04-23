@@ -45,6 +45,16 @@ public class DepartmentEntity {
     private Long managerId;
 
     /**
+     * 父部门 ID（支持树形结构）
+     */
+    private Long parentId;
+
+    /**
+     * 部门类型（office/department/team）
+     */
+    private String type;
+
+    /**
      * 部门用户数量
      */
     private Integer userCount = 0;
@@ -68,6 +78,12 @@ public class DepartmentEntity {
      * 最近加入的用户列表
      */
     private List<UserEntity> recentUsers;
+
+    /**
+     * 子部门列表（树形结构）
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    private List<DepartmentEntity> children;
 
     /**
      * 创建部门

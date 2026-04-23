@@ -75,7 +75,7 @@ public class DepartmentService {
             }
             
             log.info("成功获取 {} 个部门", departments.size());
-            return departments;
+            return buildTree(departments);
         } catch (Exception e) {
             log.error("获取所有部门时发生错误", e);
             throw new RuntimeException("获取部门列表失败", e);
@@ -378,5 +378,30 @@ public class DepartmentService {
         }
         
         validateDepartmentForCreation(department);
+    }
+
+    /**
+     * 构建部门树形结构
+     */
+    private List<DepartmentEntity> buildTree(List<DepartmentEntity> flatList) {
+        Map<Long, DepartmentEntity> map = new java.util.LinkedHashMap<>();
+        List<DepartmentEntity> roots = new java.util.ArrayList<>();
+
+        for (DepartmentEntity dept : flatList) {
+            map.put(dept.getId(), dept);
+            // 初始化 children 列表
+            dept.setChildren(new java.util.ArrayList<>());
+        }
+
+        for (DepartmentEntity dept : flatList) {
+            Long parentId = dept.getParentId();
+            if (parentId == null || parentId == 0 || !map.containsKey(parentId)) {
+                roots.add(dept);
+            } else {
+                map.get(parentId).getChildren().add(dept);
+            }
+        }
+
+        return roots;
     }
 }
