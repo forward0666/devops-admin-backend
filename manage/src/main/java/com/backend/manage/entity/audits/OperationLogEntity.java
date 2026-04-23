@@ -79,4 +79,7 @@ public class OperationLogEntity {
 
     @Field("timestamp")
     private LocalDateTime timestamp;
+
+    @Field("category")
+    private String category;
 }

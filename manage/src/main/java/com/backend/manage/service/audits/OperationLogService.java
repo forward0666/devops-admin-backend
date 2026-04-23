@@ -60,6 +60,26 @@ public class OperationLogService {
             boolean success,
             String errorMessage,
             String targetUsername) {
+        logUserOperation(userId, username, operationType, operationName, resourceType, resourceId, method, url, ipAddress, userAgent, requestBody, responseBody, success, errorMessage, targetUsername, "OPERATION");
+    }
+
+    public void logUserOperation(
+            Long userId,
+            String username,
+            String operationType,
+            String operationName,
+            String resourceType,
+            String resourceId,
+            String method,
+            String url,
+            String ipAddress,
+            String userAgent,
+            Object requestBody,
+            Object responseBody,
+            boolean success,
+            String errorMessage,
+            String targetUsername,
+            String category) {
         try {
             String details = null;
             if (targetUsername != null) {
@@ -84,6 +104,7 @@ public class OperationLogService {
                     .requestBody(requestBody instanceof Map ? (Map<String, Object>) requestBody : null)
                     .status(success ? "success" : "failed")
                     .errorMessage(errorMessage)
+                    .category(category)
                     .createdAt(LocalDateTime.now())
                     .build();
 
@@ -94,15 +115,20 @@ public class OperationLogService {
     }
 
     public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir) {
+        return getOperationLogs(page, size, sortBy, sortDir, null);
+    }
+
+    public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir, String category) {
         try {
-            log.debug("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}", page, size, sortBy, sortDir);
+            log.debug("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}, category={}", page, size, sortBy, sortDir, category);
             
-            // 使用分页和排序构建查询
             Pageable pageable = PageRequest.of(page, size,
                 Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
             
-            // 从 MongoDB 查询数据
             Query query = new Query();
+            if (category != null && !category.isEmpty()) {
+                query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
+            }
             long total = mongoTemplate.count(query, OperationLogEntity.class);
             
             List<OperationLogEntity> logs = mongoTemplate.find(

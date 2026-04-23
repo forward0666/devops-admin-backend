@@ -149,7 +149,8 @@ public class OperationLogAspect {
                             result,
                             success,
                             errorMessage,
-                            finalTargetUsername
+                            finalTargetUsername,
+                            operationLogAnnotation.category()
                     );
                     
                     log.info("Operation log submitted successfully");

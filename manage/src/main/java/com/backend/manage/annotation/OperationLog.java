@@ -39,6 +39,11 @@ public @interface OperationLog {
     String description() default "";
     
     /**
+     * 日志分类：OPERATION / AUTH
+     */
+    String category() default "OPERATION";
+
+    /**
      * 是否记录请求参数
      */
     boolean logRequest() default true;
