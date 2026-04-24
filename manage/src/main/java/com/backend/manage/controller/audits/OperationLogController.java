@@ -19,7 +19,7 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@RequestMapping("/manage/operation-log")
+@RequestMapping("/manage/operationLog")
 @RequiredArgsConstructor
 @Tag(name = "Operation Log Management", description = "操作日志管理接口")
 public class OperationLogController {
