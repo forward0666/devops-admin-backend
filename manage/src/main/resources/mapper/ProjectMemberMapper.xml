@@ -30,7 +30,7 @@
     <select id="findByProjectId" resultMap="ProjectMemberResultMap">
         SELECT <include refid="selectColumns"/>
         FROM project_members
-        WHERE project_id = #{projectId}
+        WHERE project_id = #{projectId} AND active = 1
     </select>
 
     <select id="findById" resultMap="ProjectMemberResultMap">
