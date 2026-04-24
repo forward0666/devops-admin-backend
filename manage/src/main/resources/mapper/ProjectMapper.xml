@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.backend.manage.mapper.system.ProjectMapper">
+
+    <resultMap id="ProjectResultMap" type="com.backend.manage.entity.system.ProjectEntity">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="type" column="type"/>
+        <result property="status" column="status"/>
+        <result property="progress" column="progress"/>
+        <result property="leader" column="leader"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="description" column="description"/>
+        <result property="techStack" column="tech_stack"/>
+        <result property="objectives" column="objectives"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="active" column="active"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="ProjectResultMap">
+        SELECT *
+        FROM projects
+        WHERE active = true
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="findById" parameterType="long" resultMap="ProjectResultMap">
+        SELECT *
+        FROM projects
+        WHERE id = #{id}
+          AND active = true
+    </select>
+
+    <insert id="insert"
+            parameterType="com.backend.manage.entity.system.ProjectEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO projects (
+            name, type, status, progress, leader,
+            department_id, description, tech_stack, objectives,
+            created_by, updated_by, active
+        )
+        VALUES (
+                   #{name}, #{type}, #{status}, #{progress}, #{leader},
+                   #{departmentId}, #{description}, #{techStack}, #{objectives},
+                   #{createdBy}, #{updatedBy}, #{active}
+               )
+    </insert>
+
+    <update id="update" parameterType="com.backend.manage.entity.system.ProjectEntity">
+        UPDATE projects
+        SET
+            name          = #{name},
+            type          = #{type},
+            status        = #{status},
+            progress      = #{progress},
+            leader        = #{leader},
+            department_id = #{departmentId},
+            description   = #{description},
+            tech_stack    = #{techStack},
+            objectives    = #{objectives},
+            updated_by    = #{updatedBy},
+            active        = #{active}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM projects WHERE id = #{id}
+    </delete>
+
+    <select id="existsById" parameterType="long" resultType="int">
+        SELECT COUNT(*) FROM projects WHERE id = #{id} AND active = true
+    </select>
+
+    <select id="existsByName" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM projects WHERE name = #{name} AND active = true
+    </select>
+
+    <select id="search" parameterType="string" resultMap="ProjectResultMap">
+        SELECT *
+        FROM projects
+        WHERE active = true
+          AND (name LIKE CONCAT('%', #{query}, '%')
+               OR type LIKE CONCAT('%', #{query}, '%')
+               OR leader LIKE CONCAT('%', #{query}, '%'))
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>
