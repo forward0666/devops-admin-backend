@@ -49,7 +49,7 @@ public class OperationLogController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "5") int limit) {
 
-        AccessValidator.validate(request, jwtUtil, "sys_admin", "admin", "devops", "leader");
+        AccessValidator.validate(request, jwtUtil, "sys_admin", "admin", "devops");
         List<OperationLogEntity> logs = operationLogService.getRecentOperationLogs(limit);
         return ResponseUtil.success("获取最近操作日志成功", logs);
     }
