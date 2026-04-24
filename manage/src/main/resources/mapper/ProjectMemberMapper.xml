@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.backend.manage.mapper.system.ProjectMemberMapper">
+
+    <resultMap id="ProjectMemberResultMap" type="com.backend.manage.entity.system.ProjectMemberEntity">
+        <id property="id" column="id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="fullName" column="full_name"/>
+        <result property="role" column="role"/>
+        <result property="position" column="position"/>
+        <result property="status" column="status"/>
+        <result property="joinedAt" column="joined_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="active" column="active"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        id, project_id, user_id, username, full_name, role, position, status,
+        joined_at, created_at, updated_at, created_by, updated_by, active
+    </sql>
+
+    <select id="findByProjectId" resultMap="ProjectMemberResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM project_members
+        WHERE project_id = #{projectId} AND active = 1
+    </select>
+
+    <select id="findById" resultMap="ProjectMemberResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM project_members
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
+        SELECT <include refid="selectColumns"/>
+        FROM project_members
+        WHERE project_id = #{projectId} AND user_id = #{userId} AND active = 1
+    </select>
+
+    <select id="existsByProjectIdAndUserId" resultType="int">
+        SELECT COUNT(1)
+        FROM project_members
+        WHERE project_id = #{projectId} AND user_id = #{userId} AND active = 1
+    </select>
+
+    <select id="countByProjectId" resultType="int">
+        SELECT COUNT(1)
+        FROM project_members
+        WHERE project_id = #{projectId} AND active = 1
+    </select>
+
+    <insert id="insert" parameterType="com.backend.manage.entity.system.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO project_members (project_id, user_id, username, full_name, role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
+        VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{role}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
+    </insert>
+
+    <update id="update" parameterType="com.backend.manage.entity.system.ProjectMemberEntity">
+        UPDATE project_members
+        <set>
+            <if test="role != null">role = #{role},</if>
+            <if test="position != null">position = #{position},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="username != null">username = #{username},</if>
+            <if test="fullName != null">full_name = #{fullName},</if>
+            <if test="updatedBy != null">updated_by = #{updatedBy},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="deleteById">
+        UPDATE project_members SET active = 0, updated_at = NOW() WHERE id = #{id}
+    </update>
+
+    <update id="deleteByProjectIdAndUserId">
+        UPDATE project_members SET active = 0, updated_at = NOW() WHERE project_id = #{projectId} AND user_id = #{userId}
+    </update>
+
+</mapper>
