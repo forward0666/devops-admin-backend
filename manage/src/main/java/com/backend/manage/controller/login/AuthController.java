@@ -82,7 +82,7 @@ public class AuthController {
             var loginResponse = authService.login(loginRequest, clientIP);
 
             operationLogService.logUserOperation(
-                    loginResponse.userId(),
+                    loginResponse.user().getId(),
                     loginRequest.username(),
                     "LOGIN", "用户登录", "AUTH", null,
                     request.getMethod(), request.getRequestURI(),
