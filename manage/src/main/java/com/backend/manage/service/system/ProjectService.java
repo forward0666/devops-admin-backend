@@ -71,7 +71,7 @@ public class ProjectService {
         if (data.getDescription() != null) project.setDescription(data.getDescription());
         if (data.getTechStack() != null) project.setTechStack(data.getTechStack());
         if (data.getObjectives() != null) project.setObjectives(data.getObjectives());
-        if (data.getActive() != project.isActive()) project.setActive(data.isActive());
+        if (data.isActive() != project.isActive()) project.setActive(data.isActive());
         project.setUpdatedBy(data.getUpdatedBy());
         project.setUpdatedAt(LocalDateTime.now());
 
