@@ -30,7 +30,7 @@
     <select id="findByProjectId" resultMap="ProjectMemberResultMap">
         SELECT <include refid="selectColumns"/>
         FROM project_members
-        WHERE project_id = #{projectId} AND active = true
+        WHERE project_id = #{projectId}
     </select>
 
     <select id="findById" resultMap="ProjectMemberResultMap">
@@ -42,7 +42,7 @@
     <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
         SELECT <include refid="selectColumns"/>
         FROM project_members
-        WHERE project_id = #{projectId} AND user_id = #{userId} AND active = true
+        WHERE project_id = #{projectId} AND user_id = #{userId}
     </select>
 
     <select id="existsByProjectIdAndUserId" resultType="int">
@@ -54,7 +54,7 @@
     <select id="countByProjectId" resultType="int">
         SELECT COUNT(1)
         FROM project_members
-        WHERE project_id = #{projectId} AND active = true
+        WHERE project_id = #{projectId}
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.system.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
