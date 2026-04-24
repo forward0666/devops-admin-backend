@@ -47,7 +47,8 @@ import java.util.concurrent.ThreadPoolExecutor;
                 "shutdown",
                 "config",
                 "monitor",
-                "filter"
+                "filter",
+                "com.backend.manage.controller.audits"
         })
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.backend.manage.client")
