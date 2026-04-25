@@ -11,7 +11,7 @@
         <result property="userId" column="user_id"/>
         <result property="username" column="username"/>
         <result property="fullName" column="full_name"/>
-        <result property="role" column="role"/>
+        <result property="projectRole" column="project_role"/>
         <result property="status" column="status"/>
         <result property="joinedAt" column="joined_at"/>
         <result property="createdAt" column="created_at"/>
@@ -27,18 +27,9 @@
         <result property="userPosition" column="user_position"/>
     </resultMap>
 
-    <sql id="selectColumns">
-        pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.role, pm.status,
-        pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
-    </sql>
-
-    <sql id="selectColumnsWithAlias">
-        pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.role, pm.status,
-        pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
-    </sql>
-
     <select id="findByProjectId" resultMap="ProjectMemberResultMap">
-        SELECT <include refid="selectColumns"/>,
+        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.project_role, pm.status,
+               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active,
                u.role AS system_role, u.email, u.phone, u.tg_username, u.position AS user_position, u.department_id,
                d.name AS department_name
         FROM project_members pm
@@ -48,46 +39,48 @@
     </select>
 
     <select id="findById" resultMap="ProjectMemberResultMap">
-        SELECT <include refid="selectColumns"/>
+        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.project_role, pm.status,
+               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
         FROM project_members pm
         WHERE pm.id = #{id}
     </select>
 
     <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
-        SELECT <include refid="selectColumns"/>
-        FROM project_members
-        WHERE project_id = #{projectId} AND user_id = #{userId}
+        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.project_role, pm.status,
+               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
+        FROM project_members pm
+        WHERE pm.project_id = #{projectId} AND pm.user_id = #{userId}
     </select>
 
     <select id="existsByProjectIdAndUserId" resultType="int">
         SELECT COUNT(1)
-        FROM project_members
-        WHERE project_id = #{projectId} AND user_id = #{userId}
+        FROM project_members pm
+        WHERE pm.project_id = #{projectId} AND pm.user_id = #{userId}
     </select>
 
     <select id="countByProjectId" resultType="int">
         SELECT COUNT(1)
-        FROM project_members
-        WHERE project_id = #{projectId}
+        FROM project_members pm
+        WHERE pm.project_id = #{projectId}
     </select>
 
     <insert id="insert" parameterType="com.backend.user.entity.system.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO project_members (project_id, user_id, username, full_name, role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
-        VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{role}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
+        INSERT INTO project_members (project_id, user_id, username, full_name, project_role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
+        VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{projectRole}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
     </insert>
 
     <update id="update" parameterType="com.backend.user.entity.system.ProjectMemberEntity">
-        UPDATE project_members
+        UPDATE project_members pm
         <set>
-            <if test="role != null">role = #{role},</if>
-            <if test="position != null">position = #{position},</if>
-            <if test="status != null">status = #{status},</if>
-            <if test="username != null">username = #{username},</if>
-            <if test="fullName != null">full_name = #{fullName},</if>
-            <if test="updatedBy != null">updated_by = #{updatedBy},</if>
-            updated_at = NOW()
+            <if test="projectRole != null">pm.project_role = #{projectRole},</if>
+            <if test="position != null">pm.position = #{position},</if>
+            <if test="status != null">pm.status = #{status},</if>
+            <if test="username != null">pm.username = #{username},</if>
+            <if test="fullName != null">pm.full_name = #{fullName},</if>
+            <if test="updatedBy != null">pm.updated_by = #{updatedBy},</if>
+            pm.updated_at = NOW()
         </set>
-        WHERE id = #{id}
+        WHERE pm.id = #{id}
     </update>
 
     <delete id="deleteById">
