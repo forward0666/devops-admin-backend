@@ -28,9 +28,14 @@
     </sql>
 
     <select id="findByProjectId" resultMap="ProjectMemberResultMap">
-        SELECT <include refid="selectColumns"/>
-        FROM project_members
-        WHERE project_id = #{projectId}
+        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name,
+               u.role as role,
+               u.position as position,
+               pm.status, pm.joined_at, pm.created_at, pm.updated_at,
+               pm.created_by, pm.updated_by, pm.active
+        FROM project_members pm
+        LEFT JOIN users u ON pm.user_id = u.id
+        WHERE pm.project_id = #{projectId}
     </select>
 
     <select id="findById" resultMap="ProjectMemberResultMap">
