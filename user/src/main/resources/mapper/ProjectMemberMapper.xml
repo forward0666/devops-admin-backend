@@ -28,12 +28,17 @@
     </resultMap>
 
     <sql id="selectColumns">
+        id, project_id, user_id, username, full_name, role, status,
+        joined_at, created_at, updated_at, created_by, updated_by, active
+    </sql>
+
+    <sql id="selectColumnsWithAlias">
         pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.role, pm.status,
         pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
     </sql>
 
     <select id="findByProjectId" resultMap="ProjectMemberResultMap">
-        SELECT <include refid="selectColumns"/>,
+        SELECT <include refid="selectColumnsWithAlias"/>,
                u.role AS system_role, u.email, u.phone, u.tg_username, u.position AS user_position, u.department_id,
                d.name AS department_name
         FROM project_members pm
@@ -44,8 +49,8 @@
 
     <select id="findById" resultMap="ProjectMemberResultMap">
         SELECT <include refid="selectColumns"/>
-        FROM project_members pm
-        WHERE pm.id = #{id}
+        FROM project_members
+        WHERE id = #{id}
     </select>
 
     <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
