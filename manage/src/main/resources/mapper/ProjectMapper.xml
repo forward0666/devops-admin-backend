@@ -55,18 +55,20 @@
 
     <update id="update" parameterType="com.backend.manage.entity.system.ProjectEntity">
         UPDATE projects
-        SET
-            name          = #{name},
-            type          = #{type},
-            status        = #{status},
-            progress      = #{progress},
-            leader        = #{leader},
-            department_id = #{departmentId},
-            description   = #{description},
-            tech_stack    = #{techStack},
-            objectives    = #{objectives},
-            updated_by    = #{updatedBy},
-            active        = #{active}
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="type != null">type = #{type},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="progress != null">progress = #{progress},</if>
+            <if test="leader != null">leader = #{leader},</if>
+            <if test="departmentId != null">department_id = #{departmentId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="techStack != null">tech_stack = #{techStack},</if>
+            <if test="objectives != null">objectives = #{objectives},</if>
+            updated_by = #{updatedBy},
+            <if test="active != null">active = #{active},</if>
+            updated_at = NOW()
+        </set>
         WHERE id = #{id}
     </update>
 
