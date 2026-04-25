@@ -120,7 +120,7 @@ public class ProjectService {
                 member.setUserId(user.getId());
                 member.setUsername(user.getUsername());
                 member.setFullName(user.getFullName());
-                member.setRole(user.getRole());
+                member.setRole("Project Lead");
                 member.setPosition(user.getPosition());
                 member.setStatus("active");
                 projectMemberService.addMember(member);
