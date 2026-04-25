@@ -44,8 +44,8 @@
 
     <select id="findById" resultMap="ProjectMemberResultMap">
         SELECT <include refid="selectColumns"/>
-        FROM project_members
-        WHERE id = #{id}
+        FROM project_members pm
+        WHERE pm.id = #{id}
     </select>
 
     <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
