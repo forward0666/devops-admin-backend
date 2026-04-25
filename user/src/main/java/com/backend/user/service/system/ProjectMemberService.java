@@ -27,6 +27,16 @@ public class ProjectMemberService {
         return projectMemberMapper.findByProjectId(projectId);
     }
 
+    @Transactional(readOnly = true)
+    public ProjectMemberEntity findById(Long id) {
+        return projectMemberMapper.findById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectMemberEntity findByProjectIdAndUserId(Long projectId, Long userId) {
+        return projectMemberMapper.findByProjectIdAndUserId(projectId, userId);
+    }
+
     public ProjectMemberEntity addMember(ProjectMemberEntity data) {
         if (projectMemberMapper.existsByProjectIdAndUserId(data.getProjectId(), data.getUserId()) > 0) {
             throw new RuntimeException("该成员已在此项目中");

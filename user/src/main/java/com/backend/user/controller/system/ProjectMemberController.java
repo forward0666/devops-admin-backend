@@ -3,9 +3,13 @@ package com.backend.user.controller.system;
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.system.ProjectMemberEntity;
 import com.backend.user.service.system.ProjectMemberService;
+import com.backend.user.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 import java.util.List;
 
@@ -16,6 +20,28 @@ public class ProjectMemberController {
 
     @Autowired
     private ProjectMemberService projectMemberService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private Long getCurrentUserId(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return jwtUtil.getUserIdFromToken(authHeader.substring(7));
+        }
+        return null;
+    }
+
+    private void checkPermission(HttpServletRequest request, Long projectId, List<String> allowedRoles) {
+        Long userId = getCurrentUserId(request);
+        if (userId == null) {
+            throw new RuntimeException("Unauthorized");
+        }
+        ProjectMemberEntity member = projectMemberService.findByProjectIdAndUserId(projectId, userId);
+        if (member == null || !allowedRoles.contains(member.getProjectRole())) {
+            throw new RuntimeException("Permission denied");
+        }
+    }
 
     @GetMapping
     public ApiResponseDto<List<ProjectMemberEntity>> getMembers(@RequestParam Long projectId) {
@@ -29,8 +55,9 @@ public class ProjectMemberController {
     }
 
     @PostMapping
-    public ApiResponseDto<ProjectMemberEntity> addMember(@RequestBody ProjectMemberEntity member) {
+    public ApiResponseDto<ProjectMemberEntity> addMember(HttpServletRequest request, @RequestBody ProjectMemberEntity member) {
         try {
+            checkPermission(request, member.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
             ProjectMemberEntity created = projectMemberService.addMember(member);
             return ApiResponseDto.success("Member added successfully", created);
         } catch (RuntimeException e) {
@@ -43,14 +70,16 @@ public class ProjectMemberController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponseDto<ProjectMemberEntity> updateMember(@PathVariable Long id, @RequestBody ProjectMemberEntity member) {
+    public ApiResponseDto<ProjectMemberEntity> updateMember(HttpServletRequest request, @PathVariable Long id, @RequestBody ProjectMemberEntity member) {
         try {
+            ProjectMemberEntity existing = projectMemberService.findById(id);
+            if (existing == null) return ApiResponseDto.error("Member not found");
+            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps"));
             ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
-            if (updated != null) {
-                return ApiResponseDto.success("Member updated successfully", updated);
-            } else {
-                return ApiResponseDto.error("Member not found");
-            }
+            return ApiResponseDto.success("Member updated successfully", updated);
+        } catch (RuntimeException e) {
+            log.warn("Failed to update member: " + e.getMessage());
+            return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to update member: " + id, e);
             return ApiResponseDto.error("Failed to update member");
@@ -58,14 +87,20 @@ public class ProjectMemberController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponseDto<Void> removeMember(@PathVariable Long id) {
+    public ApiResponseDto<Void> removeMember(HttpServletRequest request, @PathVariable Long id) {
         try {
-            boolean deleted = projectMemberService.removeMemberById(id);
-            if (deleted) {
-                return ApiResponseDto.success("Member removed successfully", null);
-            } else {
-                return ApiResponseDto.error("Member not found");
+            ProjectMemberEntity existing = projectMemberService.findById(id);
+            if (existing == null) return ApiResponseDto.error("Member not found");
+            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
+            Long currentUserId = getCurrentUserId(request);
+            if (existing.getUserId().equals(currentUserId)) {
+                return ApiResponseDto.error("Cannot remove yourself");
             }
+            boolean deleted = projectMemberService.removeMemberById(id);
+            return ApiResponseDto.success("Member removed successfully", null);
+        } catch (RuntimeException e) {
+            log.warn("Failed to remove member: " + e.getMessage());
+            return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to remove member: " + id, e);
             return ApiResponseDto.error("Failed to remove member");
