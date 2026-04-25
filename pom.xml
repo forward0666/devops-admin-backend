@@ -28,6 +28,7 @@
         <module>telegram-bot-manager</module>                   <!-- Telegram机器人管理器 -->
         <module>security</module>                               <!-- 安全模块：负责用户认证和授权 -->
         <module>manage</module>                                 <!-- 管理服务模块 -->
+        <module>user</module>                                 <!-- 管理服务模块 -->
     </modules>
 
     <properties>
