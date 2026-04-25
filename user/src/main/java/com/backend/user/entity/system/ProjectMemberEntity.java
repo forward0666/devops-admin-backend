@@ -27,4 +27,12 @@ public class ProjectMemberEntity {
     private Long createdBy;
     private Long updatedBy;
     private boolean active;
+
+    // System info from users table (not persisted)
+    private String systemRole;
+    private String email;
+    private String phone;
+    private String tgUsername;
+    private String departmentName;
+    private String userPosition;
 }
