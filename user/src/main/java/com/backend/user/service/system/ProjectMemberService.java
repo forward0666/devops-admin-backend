@@ -37,6 +37,10 @@ public class ProjectMemberService {
         return projectMemberMapper.findByProjectIdAndUserId(projectId, userId);
     }
 
+    public List<Long> findProjectIdsByUserId(Long userId) {
+        return projectMemberMapper.findProjectIdsByUserId(userId);
+    }
+
     public ProjectMemberEntity addMember(ProjectMemberEntity data) {
         if (projectMemberMapper.existsByProjectIdAndUserId(data.getProjectId(), data.getUserId()) > 0) {
             throw new RuntimeException("该成员已在此项目中");

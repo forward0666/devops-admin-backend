@@ -26,4 +26,6 @@ public interface ProjectMemberMapper {
     int existsByProjectIdAndUserId(@Param("projectId") Long projectId, @Param("userId") Long userId);
 
     int countByProjectId(@Param("projectId") Long projectId);
+
+    List<Long> findProjectIdsByUserId(@Param("userId") Long userId);
 }

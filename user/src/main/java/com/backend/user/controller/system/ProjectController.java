@@ -3,6 +3,9 @@ package com.backend.user.controller.system;
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.system.ProjectEntity;
 import com.backend.user.service.system.ProjectService;
+import com.backend.user.service.system.ProjectMemberService;
+import com.backend.user.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,11 +19,28 @@ public class ProjectController {
 
     @Autowired
     private ProjectService projectService;
+    @Autowired
+    private ProjectMemberService projectMemberService;
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private Long getCurrentUserId(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return jwtUtil.getUserIdFromToken(authHeader.substring(7));
+        }
+        return null;
+    }
 
     @GetMapping
-    public ApiResponseDto<List<ProjectEntity>> getAllProjects() {
+    public ApiResponseDto<List<ProjectEntity>> getAllProjects(HttpServletRequest request) {
         try {
+            Long userId = getCurrentUserId(request);
             List<ProjectEntity> projects = projectService.getAllProjects();
+            if (userId != null) {
+                var memberProjects = projectMemberService.findProjectIdsByUserId(userId);
+                projects = projects.stream().filter(p -> memberProjects.contains(p.getId())).toList();
+            }
             return ApiResponseDto.success("Projects retrieved successfully", projects);
         } catch (Exception e) {
             log.error("Failed to retrieve projects", e);
