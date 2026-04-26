@@ -24,7 +24,7 @@ public class UserController {
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    @Autowired(required = false)
+    @Autowired
     private CacheService cacheService;
 
     @Autowired
@@ -98,12 +98,15 @@ public class UserController {
             }
 
             // Verify old password
-            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            boolean passwordMatch = passwordEncoder.matches(oldPassword, user.getPassword());
+            log.info("Change password attempt for user {}: match={}, dbPassword starts with $2a={}",
+                user.getUsername(), passwordMatch, user.getPassword().startsWith("$2a"));
+            if (!passwordMatch) {
                 return ApiResponseDto.error("Current password is incorrect");
             }
 
-            user.setPassword(passwordEncoder.encode(newPassword));
-            userMapper.update(user);
+            // Update password using dedicated method
+            userMapper.updatePassword(user.getId(), passwordEncoder.encode(newPassword));
 
             // Clear all Redis tokens for this user to force re-login
             if (cacheService != null) {
