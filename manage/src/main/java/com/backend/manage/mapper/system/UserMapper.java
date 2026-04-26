@@ -36,7 +36,7 @@ public interface UserMapper {
     /**
      * Authenticate user with username and password
      */
-    UserEntity authenticate(@Param("username") String username, @Param("password") String password);
+    UserEntity authenticate(@Param("username") String username);
 
     /**
      * Find users by department ID

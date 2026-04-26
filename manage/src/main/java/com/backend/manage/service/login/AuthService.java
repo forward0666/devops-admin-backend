@@ -41,6 +41,9 @@ public class AuthService {
     private CacheService cacheService; // 缓存服务，用于Redis缓存操作
 
     @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Autowired
     private JwtUtil jwtUtil; // JWT工具类
 
     /**
@@ -194,7 +197,14 @@ public class AuthService {
     private UserEntity authenticateUser(String username, String password) {
         log.info("对用户进行数据库认证: {}", username);
 
-        var authenticatedUser = userMapper.authenticate(username, password);
+        var authenticatedUser = userMapper.authenticate(username);
+        if (authenticatedUser == null) {
+            return null;
+        }
+        if (!passwordEncoder.matches(password, authenticatedUser.getPassword())) {
+            log.warn("密码不匹配: {}", username);
+            return null;
+        }
         return authenticatedUser;
     }
 
