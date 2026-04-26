@@ -402,10 +402,8 @@ public class UserService {
         Optional<UserEntity> optionalUser = Optional.ofNullable(userMapper.findById(id));
         if (optionalUser.isPresent()) {
             UserEntity user = optionalUser.get();
-            user.setPassword(passwordEncoder.encode(newPassword));
-            user.setPasswordChangedAt(LocalDateTime.now());
-            user.setUpdatedAt(LocalDateTime.now());
-            userMapper.update(user);
+            String encodedPassword = passwordEncoder.encode(newPassword);
+            userMapper.updatePassword(user.getId(), encodedPassword);
             
             // Clear cache after resetting password
             if (cacheService.isRedisAvailable()) {
