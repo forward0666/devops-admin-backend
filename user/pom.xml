@@ -12,7 +12,7 @@
 
     <artifactId>user</artifactId>
     <name>user</name>
-    <description>user</description>
+    <description>User</description>
 
     <dependencies>
 

@@ -100,4 +100,12 @@ public class CacheService {
         Object v = redisTemplate.opsForValue().get(key);
         return (v instanceof Boolean b) ? b : null;
     }
+
+    public void invalidateAllUserTokens(String username) {
+        if (!isRedisAvailable()) return;
+        var keys = redisTemplate.keys(TOKEN_PREFIX + username + ":*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
+    }
 }

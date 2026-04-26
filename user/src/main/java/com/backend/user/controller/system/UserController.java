@@ -3,6 +3,7 @@ package com.backend.user.controller.system;
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.system.UserEntity;
 import com.backend.user.mapper.system.UserMapper;
+import com.backend.user.service.CacheService;
 import com.backend.user.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,9 @@ public class UserController {
 
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private CacheService cacheService;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -101,7 +105,12 @@ public class UserController {
             user.setPassword(passwordEncoder.encode(newPassword));
             userMapper.update(user);
 
-            return ApiResponseDto.success("Password changed successfully", null);
+            // Clear all Redis tokens for this user to force re-login
+            if (cacheService != null) {
+                cacheService.invalidateAllUserTokens(user.getUsername());
+            }
+
+            return ApiResponseDto.success("Password changed successfully, please login again", null);
         } catch (Exception e) {
             log.error("Failed to change password", e);
             return ApiResponseDto.error("Failed to change password");
