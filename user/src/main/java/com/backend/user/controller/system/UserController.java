@@ -21,6 +21,9 @@ public class UserController {
     private UserMapper userMapper;
 
     @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     private Long getCurrentUserId(HttpServletRequest request) {
@@ -90,8 +93,12 @@ public class UserController {
                 return ApiResponseDto.error("User not found");
             }
 
-            // TODO: verify old password hash
-            user.setPassword(newPassword);
+            // Verify old password
+            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+                return ApiResponseDto.error("Current password is incorrect");
+            }
+
+            user.setPassword(passwordEncoder.encode(newPassword));
             userMapper.update(user);
 
             return ApiResponseDto.success("Password changed successfully", null);

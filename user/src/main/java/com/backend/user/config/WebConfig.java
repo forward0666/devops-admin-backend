@@ -29,4 +29,9 @@ public class WebConfig implements WebMvcConfigurer {
         registration.setName("jwtAuthenticationFilter");
         return registration;
     }
+
+    @Bean
+    public org.springframework.security.crypto.password.PasswordEncoder passwordEncoder() {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+    }
 }
