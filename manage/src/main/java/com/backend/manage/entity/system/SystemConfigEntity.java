@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 用于存储和管理各种系统配置参数
  *
  * 设计特点：
- * 1. 使用 @Table 注解映射到数据库表 system_config
+ * 1. 使用 @Table 注解映射到数据库表 setting
  * 2. 使用 @Id 注解标记主键
  * 3. 使用 Lombok @Data 注解自动生成 getter/setter
  * 4. 支持配置类型和公开/私有配置
@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("system_config")
+@Table("setting")
 public class SystemConfigEntity {
     /**
      * 主键 ID
