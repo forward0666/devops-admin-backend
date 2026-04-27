@@ -37,7 +37,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/settings")
+//@RequestMapping("/setting")
 @RequiredArgsConstructor // 自动生成包含 final 字段的构造函数
 public class SettingController {
 
@@ -59,7 +59,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @GetMapping
+    @GetMapping({ "/setting"})
     @OperationLog(
             operationType = "SETTINGS_READ",
             operationName = "获取系统设置",
@@ -68,7 +68,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSetting() {
-        log.info("GET /settings - Fetching settings");
+        log.info("GET /setting - Fetching settings");
         Map<String, Object> settings = systemSettingsService.getSystemSettings();
         return ResponseEntity.ok(ApiResponseDto.success("System settings retrieved successfully", settings));
     }
@@ -102,7 +102,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSettings(@RequestBody Map<String, Object> settings) {
-        log.info("PUT /settings/system - Updating system settings");
+        log.info("PUT /setting/system - Updating system settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateSystemSettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("System settings updated successfully", updatedSettings));
     }
@@ -130,7 +130,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSecuritys() {
-        log.info("GET /settings/security - Fetching security settings");
+        log.info("GET /setting/security - Fetching security settings");
         Map<String, Object> settings = systemSettingsService.getSecuritySettings();
         return ResponseEntity.ok(ApiResponseDto.success("Security settings retrieved successfully", settings));
     }
@@ -164,7 +164,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSecurity(@RequestBody Map<String, Object> settings) {
-        log.info("PUT /settings/security - Updating security settings");
+        log.info("PUT /setting/security - Updating security settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateSecuritySettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("Security settings updated successfully", updatedSettings));
     }
@@ -193,7 +193,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getPasswordPolicy() {
-        log.info("GET /settings/security/password-policy - Fetching password policy");
+        log.info("GET /setting/security/password-policy - Fetching password policy");
         Map<String, Object> policy = systemSettingsService.getPasswordPolicy();
         return ResponseEntity.ok(ApiResponseDto.success("Password policy retrieved successfully", policy));
     }
@@ -227,7 +227,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updatePasswordPolicy(@RequestBody Map<String, Object> policy) {
-        log.info("PUT /settings/security/password-policy - Updating password policy");
+        log.info("PUT /setting/security/password-policy - Updating password policy");
         Map<String, Object> updatedPolicy = systemSettingsService.updatePasswordPolicy(policy);
         return ResponseEntity.ok(ApiResponseDto.success("Password policy updated successfully", updatedPolicy));
     }
@@ -256,7 +256,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getLoginSecuritySettings() {
-        log.info("GET /settings/security/login - Fetching login security settings");
+        log.info("GET /setting/security/login - Fetching login security settings");
         Map<String, Object> settings = systemSettingsService.getLoginSecuritySettings();
         return ResponseEntity.ok(ApiResponseDto.success("Login security settings retrieved successfully", settings));
     }
@@ -290,7 +290,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateLoginSecuritySettings(@RequestBody Map<String, Object> settings) {
-        log.info("PUT /settings/security/login - Updating login security settings");
+        log.info("PUT /setting/security/login - Updating login security settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateLoginSecuritySettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("Login security settings updated successfully", updatedSettings));
     }
@@ -319,7 +319,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getIPAccessControl() {
-        log.info("GET /settings/security/ip-control - Fetching IP access control settings");
+        log.info("GET /setting/security/ip-control - Fetching IP access control settings");
         Map<String, Object> settings = systemSettingsService.getIPAccessControl();
         return ResponseEntity.ok(ApiResponseDto.success("IP access control settings retrieved successfully", settings));
     }
@@ -353,7 +353,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateIPAccessControl(@RequestBody Map<String, Object> settings) {
-        log.info("PUT /settings/security/ip-control - Updating IP access control settings");
+        log.info("PUT /setting/security/ip-control - Updating IP access control settings");
         Map<String, Object> updatedSettings = systemSettingsService.updateIPAccessControl(settings);
         return ResponseEntity.ok(ApiResponseDto.success("IP access control settings updated successfully", updatedSettings));
     }
@@ -385,7 +385,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Void>> resetToDefaults(@RequestParam String category) {
-        log.info("POST /settings/reset?category={} - Resetting settings to defaults", category);
+        log.info("POST /setting/reset?category={} - Resetting settings to defaults", category);
         systemSettingsService.resetToDefaults(category);
         return ResponseEntity.ok(ApiResponseDto.success("Settings reset to defaults successfully", null));
     }
@@ -414,7 +414,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSessionSettings() {
-        log.info("GET /settings/session - Fetching session settings");
+        log.info("GET /setting/session - Fetching session settings");
         Map<String, Object> settings = systemSettingsService.getSessionSettings();
         return ResponseEntity.ok(ApiResponseDto.success("Session settings retrieved successfully", settings));
     }
@@ -427,7 +427,7 @@ public class SettingController {
             description = "修改Session和Token配置"
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSessionSettings(@RequestBody Map<String, Object> settings) {
-        log.info("PUT /settings/session - Updating session settings");
+        log.info("PUT /setting/session - Updating session settings");
         Map<String, Object> updated = systemSettingsService.updateSessionSettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("Session settings updated successfully", updated));
     }
@@ -442,7 +442,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> exportSettings() {
-        log.info("GET /settings/export - Exporting all settings");
+        log.info("GET /setting/export - Exporting all settings");
         Map<String, Object> allSettings = systemSettingsService.exportAllSettings();
         return ResponseEntity.ok(ApiResponseDto.success("Settings exported successfully", allSettings));
     }
@@ -475,7 +475,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Void>> importSettings(@RequestBody Map<String, Object> settings) {
-        log.info("POST /settings/import - Importing settings configuration");
+        log.info("POST /setting/import - Importing settings configuration");
         systemSettingsService.importSettings(settings);
         return ResponseEntity.ok(ApiResponseDto.success("Settings imported successfully", null));
     }
@@ -508,7 +508,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> addIPToWhitelist(@RequestBody Map<String, Object> request) {
-        log.info("POST /settings/security/ip-control/whitelist/add - Adding IP to whitelist");
+        log.info("POST /setting/security/ip-control/whitelist/add - Adding IP to whitelist");
         Map<String, Object> result = systemSettingsService.addIPToWhitelist(request);
         return ResponseEntity.ok(ApiResponseDto.success("IP added to whitelist successfully", result));
     }
@@ -540,7 +540,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> removeIPFromWhitelist(@RequestBody Map<String, Object> request) {
-        log.info("DELETE /settings/security/ip-control/whitelist/remove - Removing IP from whitelist");
+        log.info("DELETE /setting/security/ip-control/whitelist/remove - Removing IP from whitelist");
         Map<String, Object> result = systemSettingsService.removeIPFromWhitelist(request);
         return ResponseEntity.ok(ApiResponseDto.success("IP removed from whitelist successfully", result));
     }
@@ -573,7 +573,7 @@ public class SettingController {
             // logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> bulkUpdateIPWhitelist(@RequestBody Map<String, Object> request) {
-        log.info("PUT /settings/security/ip-control/whitelist/bulk - Bulk updating IP whitelist");
+        log.info("PUT /setting/security/ip-control/whitelist/bulk - Bulk updating IP whitelist");
         Map<String, Object> result = systemSettingsService.bulkUpdateIPWhitelist(request);
         return ResponseEntity.ok(ApiResponseDto.success("IP whitelist bulk updated successfully", result));
     }
@@ -603,7 +603,7 @@ public class SettingController {
             //            logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Void>> clearIPWhitelist() {
-        log.info("DELETE /settings/security/ip-control/whitelist/clear - Clearing IP whitelist");
+        log.info("DELETE /setting/security/ip-control/whitelist/clear - Clearing IP whitelist");
         systemSettingsService.clearIPWhitelist();
         return ResponseEntity.ok(ApiResponseDto.success("IP whitelist cleared successfully", null));
     }
@@ -633,7 +633,7 @@ public class SettingController {
 //            logResponse = true
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> clearRedisCache() {
-        log.info("POST /settings/cache/clear - Clearing Redis cache for system settings");
+        log.info("POST /setting/cache/clear - Clearing Redis cache for system settings");
         Map<String, Object> result = systemSettingsService.clearRedisCache();
         return ResponseEntity.ok(ApiResponseDto.success("Redis cache cleared successfully", result));
     }
@@ -666,7 +666,7 @@ public class SettingController {
             logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> clearAllRedisCache() {
-        log.info("POST /settings/cache/clear-all - Clearing all Redis cache");
+        log.info("POST /setting/cache/clear-all - Clearing all Redis cache");
         cacheService.clearAllCache();
         return ResponseEntity.ok(ApiResponseDto.success("All Redis cache cleared successfully", Map.of(
                 "timestamp", System.currentTimeMillis(),
