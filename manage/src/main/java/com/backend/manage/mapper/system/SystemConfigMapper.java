@@ -1,6 +1,6 @@
 package com.backend.manage.mapper.system;
 
-import com.backend.manage.entity.system.SystemSettingEntity;
+import com.backend.manage.entity.system.SettingEntity;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
@@ -19,25 +19,25 @@ public interface SystemConfigMapper {
         @Result(property = "updatedAt", column = "updated_at")
     })
     @Select("SELECT * FROM setting WHERE config_key = #{key}")
-    SystemSettingEntity findByKey(@Param("key") String key);
+    SettingEntity findByKey(@Param("key") String key);
 
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM setting ORDER BY config_key")
-    List<SystemSettingEntity> findAll();
+    List<SettingEntity> findAll();
 
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM setting WHERE is_public = true ORDER BY config_key")
-    List<SystemSettingEntity> findPublicConfigs();
+    List<SettingEntity> findPublicConfigs();
 
     @Insert("INSERT INTO setting (config_key, config_value, config_type, description, is_public, created_at, updated_at) " +
             "VALUES (#{configKey}, #{configValue}, #{configType}, #{description}, #{isPublic}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insert(SystemSettingEntity config);
+    int insert(SettingEntity config);
 
     @Update("UPDATE setting SET config_value = #{configValue}, config_type = #{configType}, " +
             "description = #{description}, is_public = #{isPublic}, updated_at = NOW() " +
             "WHERE config_key = #{configKey}")
-    int update(SystemSettingEntity config);
+    int update(SettingEntity config);
 
     @Delete("DELETE FROM setting WHERE config_key = #{key}")
     int deleteByKey(@Param("key") String key);
@@ -47,13 +47,13 @@ public interface SystemConfigMapper {
 
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM setting WHERE config_type = #{type} ORDER BY config_key")
-    List<SystemSettingEntity> findByType(@Param("type") String type);
+    List<SettingEntity> findByType(@Param("type") String type);
 
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM setting WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key")
-    List<SystemSettingEntity> searchByKeyPattern(@Param("pattern") String pattern);
+    List<SettingEntity> searchByKeyPattern(@Param("pattern") String pattern);
 
     @ResultMap("systemConfigResultMap")
     @Select("SELECT * FROM setting WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key")
-    List<SystemSettingEntity> findByKeyPrefix(@Param("prefix") String prefix);
+    List<SettingEntity> findByKeyPrefix(@Param("prefix") String prefix);
 }

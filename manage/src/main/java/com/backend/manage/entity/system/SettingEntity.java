@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table("setting")
-public class SystemSettingEntity {
+public class SettingEntity {
     /**
      * 主键 ID
      */
@@ -84,7 +84,7 @@ public class SystemSettingEntity {
      * @param description 配置描述
      * @param isPublic 是否公开
      */
-    public SystemSettingEntity(String configKey, String configValue, String configType, String description, boolean isPublic) {
+    public SettingEntity(String configKey, String configValue, String configType, String description, boolean isPublic) {
         this.configKey = configKey;
         this.configValue = configValue;
         this.configType = configType;

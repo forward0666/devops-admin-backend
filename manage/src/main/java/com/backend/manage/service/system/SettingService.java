@@ -1,7 +1,7 @@
 package com.backend.manage.service.system;
 
 import com.backend.manage.mapper.system.SystemConfigMapper;
-import com.backend.manage.entity.system.SystemSettingEntity;
+import com.backend.manage.entity.system.SettingEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -110,8 +110,8 @@ public class SettingService {
 
     public Map<String, Object> getSetting() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemSettingEntity> allConfigs = systemConfigMapper.findAll();
-        for (SystemSettingEntity config : allConfigs) {
+        List<SettingEntity> allConfigs = systemConfigMapper.findAll();
+        for (SettingEntity config : allConfigs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
         return result;
@@ -152,8 +152,8 @@ public class SettingService {
 
     public Map<String, Object> getPasswordPolicy() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemSettingEntity> configs = systemConfigMapper.findByKeyPrefix("setting.password.");
-        for (SystemSettingEntity config : configs) {
+        List<SettingEntity> configs = systemConfigMapper.findByKeyPrefix("setting.password.");
+        for (SettingEntity config : configs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
         return result;
@@ -186,8 +186,8 @@ public class SettingService {
 
     public Map<String, Object> getLoginSecuritySettings() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemSettingEntity> configs = systemConfigMapper.findByKeyPrefix("setting.login.");
-        for (SystemSettingEntity config : configs) {
+        List<SettingEntity> configs = systemConfigMapper.findByKeyPrefix("setting.login.");
+        for (SettingEntity config : configs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
         return result;
@@ -290,8 +290,8 @@ public class SettingService {
                 return;
         }
         // Delete existing configs in this category
-        List<SystemSettingEntity> existing = systemConfigMapper.findByKeyPrefix(prefix);
-        for (SystemSettingEntity config : existing) {
+        List<SettingEntity> existing = systemConfigMapper.findByKeyPrefix(prefix);
+        for (SettingEntity config : existing) {
             systemConfigMapper.deleteByKey(config.getConfigKey());
         }
         // Re-insert defaults
@@ -305,8 +305,8 @@ public class SettingService {
 
     public Map<String, Object> exportAllSettings() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemSettingEntity> all = systemConfigMapper.findAll();
-        for (SystemSettingEntity config : all) {
+        List<SettingEntity> all = systemConfigMapper.findAll();
+        for (SettingEntity config : all) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
         return result;
@@ -332,19 +332,19 @@ public class SettingService {
     // ===== Helper Methods =====
 
     private void upsertConfig(String key, String value, String type, String description) {
-        SystemSettingEntity existing = systemConfigMapper.findByKey(key);
+        SettingEntity existing = systemConfigMapper.findByKey(key);
         if (existing != null) {
             existing.setConfigValue(value);
             existing.setUpdatedAt(java.time.LocalDateTime.now());
             systemConfigMapper.update(existing);
         } else {
-            SystemSettingEntity entity = new SystemSettingEntity(key, value, type, description, key.startsWith("setting."));
+            SettingEntity entity = new SettingEntity(key, value, type, description, key.startsWith("setting."));
             systemConfigMapper.insert(entity);
         }
     }
 
     private List<String> loadConfig(String key) {
-        SystemSettingEntity config = systemConfigMapper.findByKey(key);
+        SettingEntity config = systemConfigMapper.findByKey(key);
         if (config == null || !StringUtils.hasText(config.getConfigValue())) {
             return Collections.emptyList();
         }
