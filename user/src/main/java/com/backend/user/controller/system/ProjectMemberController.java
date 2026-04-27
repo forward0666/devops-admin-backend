@@ -43,6 +43,12 @@ public class ProjectMemberController {
         }
     }
 
+    private boolean isLeaderAndTargetIsPrivileged(HttpServletRequest request, Long projectId, String targetRole) {
+        if (!"Administrator".equals(targetRole) && !"DevOps".equals(targetRole)) return false;
+        ProjectMemberEntity current = projectMemberService.findByProjectIdAndUserId(projectId, getCurrentUserId(request));
+        return current != null && "Leader".equals(current.getProjectRole());
+    }
+
     @GetMapping
     public ApiResponseDto<List<ProjectMemberEntity>> getMembers(@RequestParam Long projectId) {
         try {
@@ -74,7 +80,13 @@ public class ProjectMemberController {
         try {
             ProjectMemberEntity existing = projectMemberService.findById(id);
             if (existing == null) return ApiResponseDto.error("Member not found");
-            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps"));
+            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
+                return ApiResponseDto.error("Leaders cannot edit admin/devops members");
+            }
+            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
+                return ApiResponseDto.error("Leaders cannot remove admin/devops members");
+            }
+            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
             ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
             return ApiResponseDto.success("Member updated successfully", updated);
         } catch (RuntimeException e) {
@@ -91,6 +103,9 @@ public class ProjectMemberController {
         try {
             ProjectMemberEntity existing = projectMemberService.findById(id);
             if (existing == null) return ApiResponseDto.error("Member not found");
+            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
+                return ApiResponseDto.error("Leaders cannot remove admin/devops members");
+            }
             checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
             Long currentUserId = getCurrentUserId(request);
             if (existing.getUserId().equals(currentUserId)) {
