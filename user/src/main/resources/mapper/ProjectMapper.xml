@@ -24,14 +24,14 @@
 
     <select id="findAll" resultMap="ProjectResultMap">
         SELECT *
-        FROM projects
+        FROM project
         WHERE active = true
         ORDER BY created_at DESC
     </select>
 
     <select id="findById" parameterType="long" resultMap="ProjectResultMap">
         SELECT *
-        FROM projects
+        FROM project
         WHERE id = #{id}
           AND active = true
     </select>
@@ -40,7 +40,7 @@
             parameterType="com.backend.user.entity.system.ProjectEntity"
             useGeneratedKeys="true"
             keyProperty="id">
-        INSERT INTO projects (
+        INSERT INTO project (
             department_id, description, tech_stack, objectives,
             created_by, updated_by, active
         )
@@ -51,7 +51,7 @@
     </insert>
 
     <update id="update" parameterType="com.backend.user.entity.system.ProjectEntity">
-        UPDATE projects
+        UPDATE project
         <set>
             <if test="name != null">name = #{name},</if>
             <if test="type != null">type = #{type},</if>
@@ -69,20 +69,20 @@
     </update>
 
     <delete id="deleteById" parameterType="long">
-        DELETE FROM projects WHERE id = #{id}
+        DELETE FROM project WHERE id = #{id}
     </delete>
 
     <select id="existsById" parameterType="long" resultType="int">
-        SELECT COUNT(*) FROM projects WHERE id = #{id} AND active = true
+        SELECT COUNT(*) FROM project WHERE id = #{id} AND active = true
     </select>
 
     <select id="existsByName" parameterType="string" resultType="int">
-        SELECT COUNT(*) FROM projects WHERE name = #{name} AND active = true
+        SELECT COUNT(*) FROM project WHERE name = #{name} AND active = true
     </select>
 
     <select id="search" parameterType="string" resultMap="ProjectResultMap">
         SELECT *
-        FROM projects
+        FROM project
         WHERE active = true
           AND (name LIKE CONCAT('%', #{query}, '%')
                OR type LIKE CONCAT('%', #{query}, '%')

@@ -19,30 +19,30 @@
 
     <select id="findAll" resultMap="roleResultMap">
         SELECT id, name, code, description, status, user_count, created_by, updated_by, created_at, updated_at, deleted_at
-        FROM roles
+        FROM role
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
     </select>
 
     <select id="findById" resultMap="roleResultMap">
         SELECT id, name, code, description, status, user_count, created_by, updated_by, created_at, updated_at, deleted_at
-        FROM roles
+        FROM role
         WHERE id = #{id} AND deleted_at IS NULL
     </select>
 
     <select id="findByCode" resultMap="roleResultMap">
         SELECT id, name, code, description, status, user_count, created_by, updated_by, created_at, updated_at, deleted_at
-        FROM roles
+        FROM role
         WHERE code = #{code} AND deleted_at IS NULL
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.system.RoleEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO roles (name, code, description, status, user_count, created_by, updated_by, created_at, updated_at)
+        INSERT INTO role (name, code, description, status, user_count, created_by, updated_by, created_at, updated_at)
         VALUES (#{name}, #{code}, #{description}, #{status}, #{userCount}, #{createdBy}, #{updatedBy}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update" parameterType="com.backend.manage.entity.system.RoleEntity">
-        UPDATE roles
+        UPDATE role
         SET name = #{name},
             code = #{code},
             description = #{description},
@@ -56,26 +56,26 @@
     </update>
 
     <delete id="deleteById" parameterType="long">
-        DELETE FROM roles WHERE id = #{id}
+        DELETE FROM role WHERE id = #{id}
     </delete>
 
 
 
     <select id="existsById" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM roles
+        FROM role
         WHERE id = #{id} AND deleted_at IS NULL
     </select>
 
     <select id="existsByCode" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM roles
+        FROM role
         WHERE code = #{code} AND deleted_at IS NULL
     </select>
 
     <select id="existsByCodeExcludingId" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM roles
+        FROM role
         WHERE code = #{code} AND id != #{id} AND deleted_at IS NULL
     </select>
 

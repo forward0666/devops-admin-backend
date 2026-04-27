@@ -23,8 +23,8 @@
     <select id="findAll" resultMap="positionResultMap">
         SELECT p.id, p.name, p.code, p.department_id, d.name as department_name, p.level, p.description,
                p.status, p.user_count, p.created_by, p.updated_by, p.created_at, p.updated_at, p.deleted_at
-        FROM positions p
-        LEFT JOIN departments d ON p.department_id = d.id
+        FROM position p
+        LEFT JOIN department d ON p.department_id = d.id
         WHERE p.deleted_at IS NULL
         ORDER BY p.created_at DESC
     </select>
@@ -32,35 +32,35 @@
     <select id="findById" resultMap="positionResultMap">
         SELECT p.id, p.name, p.code, p.department_id, d.name as department_name, p.level, p.description,
                p.status, p.user_count, p.created_by, p.updated_by, p.created_at, p.updated_at, p.deleted_at
-        FROM positions p
-        LEFT JOIN departments d ON p.department_id = d.id
+        FROM position p
+        LEFT JOIN department d ON p.department_id = d.id
         WHERE p.id = #{id} AND p.deleted_at IS NULL
     </select>
 
     <select id="findByCode" resultMap="positionResultMap">
         SELECT p.id, p.name, p.code, p.department_id, d.name as department_name, p.level, p.description,
                p.status, p.user_count, p.created_by, p.updated_by, p.created_at, p.updated_at, p.deleted_at
-        FROM positions p
-        LEFT JOIN departments d ON p.department_id = d.id
+        FROM position p
+        LEFT JOIN department d ON p.department_id = d.id
         WHERE p.code = #{code} AND p.deleted_at IS NULL
     </select>
 
     <select id="findByDepartmentId" resultMap="positionResultMap">
         SELECT p.id, p.name, p.code, p.department_id, d.name as department_name, p.level, p.description,
                p.status, p.user_count, p.created_by, p.updated_by, p.created_at, p.updated_at, p.deleted_at
-        FROM positions p
-        LEFT JOIN departments d ON p.department_id = d.id
+        FROM position p
+        LEFT JOIN department d ON p.department_id = d.id
         WHERE p.department_id = #{departmentId} AND p.deleted_at IS NULL
         ORDER BY p.level ASC
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.system.PositionEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO positions (name, code, department_id, level, description, status, user_count, created_by, updated_by, created_at, updated_at)
+        INSERT INTO position (name, code, department_id, level, description, status, user_count, created_by, updated_by, created_at, updated_at)
         VALUES (#{name}, #{code}, #{departmentId}, #{level}, #{description}, #{status}, #{userCount}, #{createdBy}, #{updatedBy}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update" parameterType="com.backend.manage.entity.system.PositionEntity">
-        UPDATE positions
+        UPDATE position
         SET name = #{name},
             code = #{code},
             department_id = #{departmentId},
@@ -73,34 +73,34 @@
     </update>
 
     <update id="deleteById">
-        UPDATE positions
+        UPDATE position
         SET deleted_at = NOW()
         WHERE id = #{id}
     </update>
 
     <select id="existsById" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM positions
+        FROM position
         WHERE id = #{id} AND deleted_at IS NULL
     </select>
 
     <select id="existsByCode" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM positions
+        FROM position
         WHERE code = #{code} AND deleted_at IS NULL
     </select>
 
     <select id="existsByCodeExcludingId" resultType="boolean">
         SELECT COUNT(*) > 0
-        FROM positions
+        FROM position
         WHERE code = #{code} AND id != #{id} AND deleted_at IS NULL
     </select>
 
     <update id="updateUserCount">
-        UPDATE positions
+        UPDATE position
         SET user_count = (
             SELECT COUNT(*)
-            FROM users
+            FROM user
             WHERE position_id = #{id} AND deleted_at IS NULL
         )
         WHERE id = #{id}

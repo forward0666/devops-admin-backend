@@ -36,40 +36,40 @@
 
     <select id="findByUsername" parameterType="string" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE username = #{username}
           AND active = true
     </select>
 
     <select id="findById" parameterType="long" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE id = #{id}
           AND active = true
     </select>
 
     <select id="findByIdIncludeInactive" parameterType="long" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE id = #{id}
     </select>
 
     <select id="findAll" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         ORDER BY created_at DESC
     </select>
 
     <select id="authenticate" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE username = #{username}
           AND active = true
     </select>
 
     <select id="findByDepartmentId" parameterType="long" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE department_id = #{departmentId}
           AND active = true
         ORDER BY created_at DESC
@@ -81,7 +81,7 @@
             parameterType="com.backend.manage.entity.system.UserEntity"
             useGeneratedKeys="true"
             keyProperty="id">
-        INSERT INTO users (
+        INSERT INTO user (
             username,
             password,
             email,
@@ -126,7 +126,7 @@
     <!-- ================= 更新（核心修复） ================= -->
 
     <update id="update" parameterType="com.backend.manage.entity.system.UserEntity">
-        UPDATE users
+        UPDATE user
         SET
             username        = #{username},
             email           = NULLIF(#{email}, ''),
@@ -148,7 +148,7 @@
     <!-- ================= 其他更新 ================= -->
 
     <update id="updatePassword">
-        UPDATE users
+        UPDATE user
         SET password = #{password},
             password_changed_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
@@ -156,7 +156,7 @@
     </update>
 
     <update id="updateLoginInfo">
-        UPDATE users
+        UPDATE user
         SET last_login_at = #{lastLoginAt},
             last_login_ip = #{lastLoginIp},
             login_count = login_count + 1,
@@ -167,28 +167,28 @@
     <!-- ================= 删除 ================= -->
 
     <delete id="deleteById" parameterType="long">
-        DELETE FROM users WHERE id = #{id}
+        DELETE FROM user WHERE id = #{id}
     </delete>
 
     <!-- ================= 存在性校验（NULL 安全） ================= -->
 
     <select id="existsById" parameterType="long" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE id = #{id}
           AND active = true
     </select>
 
     <select id="existsByUsername" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE username = #{username}
           AND active = true
     </select>
 
     <select id="existsByEmail" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE active = true
         <if test="email != null and email != ''">
             AND email = #{email}
@@ -197,7 +197,7 @@
 
     <select id="existsByPhone" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE active = true
         <if test="phone != null and phone != ''">
             AND phone = #{phone}
@@ -206,7 +206,7 @@
 
     <select id="existsByTgUsername" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE active = true
         <if test="tgUsername != null and tgUsername != ''">
             AND tg_username = #{tgUsername}
@@ -215,7 +215,7 @@
 
     <select id="existsByEmployeeId" parameterType="string" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE active = true
         <if test="employeeId != null and employeeId != ''">
             AND employee_id = #{employeeId}
@@ -224,7 +224,7 @@
 
     <select id="countByDepartmentId" parameterType="long" resultType="int">
         SELECT COUNT(*)
-        FROM users
+        FROM user
         WHERE department_id = #{departmentId}
           AND active = true
     </select>
@@ -233,7 +233,7 @@
 
     <select id="searchByUsernameOrEmail" parameterType="string" resultMap="UserResultMap">
         SELECT *
-        FROM users
+        FROM user
         WHERE active = true
           AND (
             username LIKE CONCAT('%', #{query}, '%')
