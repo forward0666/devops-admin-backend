@@ -110,7 +110,7 @@ public class SettingService {
 
     public Map<String, Object> getSetting() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemConfigEntity> allConfigs = systemConfigMapper.findAllConfigs();
+        List<SystemConfigEntity> allConfigs = systemConfigMapper.findAll();
         for (SystemConfigEntity config : allConfigs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
@@ -130,7 +130,7 @@ public class SettingService {
             upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
                     KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
         }
-        return getSystemSettings();
+        return getSetting();
     }
 
     public Map<String, Object> getSecuritySettings() {
