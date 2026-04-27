@@ -41,6 +41,11 @@ public class SettingService {
     private static final String SEC_LOGIN_LOCKOUT_MINUTES = "security.login.lockout_minutes";
     private static final String SEC_LOGIN_CAPTCHA_ENABLED = "security.login.captcha_enabled";
 
+    // Session
+    private static final String SESSION_TOKEN_EXPIRE = "session.token_expire_seconds";
+    private static final String SESSION_REFRESH_EXPIRE = "session.refresh_token_expire_seconds";
+    private static final String SESSION_MAX_CONCURRENT = "session.max_concurrent_sessions";
+
     // Default values
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
     static {
@@ -56,6 +61,9 @@ public class SettingService {
         DEFAULTS.put(SEC_LOGIN_MAX_ATTEMPTS, "5");
         DEFAULTS.put(SEC_LOGIN_LOCKOUT_MINUTES, "30");
         DEFAULTS.put(SEC_LOGIN_CAPTCHA_ENABLED, "false");
+        DEFAULTS.put(SESSION_TOKEN_EXPIRE, "86400");
+        DEFAULTS.put(SESSION_REFRESH_EXPIRE, "604800");
+        DEFAULTS.put(SESSION_MAX_CONCURRENT, "5");
     }
 
     private static final Map<String, String> KEY_DESCRIPTIONS = new LinkedHashMap<>();
@@ -164,6 +172,22 @@ public class SettingService {
                     KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
         }
         return getPasswordPolicy();
+    }
+
+    public Map<String, Object> getSessionSettings() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put(SESSION_TOKEN_EXPIRE, loadConfig(SESSION_TOKEN_EXPIRE));
+        result.put(SESSION_REFRESH_EXPIRE, loadConfig(SESSION_REFRESH_EXPIRE));
+        result.put(SESSION_MAX_CONCURRENT, loadConfig(SESSION_MAX_CONCURRENT));
+        return result;
+    }
+
+    public Map<String, Object> updateSessionSettings(Map<String, Object> settings) {
+        log.info("Updating session settings");
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string", "Session setting");
+        }
+        return getSessionSettings();
     }
 
     public Map<String, Object> getLoginSecuritySettings() {

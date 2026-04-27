@@ -405,6 +405,33 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录请求和响应内容（安全考虑）
      */
+    @GetMapping("/session")
+    @OperationLog(
+            operationType = "SESSION_READ",
+            operationName = "获取Session设置",
+            resourceType = "SESSION_SETTINGS",
+            description = "查看Session和Token配置",
+            logResponse = false
+    )
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSessionSettings() {
+        log.info("GET /settings/session - Fetching session settings");
+        Map<String, Object> settings = systemSettingsService.getSessionSettings();
+        return ResponseEntity.ok(ApiResponseDto.success("Session settings retrieved successfully", settings));
+    }
+
+    @PutMapping("/session")
+    @OperationLog(
+            operationType = "SESSION_UPDATE",
+            operationName = "更新Session设置",
+            resourceType = "SESSION_SETTINGS",
+            description = "修改Session和Token配置"
+    )
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSessionSettings(@RequestBody Map<String, Object> settings) {
+        log.info("PUT /settings/session - Updating session settings");
+        Map<String, Object> updated = systemSettingsService.updateSessionSettings(settings);
+        return ResponseEntity.ok(ApiResponseDto.success("Session settings updated successfully", updated));
+    }
+
     @GetMapping("/export")
     @OperationLog(
             operationType = "SETTINGS_EXPORT",
