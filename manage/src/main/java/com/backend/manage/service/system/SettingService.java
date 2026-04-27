@@ -20,26 +20,26 @@ public class SettingService {
     private final com.backend.manage.service.CacheService cacheService;
 
     // IP Access Control
-    private static final String ALLOWED_KEY = "security.ip.allowed_ips";
-    private static final String BLOCKED_KEY = "security.ip.blocked_ips";
+    private static final String ALLOWED_KEY = "setting.ip.allowed_ips";
+    private static final String BLOCKED_KEY = "setting.ip.blocked_ips";
 
     // System Settings
-    private static final String SYS_NAME_KEY = "system.name";
-    private static final String SYS_LOGO_KEY = "system.logo";
-    private static final String SYS_LANGUAGE_KEY = "system.language";
-    private static final String SYS_THEME_KEY = "system.theme";
+    private static final String SYS_NAME_KEY = "setting.name";
+    private static final String SYS_LOGO_KEY = "setting.logo";
+    private static final String SYS_LANGUAGE_KEY = "setting.language";
+    private static final String SYS_THEME_KEY = "setting.theme";
 
     // Password Policy
-    private static final String SEC_PASSWORD_MIN_LEN = "security.password.min_length";
-    private static final String SEC_PASSWORD_REQUIRE_UPPER = "security.password.require_uppercase";
-    private static final String SEC_PASSWORD_REQUIRE_NUMBER = "security.password.require_number";
-    private static final String SEC_PASSWORD_REQUIRE_SPECIAL = "security.password.require_special";
-    private static final String SEC_PASSWORD_EXPIRE_DAYS = "security.password.expire_days";
+    private static final String SEC_PASSWORD_MIN_LEN = "setting.password.min_length";
+    private static final String SEC_PASSWORD_REQUIRE_UPPER = "setting.password.require_uppercase";
+    private static final String SEC_PASSWORD_REQUIRE_NUMBER = "setting.password.require_number";
+    private static final String SEC_PASSWORD_REQUIRE_SPECIAL = "setting.password.require_special";
+    private static final String SEC_PASSWORD_EXPIRE_DAYS = "setting.password.expire_days";
 
     // Login Security
-    private static final String SEC_LOGIN_MAX_ATTEMPTS = "security.login.max_attempts";
-    private static final String SEC_LOGIN_LOCKOUT_MINUTES = "security.login.lockout_minutes";
-    private static final String SEC_LOGIN_CAPTCHA_ENABLED = "security.login.captcha_enabled";
+    private static final String SEC_LOGIN_MAX_ATTEMPTS = "setting.login.max_attempts";
+    private static final String SEC_LOGIN_LOCKOUT_MINUTES = "setting.login.lockout_minutes";
+    private static final String SEC_LOGIN_CAPTCHA_ENABLED = "setting.login.captcha_enabled";
 
     // Session
     private static final String SESSION_TOKEN_EXPIRE = "session.token_expire_seconds";
@@ -120,7 +120,7 @@ public class SettingService {
         }
 
         // Also add non-public system.* configs
-        List<SystemConfigEntity> systemConfigs = systemConfigMapper.findByKeyPrefix("system.");
+        List<SystemConfigEntity> systemConfigs = systemConfigMapper.findByKeyPrefix("setting.");
         for (SystemConfigEntity config : systemConfigs) {
             if (!publicKeys.contains(config.getConfigKey())) {
                 result.put(config.getConfigKey(), config.getConfigValue());
@@ -158,7 +158,7 @@ public class SettingService {
 
     public Map<String, Object> getPasswordPolicy() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("security.password.");
+        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("setting.password.");
         for (SystemConfigEntity config : configs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
@@ -192,7 +192,7 @@ public class SettingService {
 
     public Map<String, Object> getLoginSecuritySettings() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("security.login.");
+        List<SystemConfigEntity> configs = systemConfigMapper.findByKeyPrefix("setting.login.");
         for (SystemConfigEntity config : configs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
@@ -277,19 +277,19 @@ public class SettingService {
         String prefix;
         switch (category.toLowerCase()) {
             case "system":
-                prefix = "system.";
+                prefix = "setting.";
                 break;
             case "security":
-                prefix = "security.";
+                prefix = "setting.";
                 break;
             case "password":
-                prefix = "security.password.";
+                prefix = "setting.password.";
                 break;
             case "login":
-                prefix = "security.login.";
+                prefix = "setting.login.";
                 break;
             case "ip":
-                prefix = "security.ip.";
+                prefix = "setting.ip.";
                 break;
             default:
                 log.warn("Unknown category: {}", category);
@@ -344,7 +344,7 @@ public class SettingService {
             existing.setUpdatedAt(java.time.LocalDateTime.now());
             systemConfigMapper.update(existing);
         } else {
-            SystemConfigEntity entity = new SystemConfigEntity(key, value, type, description, key.startsWith("system."));
+            SystemConfigEntity entity = new SystemConfigEntity(key, value, type, description, key.startsWith("setting."));
             systemConfigMapper.insert(entity);
         }
     }
