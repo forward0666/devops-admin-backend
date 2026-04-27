@@ -41,7 +41,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 @EnableFeignClients(basePackages = "com.backend.user.client")
 @EnableAspectJAutoProxy
 @EnableAsync
-@EnableMongoRepositories
 @MapperScan("com.backend.user.mapper")
 public class UserApplication {
 
