@@ -53,6 +53,17 @@ public class ProjectMemberService {
                 if (data.getUsername() == null || data.getUsername().isEmpty()) data.setUsername(user.getUsername());
                 if (data.getFullName() == null || data.getFullName().isEmpty()) data.setFullName(user.getFullName());
                 if (data.getPosition() == null || data.getPosition().isEmpty()) data.setPosition(user.getPosition());
+                // Auto-assign project role based on system role
+                if (data.getProjectRole() == null) {
+                    String sysRole = user.getRole();
+                    if ("sys_admin".equals(sysRole) || "admin".equals(sysRole)) {
+                        data.setProjectRole("Administrator");
+                    } else if ("devops".equals(sysRole)) {
+                        data.setProjectRole("DevOps");
+                    } else {
+                        data.setProjectRole("Member");
+                    }
+                }
             }
         }
 

@@ -1,7 +1,9 @@
 package com.backend.manage.service.system;
 
 import com.backend.manage.entity.system.ProjectMemberEntity;
+import com.backend.manage.entity.system.UserEntity;
 import com.backend.manage.mapper.system.ProjectMemberMapper;
+import com.backend.manage.mapper.system.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,9 @@ public class ProjectMemberService {
 
     @Autowired
     private ProjectMemberMapper projectMemberMapper;
+
+    @Autowired
+    private UserMapper userMapper;
 
     @Transactional(readOnly = true)
     public List<ProjectMemberEntity> getMembersByProjectId(Long projectId) {
@@ -34,7 +39,20 @@ public class ProjectMemberService {
         data.setJoinedAt(now);
         data.setActive(true);
         if (data.getStatus() == null) data.setStatus("active");
-        if (data.getProjectRole() == null) data.setProjectRole("Developer");
+        if (data.getProjectRole() == null) data.setProjectRole("Member");
+
+        // Auto-assign project role based on system role
+        if (data.getUserId() != null) {
+            UserEntity user = userMapper.findById(data.getUserId());
+            if (user != null) {
+                String sysRole = user.getRole();
+                if ("sys_admin".equals(sysRole) || "admin".equals(sysRole)) {
+                    data.setProjectRole("Administrator");
+                } else if ("devops".equals(sysRole)) {
+                    data.setProjectRole("DevOps");
+                }
+            }
+        }
 
         projectMemberMapper.insert(data);
         log.info("项目成员添加成功: projectId={}, userId={}", data.getProjectId(), data.getUserId());
