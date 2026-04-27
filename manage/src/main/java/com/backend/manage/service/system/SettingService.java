@@ -108,26 +108,20 @@ public class SettingService {
         return allowed;
     }
 
-    public Map<String, Object> getSystemSettings() {
+    public Map<String, Object> getAllSettings() {
         Map<String, Object> result = new LinkedHashMap<>();
-        List<SystemConfigEntity> publicConfigs = systemConfigMapper.findPublicConfigs();
-        Set<String> publicKeys = publicConfigs.stream()
-                .map(SystemConfigEntity::getConfigKey)
-                .collect(Collectors.toSet());
-
-        for (SystemConfigEntity config : publicConfigs) {
+        List<SystemConfigEntity> allConfigs = systemConfigMapper.findAllConfigs();
+        for (SystemConfigEntity config : allConfigs) {
             result.put(config.getConfigKey(), config.getConfigValue());
         }
-
-        // Also add non-public system.* configs
-        List<SystemConfigEntity> systemConfigs = systemConfigMapper.findByKeyPrefix("setting.");
-        for (SystemConfigEntity config : systemConfigs) {
-            if (!publicKeys.contains(config.getConfigKey())) {
-                result.put(config.getConfigKey(), config.getConfigValue());
-            }
-        }
-
         return result;
+    }
+
+    public void updateAllSettings(Map<String, Object> settings) {
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            upsertConfig(entry.getKey(), String.valueOf(entry.getValue()), "string",
+                    KEY_DESCRIPTIONS.getOrDefault(entry.getKey(), ""));
+        }
     }
 
     public Map<String, Object> updateSystemSettings(Map<String, Object> settings) {
