@@ -2,7 +2,11 @@ package com.backend.user.controller.assets;
 
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.mongo.MiddlewareEntity;
+import com.backend.user.entity.system.ProjectMemberEntity;
 import com.backend.user.service.mongo.MiddlewareService;
+import com.backend.user.service.system.ProjectMemberService;
+import com.backend.user.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +22,23 @@ public class MiddlewareController {
     @Autowired
     private MiddlewareService middlewareService;
 
+    @Autowired
+    private ProjectMemberService projectMemberService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @GetMapping("/list")
-    public ApiResponseDto<List<MiddlewareEntity>> list(@RequestParam Long projectId) {
+    public ApiResponseDto<List<MiddlewareEntity>> list(@RequestParam Long projectId, HttpServletRequest request) {
         try {
             List<MiddlewareEntity> list = middlewareService.findByProjectId(projectId);
+            String projectRole = getProjectRole(request, projectId);
+
+            // Member: hide prod environment middlewares
+            if ("Member".equals(projectRole)) {
+                list = list.stream().filter(m -> !"prod".equals(m.getEnv())).toList();
+            }
+
             return ApiResponseDto.success("Success", list);
         } catch (Exception e) {
             log.error("Failed to fetch middlewares", e);
@@ -103,6 +120,18 @@ public class MiddlewareController {
         } catch (Exception e) {
             log.error("Failed to import middlewares", e);
             return ApiResponseDto.error("Failed to import middlewares");
+        }
+    }
+
+    private String getProjectRole(HttpServletRequest request, Long projectId) {
+        try {
+            String token = request.getHeader("Authorization").substring(7);
+            Long userId = jwtUtil.getUserIdFromToken(token);
+            if (userId == null) return "Member";
+            ProjectMemberEntity member = projectMemberService.findByProjectIdAndUserId(projectId, userId);
+            return member != null ? member.getProjectRole() : "Member";
+        } catch (Exception e) {
+            return "Member";
         }
     }
 }
