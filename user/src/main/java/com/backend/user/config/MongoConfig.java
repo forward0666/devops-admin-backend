@@ -17,7 +17,7 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableMongoRepositories(basePackages = "com.backend.manage.repository.mongo")
+@EnableMongoRepositories(basePackages = "com.backend.user.repository.mongo")
 @ConfigurationProperties(prefix = "spring.data.mongodb")
 @Data
 @EqualsAndHashCode(callSuper=false)
