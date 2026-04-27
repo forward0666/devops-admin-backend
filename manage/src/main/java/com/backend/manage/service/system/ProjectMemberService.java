@@ -34,7 +34,7 @@ public class ProjectMemberService {
         data.setJoinedAt(now);
         data.setActive(true);
         if (data.getStatus() == null) data.setStatus("active");
-        if (data.getRole() == null) data.setRole("Developer");
+        if (data.getProjectRole() == null) data.setProjectRole("Developer");
 
         projectMemberMapper.insert(data);
         log.info("项目成员添加成功: projectId={}, userId={}", data.getProjectId(), data.getUserId());
@@ -47,7 +47,7 @@ public class ProjectMemberService {
             return null;
         }
 
-        if (data.getRole() != null) member.setRole(data.getRole());
+        if (data.getProjectRole() != null) member.setProjectRole(data.getProjectRole());
         if (data.getPosition() != null) member.setPosition(data.getPosition());
         if (data.getStatus() != null) member.setStatus(data.getStatus());
         if (data.getFullName() != null) member.setFullName(data.getFullName());

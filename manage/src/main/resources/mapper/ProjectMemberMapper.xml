@@ -11,7 +11,7 @@
         <result property="userId" column="user_id"/>
         <result property="username" column="username"/>
         <result property="fullName" column="full_name"/>
-        <result property="role" column="role"/>
+        <result property="projectRole" column="project_role"/>
         <result property="position" column="position"/>
         <result property="status" column="status"/>
         <result property="joinedAt" column="joined_at"/>
@@ -23,7 +23,7 @@
     </resultMap>
 
     <sql id="selectColumns">
-        id, project_id, user_id, username, full_name, role, position, status,
+        id, project_id, user_id, username, full_name, project_role, position, status,
         joined_at, created_at, updated_at, created_by, updated_by, active
     </sql>
 
@@ -58,8 +58,8 @@
     </select>
 
     <insert id="insert" parameterType="com.backend.manage.entity.system.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO project_members (project_id, user_id, username, full_name, role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
-        VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{role}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
+        INSERT INTO project_members (project_id, user_id, username, full_name, project_role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
+        VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{projectRole}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
     </insert>
 
     <update id="update" parameterType="com.backend.manage.entity.system.ProjectMemberEntity">

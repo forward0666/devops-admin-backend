@@ -18,7 +18,7 @@ public class ProjectMemberEntity {
     private Long userId;
     private String username;
     private String fullName;
-    private String role;
+    private String projectRole;
     private String position;
     private String status;
     private LocalDateTime joinedAt;
