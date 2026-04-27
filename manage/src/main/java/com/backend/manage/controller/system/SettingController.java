@@ -27,7 +27,7 @@ public class SettingController {
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> getSetting() {
         log.info("GET /setting - Fetching all setting");
-        Map<String, Object> setting = systemSettingsService.getAllSettings();
+        Map<String, Object> setting = systemSettingsService.getSetting();
         return ResponseEntity.ok(ApiResponseDto.success("Setting retrieved successfully", setting));
     }
 
@@ -40,8 +40,8 @@ public class SettingController {
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSetting(@RequestBody Map<String, Object> setting) {
         log.info("PUT /setting - Updating setting");
-        systemSettingsService.updateAllSettings(setting);
-        Map<String, Object> updated = systemSettingsService.getAllSettings();
+        systemSettingsService.updateSetting(setting);
+        Map<String, Object> updated = systemSettingsService.getSetting();
         return ResponseEntity.ok(ApiResponseDto.success("Setting updated successfully", updated));
     }
 }
