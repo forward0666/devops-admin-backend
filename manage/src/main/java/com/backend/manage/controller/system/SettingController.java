@@ -37,7 +37,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/setting")
+//@RequestMapping("/setting")
 @RequiredArgsConstructor // 自动生成包含 final 字段的构造函数
 public class SettingController {
 
@@ -59,7 +59,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @GetMapping
+    @GetMapping("/setting")
     @OperationLog(
             operationType = "SETTINGS_READ",
             operationName = "获取系统设置",
@@ -91,7 +91,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/system")
+    @PutMapping("/setting/system")
     @OperationLog(
             operationType = "SETTINGS_UPDATE",
             operationName = "更新系统设置",
@@ -121,7 +121,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @GetMapping("/security")
+    @GetMapping("/setting/security")
     @OperationLog(
             operationType = "SECURITYS_READ",
             operationName = "获取安全设置",
@@ -153,7 +153,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/security")
+    @PutMapping("/setting/security")
     @OperationLog(
             operationType = "SECURITY_SETTINGS_UPDATE",
             operationName = "更新安全设置",
@@ -184,7 +184,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容（安全考虑）
      */
-    @GetMapping("/security/password-policy")
+    @GetMapping("/setting/security/password-policy")
     @OperationLog(
             operationType = "PASSWORD_POLICY_READ",
             operationName = "获取密码策略",
@@ -216,7 +216,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/security/password-policy")
+    @PutMapping("/setting/security/password-policy")
     @OperationLog(
             operationType = "PASSWORD_POLICY_UPDATE",
             operationName = "更新密码策略",
@@ -247,7 +247,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容（安全考虑）
      */
-    @GetMapping("/security/login")
+    @GetMapping("/setting/security/login")
     @OperationLog(
             operationType = "LOGIN_SECURITY_READ",
             operationName = "获取登录安全设置",
@@ -279,7 +279,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/security/login")
+    @PutMapping("/setting/security/login")
     @OperationLog(
             operationType = "LOGIN_SECURITY_UPDATE",
             operationName = "更新登录安全设置",
@@ -310,7 +310,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容（安全考虑）
      */
-    @GetMapping("/security/ip-control")
+    @GetMapping("/setting/security/ip-control")
     @OperationLog(
             operationType = "IP_WHITELIST_READ",
             operationName = "获取IP白名单设置",
@@ -342,7 +342,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/security/ip-control")
+    @PutMapping("/setting/security/ip-control")
     @OperationLog(
             operationType = "IP_WHITELIST_UPDATE",
             operationName = "更新IP白名单设置",
@@ -375,7 +375,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @PostMapping("/reset")
+    @PostMapping("/setting/reset")
     @OperationLog(
             operationType = "SETTINGS_RESET",
             operationName = "重置设置为默认值",
@@ -405,7 +405,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录请求和响应内容（安全考虑）
      */
-    @GetMapping("/session")
+    @GetMapping("/setting/session")
     @OperationLog(
             operationType = "SESSION_READ",
             operationName = "获取Session设置",
@@ -419,7 +419,7 @@ public class SettingController {
         return ResponseEntity.ok(ApiResponseDto.success("Session settings retrieved successfully", settings));
     }
 
-    @PutMapping("/session")
+    @PutMapping("/setting/session")
     @OperationLog(
             operationType = "SESSION_UPDATE",
             operationName = "更新Session设置",
@@ -432,7 +432,7 @@ public class SettingController {
         return ResponseEntity.ok(ApiResponseDto.success("Session settings updated successfully", updated));
     }
 
-    @GetMapping("/export")
+    @GetMapping("/setting/export")
     @OperationLog(
             operationType = "SETTINGS_EXPORT",
             operationName = "导出系统设置",
@@ -465,7 +465,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @PostMapping("/import")
+    @PostMapping("/setting/import")
     @OperationLog(
             operationType = "SETTINGS_IMPORT",
             operationName = "导入系统设置",
@@ -497,7 +497,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PostMapping("/security/ip-control/whitelist/add")
+    @PostMapping("/setting/security/ip-control/whitelist/add")
     @OperationLog(
             operationType = "IP_WHITELIST_ADD",
             operationName = "添加IP白名单",
@@ -529,7 +529,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @DeleteMapping("/security/ip-control/whitelist/remove")
+    @DeleteMapping("/setting/security/ip-control/whitelist/remove")
     @OperationLog(
             operationType = "IP_WHITELIST_REMOVE",
             operationName = "移除IP白名单",
@@ -562,7 +562,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作和请求内容
      */
-    @PutMapping("/security/ip-control/whitelist/bulk")
+    @PutMapping("/setting/security/ip-control/whitelist/bulk")
     @OperationLog(
             operationType = "IP_WHITELIST_BULK_UPDATE",
             operationName = "批量更新IP白名单",
@@ -592,7 +592,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录请求内容（安全考虑）
      */
-    @DeleteMapping("/security/ip-control/whitelist/clear")
+    @DeleteMapping("/setting/security/ip-control/whitelist/clear")
     @OperationLog(
             operationType = "IP_WHITELIST_CLEAR",
             operationName = "清空IP白名单",
@@ -622,7 +622,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录请求内容
      */
-    @PostMapping("/cache/clear")
+    @PostMapping("/setting/cache/clear")
     @OperationLog(
             operationType = "CACHE_CLEAR",
             operationName = "清理Redis缓存",
@@ -656,7 +656,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @PostMapping("/cache/clear-all")
+    @PostMapping("/setting/cache/clear-all")
     @OperationLog(
             operationType = "CACHE_CLEAR_ALL",
             operationName = "清理所有Redis缓存",
