@@ -37,7 +37,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-//@RequestMapping("/setting")
+@RequestMapping("/setting")
 @RequiredArgsConstructor // 自动生成包含 final 字段的构造函数
 public class SettingController {
 
