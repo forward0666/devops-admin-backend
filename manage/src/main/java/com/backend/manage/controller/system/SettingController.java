@@ -59,7 +59,7 @@ public class SettingController {
      * 权限要求：系统管理员
      * 日志记录：记录操作但不记录响应内容
      */
-    @GetMapping("/")
+    @GetMapping({"", "/"})
     @OperationLog(
             operationType = "SETTINGS_READ",
             operationName = "获取系统设置",
