@@ -10,17 +10,20 @@ import lombok.EqualsAndHashCode;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableMongoRepositories(basePackages = "com.backend.user.repository.mongo")
+@EnableMongoRepositories(basePackages = "com.backend.user.repository.mongo", mongoTemplateRef = "projectMongoTemplate")
 @ConfigurationProperties(prefix = "spring.data.mongodb")
 @Data
-@EqualsAndHashCode(callSuper=false)
+@EqualsAndHashCode(callSuper = false)
 public class MongoConfig extends AbstractMongoClientConfiguration {
 
     private String host;
@@ -46,22 +49,31 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
 
     @Override
     @Bean
+    @Primary
     public MongoClient mongoClient() {
+        return createMongoClient(host, port, username, password, authenticationDatabase, options);
+    }
+
+    @Bean(name = "projectMongoTemplate")
+    public MongoTemplate projectMongoTemplate() {
+        return new MongoTemplate(new SimpleMongoClientDatabaseFactory(mongoClient(), "project"));
+    }
+
+    static MongoClient createMongoClient(String host, int port, String username, String password, String authDb, Options options) {
         MongoClientSettings.Builder builder = MongoClientSettings.builder()
-                .applyToClusterSettings(clusterBuilder -> 
+                .applyToClusterSettings(clusterBuilder ->
                     clusterBuilder.hosts(Collections.singletonList(new ServerAddress(host, port)))
                               .serverSelectionTimeout(options.serverSelectionTimeout, TimeUnit.MILLISECONDS))
-                .applyToConnectionPoolSettings(poolBuilder -> 
+                .applyToConnectionPoolSettings(poolBuilder ->
                     poolBuilder.maxSize(options.maxConnectionPoolSize)
                               .minSize(options.minConnectionPoolSize))
-                .applyToSocketSettings(socketBuilder -> 
+                .applyToSocketSettings(socketBuilder ->
                     socketBuilder.connectTimeout(options.connectTimeout, TimeUnit.MILLISECONDS));
 
-        // Add authentication if username and password are provided
-        if (username != null && !username.trim().isEmpty() && 
+        if (username != null && !username.trim().isEmpty() &&
             password != null && !password.trim().isEmpty()) {
             MongoCredential credential = MongoCredential.createCredential(
-                username, authenticationDatabase, password.toCharArray());
+                username, authDb, password.toCharArray());
             builder.credential(credential);
         }
 

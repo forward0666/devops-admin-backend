@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 
 @Data
-@Document(collection = "project_domains")
+@Document(collection = "domains")
 public class DomainEntity {
 
     @Id

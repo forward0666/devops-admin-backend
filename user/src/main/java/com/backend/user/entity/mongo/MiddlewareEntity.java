@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 
 @Data
-@Document(collection = "project_middlewares")
+@Document(collection = "middleware")
 public class MiddlewareEntity {
 
     @Id
