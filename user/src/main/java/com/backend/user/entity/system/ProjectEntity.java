@@ -21,7 +21,6 @@ public class ProjectEntity {
     private String type;
     private String status;
     private Integer progress;
-    private String leader;
     private Long departmentId;
     private String description;
     private String techStack;

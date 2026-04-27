@@ -11,7 +11,6 @@
         <result property="type" column="type"/>
         <result property="status" column="status"/>
         <result property="progress" column="progress"/>
-        <result property="leader" column="leader"/>
         <result property="departmentId" column="department_id"/>
         <result property="description" column="description"/>
         <result property="techStack" column="tech_stack"/>
@@ -42,12 +41,10 @@
             useGeneratedKeys="true"
             keyProperty="id">
         INSERT INTO projects (
-            name, type, status, progress, leader,
             department_id, description, tech_stack, objectives,
             created_by, updated_by, active
         )
         VALUES (
-                   #{name}, #{type}, #{status}, #{progress}, #{leader},
                    #{departmentId}, #{description}, #{techStack}, #{objectives},
                    #{createdBy}, #{updatedBy}, #{active}
                )
@@ -60,7 +57,6 @@
             <if test="type != null">type = #{type},</if>
             <if test="status != null">status = #{status},</if>
             <if test="progress != null">progress = #{progress},</if>
-            <if test="leader != null">leader = #{leader},</if>
             <if test="departmentId != null">department_id = #{departmentId},</if>
             <if test="description != null">description = #{description},</if>
             <if test="techStack != null">tech_stack = #{techStack},</if>
@@ -90,7 +86,6 @@
         WHERE active = true
           AND (name LIKE CONCAT('%', #{query}, '%')
                OR type LIKE CONCAT('%', #{query}, '%')
-               OR leader LIKE CONCAT('%', #{query}, '%'))
         ORDER BY created_at DESC
     </select>
 
