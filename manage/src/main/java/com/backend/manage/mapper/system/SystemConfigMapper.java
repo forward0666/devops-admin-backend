@@ -18,42 +18,42 @@ public interface SystemConfigMapper {
         @Result(property = "createdAt", column = "created_at"),
         @Result(property = "updatedAt", column = "updated_at")
     })
-    @Select("SELECT * FROM settings WHERE config_key = #{key}")
+    @Select("SELECT * FROM system_configs WHERE config_key = #{key}")
     SystemConfigEntity findByKey(@Param("key") String key);
 
     @ResultMap("systemConfigResultMap")
-    @Select("SELECT * FROM settings ORDER BY config_key")
+    @Select("SELECT * FROM system_configs ORDER BY config_key")
     List<SystemConfigEntity> findAll();
 
     @ResultMap("systemConfigResultMap")
-    @Select("SELECT * FROM settings WHERE is_public = true ORDER BY config_key")
+    @Select("SELECT * FROM system_configs WHERE is_public = true ORDER BY config_key")
     List<SystemConfigEntity> findPublicConfigs();
 
-    @Insert("INSERT INTO settings (config_key, config_value, config_type, description, is_public, created_at, updated_at) " +
+    @Insert("INSERT INTO system_configs (config_key, config_value, config_type, description, is_public, created_at, updated_at) " +
             "VALUES (#{configKey}, #{configValue}, #{configType}, #{description}, #{isPublic}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(SystemConfigEntity config);
 
-    @Update("UPDATE settings SET config_value = #{configValue}, config_type = #{configType}, " +
+    @Update("UPDATE system_configs SET config_value = #{configValue}, config_type = #{configType}, " +
             "description = #{description}, is_public = #{isPublic}, updated_at = NOW() " +
             "WHERE config_key = #{configKey}")
     int update(SystemConfigEntity config);
 
-    @Delete("DELETE FROM settings WHERE config_key = #{key}")
+    @Delete("DELETE FROM system_configs WHERE config_key = #{key}")
     int deleteByKey(@Param("key") String key);
 
-    @Select("SELECT COUNT(*) FROM settings WHERE config_key = #{key}")
+    @Select("SELECT COUNT(*) FROM system_configs WHERE config_key = #{key}")
     int countByKey(@Param("key") String key);
 
     @ResultMap("systemConfigResultMap")
-    @Select("SELECT * FROM settings WHERE config_type = #{type} ORDER BY config_key")
+    @Select("SELECT * FROM system_configs WHERE config_type = #{type} ORDER BY config_key")
     List<SystemConfigEntity> findByType(@Param("type") String type);
 
     @ResultMap("systemConfigResultMap")
-    @Select("SELECT * FROM settings WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key")
+    @Select("SELECT * FROM system_configs WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key")
     List<SystemConfigEntity> searchByKeyPattern(@Param("pattern") String pattern);
 
     @ResultMap("systemConfigResultMap")
-    @Select("SELECT * FROM settings WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key")
+    @Select("SELECT * FROM system_configs WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key")
     List<SystemConfigEntity> findByKeyPrefix(@Param("prefix") String prefix);
 }
