@@ -135,7 +135,7 @@ public class OperationLogService {
     }
 
     public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir) {
-        return getOperationLogs(page, size, sortBy, sortDir, null);
+        return getOperationLogs(page, size, sortBy, sortDir, null, null, null);
     }
 
     public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir, String category,
