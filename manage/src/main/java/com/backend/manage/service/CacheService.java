@@ -2,9 +2,11 @@ package com.backend.manage.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import com.backend.manage.service.system.SettingService;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
