@@ -1,14 +1,20 @@
 package com.backend.manage.mapper.mongo;
 
 import com.backend.manage.entity.audits.OperationLogEntity;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,8 +28,24 @@ import java.util.List;
 public class OperationLogMapper {
 
     private final MongoTemplate mongoTemplate;
+    private final ObjectMapper objectMapper;
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
+    private static final String QUERY_FILE = "mongo/OperationLogRepository.json";
+
+    private JsonNode queryDefinitions;
+
+    @PostConstruct
+    public void init() {
+        try {
+            InputStream is = new ClassPathResource(QUERY_FILE).getInputStream();
+            queryDefinitions = objectMapper.readTree(is);
+            log.info("Loaded MongoDB query definitions from {}", QUERY_FILE);
+        } catch (Exception e) {
+            log.error("Failed to load query definitions from {}: {}", QUERY_FILE, e.getMessage());
+            queryDefinitions = objectMapper.createObjectNode();
+        }
+    }
 
     // ==================== Collection Name ====================
 
@@ -51,6 +73,29 @@ public class OperationLogMapper {
         return collections;
     }
 
+    // ==================== Query Template ====================
+
+    private Query buildQueryFromTemplate(String templateName) {
+        Query query = new Query();
+        JsonNode def = queryDefinitions.get(templateName);
+        if (def == null) return query;
+
+        // Apply sort from template
+        JsonNode sortNode = def.get("sort");
+        if (sortNode != null && sortNode.isObject()) {
+            List<Sort.Order> orders = new ArrayList<>();
+            sortNode.fields().forEachRemaining(entry -> {
+                int direction = entry.getValue().asInt(-1);
+                orders.add(new Sort.Order(direction == 1 ? Sort.Direction.ASC : Sort.Direction.DESC, entry.getKey()));
+            });
+            if (!orders.isEmpty()) {
+                query.with(Sort.by(orders));
+            }
+        }
+
+        return query;
+    }
+
     // ==================== Insert ====================
 
     public void insert(OperationLogEntity entity, String collectionName) {
@@ -62,8 +107,21 @@ public class OperationLogMapper {
     public List<OperationLogEntity> findByCriteria(String category, String startDate, String endDate,
                                                     int page, int size, String sortBy, String sortDir) {
         Query query = buildCriteriaQuery(category, startDate, endDate);
-        Sort sort = Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy);
-        query.with(sort);
+
+        // Use sort from JSON template, allow override by params
+        JsonNode def = queryDefinitions.get("findOperationLogs");
+        if (sortBy != null && !sortBy.isEmpty()) {
+            Sort.Direction dir = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+            query.with(Sort.by(dir, sortBy));
+        } else if (def != null && def.has("sort")) {
+            JsonNode sortNode = def.get("sort");
+            List<Sort.Order> orders = new ArrayList<>();
+            sortNode.fields().forEachRemaining(entry -> {
+                int direction = entry.getValue().asInt(-1);
+                orders.add(new Sort.Order(direction == 1 ? Sort.Direction.ASC : Sort.Direction.DESC, entry.getKey()));
+            });
+            query.with(Sort.by(orders));
+        }
 
         LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
         LocalDateTime queryEnd = LocalDateTime.now();
@@ -88,10 +146,9 @@ public class OperationLogMapper {
         // Global sort across collections
         boolean isAsc = sortDir.equalsIgnoreCase("asc");
         allLogs.sort(isAsc
-            ? java.util.Comparator.comparing(OperationLogEntity::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
-            : java.util.Comparator.comparing(OperationLogEntity::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+            ? Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            : Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
 
-        // Memory pagination
         long skip = (long) page * size;
         return allLogs.stream().skip(skip).limit(size).toList();
     }
@@ -121,10 +178,10 @@ public class OperationLogMapper {
     }
 
     public List<OperationLogEntity> findRecent(int limit) {
+        Query query = buildQueryFromTemplate("findRecentLogs");
         List<String> collections = getQueryableCollections(
             LocalDateTime.now().minusMonths(3), LocalDateTime.now());
 
-        Query query = new Query().with(Sort.by(Sort.Direction.DESC, "createdAt"));
         List<OperationLogEntity> allLogs = new ArrayList<>();
         for (String col : collections) {
             if (allLogs.size() >= limit) break;
@@ -138,7 +195,7 @@ public class OperationLogMapper {
     // ==================== Private Helpers ====================
 
     private Query buildCriteriaQuery(String category, String startDate, String endDate) {
-        Query query = new Query();
+        Query query = buildQueryFromTemplate("findOperationLogs");
 
         if (category != null && !category.isEmpty()) {
             query.addCriteria(Criteria.where("category").is(category));
