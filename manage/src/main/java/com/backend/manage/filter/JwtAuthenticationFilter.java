@@ -95,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                                 // Store validation result in Redis
                                 if (cacheService.isRedisAvailable()) {
-                                    cacheService.cacheTokenValidation(username, token, true);
+                                    cacheService.cacheTokenValidation(username, token, true, 86400);
                                     log.info("Stored token validation result in Redis");
                                 }
                             } else {
