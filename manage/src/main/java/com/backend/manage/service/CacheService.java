@@ -6,8 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
-import com.backend.manage.service.system.SettingService;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
@@ -22,11 +20,8 @@ public class CacheService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
-    private SettingService settingService;
-
-    public CacheService(RedisTemplate<String, Object> redisTemplate, @Lazy SettingService settingService) {
+    public CacheService(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
-        this.settingService = settingService;
     }
 
     /* ================= Redis 健康检查 ================= */
@@ -95,10 +90,10 @@ public class CacheService {
         clearByPrefix("settings:");
     }
 
-    public void cacheTokenValidation(String username, String token, boolean valid) {
+    public void cacheTokenValidation(String username, String token, boolean valid, long expireSeconds) {
         if (!isRedisAvailable() || token == null) return;
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
-        long expireMin = settingService.getTokenExpireSeconds() / 60;
+        long expireMin = Math.max(1, expireSeconds / 60);
         redisTemplate.opsForValue().set(key, valid, expireMin, java.util.concurrent.TimeUnit.MINUTES);
     }
 

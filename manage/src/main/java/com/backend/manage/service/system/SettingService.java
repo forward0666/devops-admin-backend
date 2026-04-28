@@ -3,6 +3,8 @@ package com.backend.manage.service.system;
 import com.backend.manage.mapper.system.SystemConfigMapper;
 import com.backend.manage.entity.system.SettingEntity;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -17,7 +19,10 @@ import java.util.stream.Collectors;
 public class SettingService {
 
     private final SystemConfigMapper systemConfigMapper;
-    private final com.backend.manage.service.CacheService cacheService;
+
+    @Autowired
+    @Lazy
+    private com.backend.manage.service.CacheService cacheService;
 
     // IP Access Control
     private static final String ALLOWED_KEY = "setting.ip.allowed_ips";

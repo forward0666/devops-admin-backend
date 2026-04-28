@@ -195,7 +195,7 @@ public class AuthService {
 
                 // 如果Redis可用，将令牌验证结果缓存
                 if (cacheService.isRedisAvailable()) {
-                    cacheService.cacheTokenValidation(user.getUsername(), token, true);
+                    cacheService.cacheTokenValidation(user.getUsername(), token, true, settingService.getTokenExpireSeconds());
                     log.info("令牌已存储在Redis缓存中供验证使用");
                 }
 
@@ -322,7 +322,7 @@ public class AuthService {
 
             // 缓存验证结果
             if (cacheService.isRedisAvailable()) {
-                cacheService.cacheTokenValidation(username, cleanToken, isValid);
+                cacheService.cacheTokenValidation(username, cleanToken, isValid, settingService.getTokenExpireSeconds());
             }
 
             return isValid;
