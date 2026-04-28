@@ -153,6 +153,9 @@ public class OperationLogService {
             List<String> collections = getCollectionNamesForRange(
                 LocalDateTime.now().minusMonths(6), LocalDateTime.now());
             Collections.reverse(collections);
+            if (!collections.contains("operation_logs")) {
+                collections.add("operation_logs");
+            }
 
             List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
             long total = 0;
@@ -186,6 +189,9 @@ public class OperationLogService {
             List<String> collections = getCollectionNamesForRange(
                 LocalDateTime.now().minusMonths(3), LocalDateTime.now());
             Collections.reverse(collections);
+            if (!collections.contains("operation_logs")) {
+                collections.add("operation_logs");
+            }
 
             List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
             Query query = new Query().with(Sort.by(Sort.Direction.DESC, "createdAt"));
