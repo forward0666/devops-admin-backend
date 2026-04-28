@@ -30,17 +30,35 @@ public class OperationLogService {
     @Async
     public void logOperation(OperationLogEntity operationLog) {
         try {
-            // 使用Java 21的模式匹配简化条件检查
             if (operationLog.getOperationId() == null) {
                 operationLog.setOperationId(UUID.randomUUID().toString());
             }
             if (operationLog.getCreatedAt() == null) {
                 operationLog.setCreatedAt(LocalDateTime.now());
             }
-            mongoTemplate.save(operationLog);
+            String collectionName = getCollectionName(operationLog.getCreatedAt());
+            mongoTemplate.save(operationLog, collectionName);
         } catch (Exception e) {
             log.error("Failed to save operation log: {}", e.getMessage(), e);
         }
+    }
+
+    private String getCollectionName(LocalDateTime dateTime) {
+        return "operation_logs_" + dateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM"));
+    }
+
+    /**
+     * Query across monthly collections for a date range
+     */
+    private List<String> getCollectionNamesForRange(LocalDateTime start, LocalDateTime end) {
+        List<String> names = new java.util.ArrayList<>();
+        java.time.YearMonth current = java.time.YearMonth.from(start);
+        java.time.YearMonth endMonth = java.time.YearMonth.from(end);
+        while (!current.isAfter(endMonth)) {
+            names.add("operation_logs_" + current.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")));
+            current = current.plusMonths(1);
+        }
+        return names;
     }
 
     @Async
@@ -129,19 +147,33 @@ public class OperationLogService {
             if (category != null && !category.isEmpty()) {
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
             }
-            long total = mongoTemplate.count(query, OperationLogEntity.class);
-            
-            List<OperationLogEntity> logs = mongoTemplate.find(
-                query.skip((long) page * size).limit(size)
-                    .with(Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy)),
-                OperationLogEntity.class
-            );
-            
-            log.info("✅ 成功查询操作日志: 总数={}, 当前页={}条", total, logs.size());
-            return new PageImpl<>(logs, pageable, total);
+
+            // Query recent 6 months collections
+            List<String> collections = getCollectionNamesForRange(
+                LocalDateTime.now().minusMonths(6), LocalDateTime.now());
+            Collections.reverse(collections);
+
+            List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
+            long total = 0;
+            for (String col : collections) {
+                total += mongoTemplate.count(query, col, OperationLogEntity.class);
+            }
+
+            long skip = (long) page * size;
+            long remaining = size;
+            for (String col : collections) {
+                if (remaining <= 0) break;
+                Query colQuery = query.skip(allLogs.size() > 0 ? 0 : skip - allLogs.size()).limit((int) remaining)
+                    .with(Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
+                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, col, OperationLogEntity.class);
+                allLogs.addAll(logs);
+                remaining -= logs.size();
+            }
+
+            log.info("Fetched operation logs: total={}, returned={}", total, allLogs.size());
+            return new PageImpl<>(allLogs, pageable, total);
         } catch (Exception e) {
-            log.error("❌ 查询操作日志失败: {}", e.getMessage());
-            // 降级：返回空结果而不抛出异常，确保不影响前端显示
+            log.error("Failed to query operation logs: {}", e.getMessage());
             return new PageImpl<>(List.of(), PageRequest.of(page, size), 0);
         }
     }
@@ -150,15 +182,21 @@ public class OperationLogService {
         try {
             log.debug("Fetching recent operation logs: limit={}", limit);
             
-            // 查询最近的 N 条日志
-            Query query = new Query()
-                .limit(limit)
-                .with(Sort.by(Sort.Direction.DESC, "createdAt"));
-            
-            List<OperationLogEntity> logs = mongoTemplate.find(query, OperationLogEntity.class);
-            
-            log.info("✅ 成功查询最近操作日志: {}条", logs.size());
-            return logs;
+            List<String> collections = getCollectionNamesForRange(
+                LocalDateTime.now().minusMonths(3), LocalDateTime.now());
+            Collections.reverse(collections);
+
+            List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
+            Query query = new Query().with(Sort.by(Sort.Direction.DESC, "createdAt"));
+            for (String col : collections) {
+                if (allLogs.size() >= limit) break;
+                Query colQuery = query.limit(limit - allLogs.size());
+                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, col, OperationLogEntity.class);
+                allLogs.addAll(logs);
+            }
+
+            log.info("Fetched recent operation logs: {}", allLogs.size());
+            return allLogs.stream().limit(limit).toList();
         } catch (Exception e) {
             log.error("❌ 查询最近操作日志失败: {}", e.getMessage());
             // 降级：返回空结果
