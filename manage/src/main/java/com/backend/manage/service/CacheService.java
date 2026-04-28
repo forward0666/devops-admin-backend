@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import com.backend.manage.service.system.SettingService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class CacheService {
     @Autowired
     private SettingService settingService;
 
-    public CacheService(RedisTemplate<String, Object> redisTemplate, SettingService settingService) {
+    public CacheService(RedisTemplate<String, Object> redisTemplate, @Lazy SettingService settingService) {
         this.redisTemplate = redisTemplate;
         this.settingService = settingService;
     }
