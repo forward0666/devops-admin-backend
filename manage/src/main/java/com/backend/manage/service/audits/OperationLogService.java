@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.UUID;
 
 
@@ -167,10 +168,15 @@ public class OperationLogService {
                     List<OperationLogEntity> logs = mongoTemplate.find(queryWithSort, OperationLogEntity.class, col);
                     allLogs.addAll(logs);
                 } catch (Exception e) {
-                    // Collection may not exist yet
                     log.debug("Collection {} not found, skipping", col);
                 }
             }
+
+            // Global sort across collections
+            Comparator<OperationLogEntity> comparator = sortDir.equalsIgnoreCase("asc")
+                ? Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                : Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            allLogs.sort(comparator);
 
             long total = allLogs.size();
             long skip = (long) page * size;
