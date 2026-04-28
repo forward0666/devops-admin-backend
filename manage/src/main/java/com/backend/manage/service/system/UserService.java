@@ -39,6 +39,9 @@ public class UserService {
     @Autowired
     private CacheService cacheService;
 
+    @Autowired
+    private SettingService settingService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -362,15 +365,19 @@ public class UserService {
     public boolean changePassword(Long id, String oldPassword, String newPassword) {
         log.info("Changing password for user: " + id);
 
+        // Validate password policy
+        String passwordError = settingService.validatePassword(newPassword);
+        if (passwordError != null) {
+            throw new RuntimeException(passwordError);
+        }
+
         Optional<UserEntity> optionalUser = Optional.ofNullable(userMapper.findById(id));
         if (optionalUser.isPresent()) {
             UserEntity user = optionalUser.get();
             
             // Verify old password
             if (passwordEncoder.matches(oldPassword, user.getPassword())) {
-                user.setPassword(passwordEncoder.encode(newPassword));
-                user.setUpdatedAt(LocalDateTime.now());
-                userMapper.update(user);
+                userMapper.updatePassword(id, passwordEncoder.encode(newPassword));
                 
                 // Clear cache after changing password
                 if (cacheService.isRedisAvailable()) {
@@ -398,6 +405,12 @@ public class UserService {
      */
     public boolean resetPassword(Long id, String newPassword) {
         log.info("Resetting password for user: " + id);
+
+        // Validate password policy
+        String passwordError = settingService.validatePassword(newPassword);
+        if (passwordError != null) {
+            throw new RuntimeException(passwordError);
+        }
 
         Optional<UserEntity> optionalUser = Optional.ofNullable(userMapper.findById(id));
         if (optionalUser.isPresent()) {

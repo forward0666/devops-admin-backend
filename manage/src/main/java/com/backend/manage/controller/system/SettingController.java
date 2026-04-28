@@ -44,4 +44,11 @@ public class SettingController {
         Map<String, Object> updated = systemSettingsService.getSetting();
         return ResponseEntity.ok(ApiResponseDto.success("Setting updated successfully", updated));
     }
+
+    @GetMapping({ "/setting/captcha"})
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> getCaptchaStatus() {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("enabled", systemSettingsService.isLoginCaptchaEnabled());
+        return ResponseEntity.ok(ApiResponseDto.success("Captcha status retrieved", result));
+    }
 }

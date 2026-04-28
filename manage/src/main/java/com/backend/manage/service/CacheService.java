@@ -18,8 +18,12 @@ public class CacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public CacheService(RedisTemplate<String, Object> redisTemplate) {
+    @Autowired
+    private SettingService settingService;
+
+    public CacheService(RedisTemplate<String, Object> redisTemplate, SettingService settingService) {
         this.redisTemplate = redisTemplate;
+        this.settingService = settingService;
     }
 
     /* ================= Redis 健康检查 ================= */
@@ -91,7 +95,8 @@ public class CacheService {
     public void cacheTokenValidation(String username, String token, boolean valid) {
         if (!isRedisAvailable() || token == null) return;
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
-        redisTemplate.opsForValue().set(key, valid, TOKEN_MIN, java.util.concurrent.TimeUnit.MINUTES);
+        long expireMin = settingService.getTokenExpireSeconds() / 60;
+        redisTemplate.opsForValue().set(key, valid, expireMin, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     public Boolean getCachedTokenValidation(String username, String token) {
@@ -99,5 +104,27 @@ public class CacheService {
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
         Object v = redisTemplate.opsForValue().get(key);
         return (v instanceof Boolean b) ? b : null;
+    }
+
+    /* ================= Generic Cache Operations ================= */
+
+    public Object get(String key) {
+        if (!redisOk()) return null;
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    public void set(String key, Object value, long timeout, java.util.concurrent.TimeUnit unit) {
+        if (!redisOk()) return;
+        redisTemplate.opsForValue().set(key, value, timeout, unit);
+    }
+
+    public Long increment(String key) {
+        if (!redisOk()) return null;
+        return redisTemplate.opsForValue().increment(key);
+    }
+
+    public Boolean delete(String key) {
+        if (!redisOk()) return false;
+        return redisTemplate.delete(key);
     }
 }

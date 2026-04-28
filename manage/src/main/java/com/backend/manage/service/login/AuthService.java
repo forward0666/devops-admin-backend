@@ -8,6 +8,7 @@ import com.backend.manage.entity.system.UserEntity;
 import com.backend.manage.mapper.system.UserMapper;
 import com.backend.manage.service.CacheService;
 import com.backend.manage.service.system.SecurityService;
+import com.backend.manage.service.system.SettingService;
 import com.backend.manage.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,9 @@ public class AuthService {
     private SecurityService ipWhitelistService; // IP白名单服务
 
     @Autowired
+    private SettingService settingService;
+
+    @Autowired
     private CacheService cacheService; // 缓存服务，用于Redis缓存操作
 
     @Autowired
@@ -64,28 +68,48 @@ public class AuthService {
             throw new RuntimeException("访问被拒绝: 您的IP地址未获得授权");
         }
 
+        // 步骤0.1: 检查登录锁定
+        if (settingService.isLoginLocked(loginRequest.username())) {
+            int lockoutMin = settingService.getLoginLockoutMinutes();
+            throw new RuntimeException("Account is locked due to too many failed attempts. Try again in " + lockoutMin + " minutes.");
+        }
+
+        // 步骤0.2: 如果验证码未启用，跳过验证码检查
+        boolean captchaEnabled = settingService.isLoginCaptchaEnabled();
+
         // 步骤1: 验证用户凭据（用户名和密码）
         var user = authenticateUser(loginRequest.username(), loginRequest.password());
 
         if (user == null) {
             log.warn("认证失败: 用户名或密码无效 {}", loginRequest.username());
-            throw new RuntimeException("无效的用户名或密码");
+            boolean locked = settingService.recordFailedLogin(loginRequest.username());
+            if (locked) {
+                throw new RuntimeException("Account is locked due to too many failed attempts. Try again in " + settingService.getLoginLockoutMinutes() + " minutes.");
+            }
+            int remaining = settingService.getRemainingAttempts(loginRequest.username());
+            throw new RuntimeException("Invalid username or password. " + remaining + " attempts remaining.");
         }
 
         log.info("用户凭据验证成功: {}", loginRequest.username());
 
-        // 步骤2: 验证验证码（通过安全服务）
-        boolean isValidCode = validateVerificationCode(
-                loginRequest.verificationCodeKey(),
-                loginRequest.verificationCode()
-        );
+        // 清除失败登录计数
+        settingService.clearFailedLogin(loginRequest.username());
 
-        if (!isValidCode) {
-            log.warn("认证失败: 验证码无效 {}", loginRequest.username());
-            throw new RuntimeException("无效的验证码");
+        // 步骤2: 验证验证码（通过安全服务）- 仅在启用时检查
+        if (captchaEnabled) {
+            boolean isValidCode = validateVerificationCode(
+                    loginRequest.verificationCodeKey(),
+                    loginRequest.verificationCode()
+            );
+
+            if (!isValidCode) {
+                log.warn("认证失败: 验证码无效 {}", loginRequest.username());
+                throw new RuntimeException("Invalid verification code");
+            }
+            log.info("验证码验证成功: {}", loginRequest.username());
+        } else {
+            log.info("验证码已禁用, 跳过验证: {}", loginRequest.username());
         }
-
-        log.info("验证码验证成功: {}", loginRequest.username());
 
         // 步骤3: 生成JWT承载令牌
         var token = generateBearerToken(user);
