@@ -34,9 +34,11 @@ public class SettingController {
     @PutMapping({ "/setting"})
     @OperationLog(
             operationType = "SETTING_UPDATE",
-            operationName = "更新系统设置",
+            operationName = "Update System Setting",
             resourceType = "SYSTEM_SETTING",
-            description = "修改配置信息"
+            description = "Modify system setting",
+            logRequest = false,
+            logResponse = false
     )
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> updateSetting(@RequestBody Map<String, Object> setting) {
         log.info("PUT /setting - Updating setting");
