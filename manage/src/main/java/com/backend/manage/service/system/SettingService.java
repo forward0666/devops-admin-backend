@@ -149,12 +149,8 @@ public class SettingService {
      * Check if IP is allowed
      */
     public boolean isIpAllowed(String clientIp) {
-        List<String> blockedList = loadConfig(ALLOWED_KEY);
-        List<String> allowedList = loadConfig(BLOCKED_KEY);
-
-        // Fix: swapped blocked/allowed
-        blockedList = loadIpList(BLOCKED_KEY);
-        allowedList = loadIpList(ALLOWED_KEY);
+        List<String> blockedList = loadIpList(BLOCKED_KEY);
+        List<String> allowedList = loadIpList(ALLOWED_KEY);
 
         if (matchAny(clientIp, blockedList)) {
             log.warn("IP {} is blocked", clientIp);
@@ -164,6 +160,13 @@ public class SettingService {
             return true;
         }
         return matchAny(clientIp, allowedList);
+    }
+
+    public Map<String, Object> getIPAccessControl() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("allowed_ips", String.join(",", loadIpList(ALLOWED_KEY)));
+        result.put("blocked_ips", String.join(",", loadIpList(BLOCKED_KEY)));
+        return result;
     }
 
     /**
