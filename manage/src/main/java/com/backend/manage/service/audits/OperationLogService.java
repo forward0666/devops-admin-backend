@@ -152,13 +152,17 @@ public class OperationLogService {
             if (category != null && !category.isEmpty()) {
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
             }
-            if (startDate != null && !startDate.isEmpty()) {
-                LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
-                query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").gte(start));
-            }
-            if (endDate != null && !endDate.isEmpty()) {
-                LocalDateTime end = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
-                query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").lt(end));
+            if (startDate != null && !startDate.isEmpty() || endDate != null && !endDate.isEmpty()) {
+                org.springframework.data.mongodb.core.query.Criteria dateCriteria = org.springframework.data.mongodb.core.query.Criteria.where("createdAt");
+                if (startDate != null && !startDate.isEmpty()) {
+                    LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+                    dateCriteria.gte(start);
+                }
+                if (endDate != null && !endDate.isEmpty()) {
+                    LocalDateTime end = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
+                    dateCriteria.lt(end);
+                }
+                query.addCriteria(dateCriteria);
             }
 
             // Query recent 6 months collections + legacy collection
