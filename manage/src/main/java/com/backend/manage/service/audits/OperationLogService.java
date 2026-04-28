@@ -149,7 +149,7 @@ public class OperationLogService {
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
             }
 
-            // Query recent 6 months collections
+            // Query recent 6 months collections + legacy collection
             List<String> collections = getCollectionNamesForRange(
                 LocalDateTime.now().minusMonths(6), LocalDateTime.now());
             Collections.reverse(collections);
@@ -157,25 +157,30 @@ public class OperationLogService {
                 collections.add("operation_logs");
             }
 
+            Sort sort = Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy);
+            Query queryWithSort = query.with(sort);
+
+            // Collect all matching logs from all collections
             List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
-            long total = 0;
             for (String col : collections) {
-                total += mongoTemplate.count(query, OperationLogEntity.class, col);
+                try {
+                    List<OperationLogEntity> logs = mongoTemplate.find(queryWithSort, OperationLogEntity.class, col);
+                    allLogs.addAll(logs);
+                } catch (Exception e) {
+                    // Collection may not exist yet
+                    log.debug("Collection {} not found, skipping", col);
+                }
             }
 
+            long total = allLogs.size();
             long skip = (long) page * size;
-            long remaining = size;
-            for (String col : collections) {
-                if (remaining <= 0) break;
-                Query colQuery = query.skip(allLogs.size() > 0 ? 0 : skip - allLogs.size()).limit((int) remaining)
-                    .with(Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
-                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, OperationLogEntity.class, col);
-                allLogs.addAll(logs);
-                remaining -= logs.size();
-            }
+            List<OperationLogEntity> paged = allLogs.stream()
+                    .skip(skip)
+                    .limit(size)
+                    .toList();
 
-            log.info("Fetched operation logs: total={}, returned={}", total, allLogs.size());
-            return new PageImpl<>(allLogs, pageable, total);
+            log.info("Fetched operation logs: total={}, returned={}", total, paged.size());
+            return new PageImpl<>(paged, pageable, total);
         } catch (Exception e) {
             log.error("Failed to query operation logs: {}", e.getMessage());
             return new PageImpl<>(List.of(), PageRequest.of(page, size), 0);
