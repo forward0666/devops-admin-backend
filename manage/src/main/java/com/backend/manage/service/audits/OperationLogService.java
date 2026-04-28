@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.UUID;
 
 
@@ -156,7 +157,7 @@ public class OperationLogService {
             List<OperationLogEntity> allLogs = new java.util.ArrayList<>();
             long total = 0;
             for (String col : collections) {
-                total += mongoTemplate.count(query, col, OperationLogEntity.class);
+                total += mongoTemplate.count(query, OperationLogEntity.class, col);
             }
 
             long skip = (long) page * size;
@@ -165,7 +166,7 @@ public class OperationLogService {
                 if (remaining <= 0) break;
                 Query colQuery = query.skip(allLogs.size() > 0 ? 0 : skip - allLogs.size()).limit((int) remaining)
                     .with(Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
-                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, col, OperationLogEntity.class);
+                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, OperationLogEntity.class, col);
                 allLogs.addAll(logs);
                 remaining -= logs.size();
             }
@@ -191,7 +192,7 @@ public class OperationLogService {
             for (String col : collections) {
                 if (allLogs.size() >= limit) break;
                 Query colQuery = query.limit(limit - allLogs.size());
-                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, col, OperationLogEntity.class);
+                List<OperationLogEntity> logs = mongoTemplate.find(colQuery, OperationLogEntity.class, col);
                 allLogs.addAll(logs);
             }
 
