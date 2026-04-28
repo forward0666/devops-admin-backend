@@ -138,9 +138,11 @@ public class OperationLogService {
         return getOperationLogs(page, size, sortBy, sortDir, null);
     }
 
-    public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir, String category) {
+    public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir, String category,
+            String startDate, String endDate) {
         try {
-            log.debug("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}, category={}", page, size, sortBy, sortDir, category);
+            log.debug("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}, category={}, startDate={}, endDate={}",
+                page, size, sortBy, sortDir, category, startDate, endDate);
             
             Pageable pageable = PageRequest.of(page, size,
                 Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy));
@@ -149,10 +151,26 @@ public class OperationLogService {
             if (category != null && !category.isEmpty()) {
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
             }
+            if (startDate != null && !startDate.isEmpty()) {
+                LocalDateTime start = LocalDateTime.parse(startDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+                query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").gte(start));
+            }
+            if (endDate != null && !endDate.isEmpty()) {
+                LocalDateTime end = LocalDateTime.parse(endDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE).plusDays(1);
+                query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").lt(end));
+            }
 
             // Query recent 6 months collections + legacy collection
-            List<String> collections = getCollectionNamesForRange(
-                LocalDateTime.now().minusMonths(6), LocalDateTime.now());
+            // Determine date range for collection selection
+            LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
+            LocalDateTime queryEnd = LocalDateTime.now();
+            if (startDate != null && !startDate.isEmpty()) {
+                queryStart = LocalDateTime.parse(startDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+            }
+            if (endDate != null && !endDate.isEmpty()) {
+                queryEnd = LocalDateTime.parse(endDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE).plusDays(1);
+            }
+            List<String> collections = getCollectionNamesForRange(queryStart, queryEnd);
             Collections.reverse(collections);
             if (!collections.contains("operation_logs")) {
                 collections.add("operation_logs");

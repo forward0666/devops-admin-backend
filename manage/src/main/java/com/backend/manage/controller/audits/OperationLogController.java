@@ -35,11 +35,13 @@ public class OperationLogController {
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) String category) {
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
 
         AccessValidator.validate(request, jwtUtil, "sys_admin", "admin", "devops");
         int springDataPage = Math.max(0, page - 1);
-        Page<OperationLogEntity> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir, category);
+        Page<OperationLogEntity> logs = operationLogService.getOperationLogs(springDataPage, pageSize, sortBy, sortDir, category, startDate, endDate);
         return ResponseUtil.page("获取操作日志成功", logs, page);
     }
 
