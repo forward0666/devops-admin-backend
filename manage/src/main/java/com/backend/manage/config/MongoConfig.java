@@ -10,10 +10,17 @@ import lombok.EqualsAndHashCode;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -66,5 +73,28 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
         }
 
         return MongoClients.create(builder.build());
+    }
+
+    @Bean
+    @Override
+    public MongoCustomConversions customConversions() {
+        List<Converter<?, ?>> converters = new ArrayList<>();
+        converters.add(new LocalDateTimeToDateConverter());
+        converters.add(new DateToLocalDateTimeConverter());
+        return new MongoCustomConversions(converters);
+    }
+
+    private static class LocalDateTimeToDateConverter implements Converter<LocalDateTime, Date> {
+        @Override
+        public Date convert(LocalDateTime source) {
+            return Date.from(source.atZone(ZoneId.systemDefault()).toInstant());
+        }
+    }
+
+    private static class DateToLocalDateTimeConverter implements Converter<Date, LocalDateTime> {
+        @Override
+        public LocalDateTime convert(Date source) {
+            return source.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        }
     }
 }
