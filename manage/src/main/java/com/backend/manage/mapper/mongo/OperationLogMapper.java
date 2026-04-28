@@ -107,21 +107,27 @@ public class OperationLogMapper {
 
     public List<OperationLogEntity> findByCriteria(String category, String startDate, String endDate,
                                                     int page, int size, String sortBy, String sortDir) {
+        return findByCriteriaWithTotal(category, startDate, endDate, page, size, sortBy, sortDir).logs();
+    }
+
+    public long countByCriteria(String category, String startDate, String endDate) {
+        return findByCriteriaWithTotal(category, startDate, endDate, 0, Integer.MAX_VALUE, "createdAt", "desc").total();
+    }
+
+    public record QueryResult(List<OperationLogEntity> logs, long total) {}
+
+    public QueryResult findByCriteriaWithTotal(String category, String startDate, String endDate,
+                                                int page, int size, String sortBy, String sortDir) {
         Query query = buildCriteriaQuery(category, startDate, endDate);
 
         // Use sort from JSON template, allow override by params
-        JsonNode def = queryDefinitions.get("findOperationLogs");
         if (sortBy != null && !sortBy.isEmpty()) {
             Sort.Direction dir = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
             query.with(Sort.by(dir, sortBy));
-        } else if (def != null && def.has("sort")) {
-            JsonNode sortNode = def.get("sort");
-            List<Sort.Order> orders = new ArrayList<>();
-            sortNode.fields().forEachRemaining(entry -> {
-                int direction = entry.getValue().asInt(-1);
-                orders.add(new Sort.Order(direction == 1 ? Sort.Direction.ASC : Sort.Direction.DESC, entry.getKey()));
-            });
-            query.with(Sort.by(orders));
+        } else {
+            query = buildQueryFromTemplate("findOperationLogs");
+            buildCriteriaQuery(category, startDate, endDate).getCriteriaObject()
+                .forEach(query::addCriteria);
         }
 
         LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
@@ -144,38 +150,17 @@ public class OperationLogMapper {
             }
         }
 
+        long total = allLogs.size();
+
         // Global sort across collections
-        boolean isAsc = sortDir.equalsIgnoreCase("asc");
+        boolean isAsc = sortDir != null && sortDir.equalsIgnoreCase("asc");
         allLogs.sort(isAsc
             ? Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
             : Comparator.comparing(OperationLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
 
         long skip = (long) page * size;
-        return allLogs.stream().skip(skip).limit(size).toList();
-    }
-
-    public long countByCriteria(String category, String startDate, String endDate) {
-        Query query = buildCriteriaQuery(category, startDate, endDate);
-
-        LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
-        LocalDateTime queryEnd = LocalDateTime.now();
-        if (startDate != null && !startDate.isEmpty()) {
-            queryStart = LocalDate.parse(startDate).atStartOfDay();
-        }
-        if (endDate != null && !endDate.isEmpty()) {
-            queryEnd = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
-        }
-
-        List<String> collections = getQueryableCollections(queryStart, queryEnd);
-        long total = 0;
-        for (String col : collections) {
-            try {
-                total += mongoTemplate.count(query, OperationLogEntity.class, col);
-            } catch (Exception e) {
-                log.debug("Collection {} not found, skipping", col);
-            }
-        }
-        return total;
+        List<OperationLogEntity> paged = allLogs.stream().skip(skip).limit(size).toList();
+        return new QueryResult(paged, total);
     }
 
     public List<OperationLogEntity> findRecent(int limit) {

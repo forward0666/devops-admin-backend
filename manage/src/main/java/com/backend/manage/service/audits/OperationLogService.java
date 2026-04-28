@@ -95,12 +95,11 @@ public class OperationLogService {
                 page, size, sortBy, sortDir, category, startDate, endDate);
 
             Pageable pageable = PageRequest.of(page, size);
-            List<OperationLogEntity> logs = operationLogMapper.findByCriteria(
+            var result = operationLogMapper.findByCriteriaWithTotal(
                 category, startDate, endDate, page, size, sortBy, sortDir);
-            long total = operationLogMapper.countByCriteria(category, startDate, endDate);
 
-            log.info("Fetched operation logs: total={}, returned={}", total, logs.size());
-            return new PageImpl<>(logs, pageable, total);
+            log.info("Fetched operation logs: total={}, returned={}", result.total(), result.logs().size());
+            return new PageImpl<>(result.logs(), pageable, result.total());
         } catch (Exception e) {
             log.error("Failed to query operation logs: {}", e.getMessage());
             return new PageImpl<>(List.of(), PageRequest.of(page, size), 0);
