@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -152,11 +153,11 @@ public class OperationLogService {
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("category").is(category));
             }
             if (startDate != null && !startDate.isEmpty()) {
-                LocalDateTime start = LocalDateTime.parse(startDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+                LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").gte(start));
             }
             if (endDate != null && !endDate.isEmpty()) {
-                LocalDateTime end = LocalDateTime.parse(endDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE).plusDays(1);
+                LocalDateTime end = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
                 query.addCriteria(org.springframework.data.mongodb.core.query.Criteria.where("createdAt").lt(end));
             }
 
@@ -165,10 +166,10 @@ public class OperationLogService {
             LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
             LocalDateTime queryEnd = LocalDateTime.now();
             if (startDate != null && !startDate.isEmpty()) {
-                queryStart = LocalDateTime.parse(startDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+                queryStart = LocalDate.parse(startDate).atStartOfDay();
             }
             if (endDate != null && !endDate.isEmpty()) {
-                queryEnd = LocalDateTime.parse(endDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE).plusDays(1);
+                queryEnd = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
             }
             List<String> collections = getCollectionNamesForRange(queryStart, queryEnd);
             Collections.reverse(collections);
