@@ -3,9 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.backend.user.mapper.system.ProjectMemberMapper">
+<mapper namespace="com.backend.user.mapper.ProjectMemberMapper">
 
-    <resultMap id="ProjectMemberResultMap" type="com.backend.user.entity.system.ProjectMemberEntity">
+    <resultMap id="ProjectMemberResultMap" type="com.backend.user.entity.ProjectMemberEntity">
         <id property="id" column="id"/>
         <result property="projectId" column="project_id"/>
         <result property="userId" column="user_id"/>
@@ -64,12 +64,12 @@
         WHERE pm.project_id = #{projectId}
     </select>
 
-    <insert id="insert" parameterType="com.backend.user.entity.system.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.user.entity.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO project_member (project_id, user_id, username, full_name, project_role, position, status, joined_at, created_at, updated_at, created_by, updated_by, active)
         VALUES (#{projectId}, #{userId}, #{username}, #{fullName}, #{projectRole}, #{position}, #{status}, #{joinedAt}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}, #{active})
     </insert>
 
-    <update id="update" parameterType="com.backend.user.entity.system.ProjectMemberEntity">
+    <update id="update" parameterType="com.backend.user.entity.ProjectMemberEntity">
         UPDATE project_member pm
         <set>
             <if test="projectRole != null">pm.project_role = #{projectRole},</if>

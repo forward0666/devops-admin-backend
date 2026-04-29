@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableMongoRepositories(basePackages = "com.backend.user.repository.mongo", mongoTemplateRef = "projectMongoTemplate")
+@EnableMongoRepositories(basePackages = "com.backend.user.repository", mongoTemplateRef = "projectMongoTemplate")
 @ConfigurationProperties(prefix = "spring.data.mongodb")
 @Data
 @EqualsAndHashCode(callSuper = false)

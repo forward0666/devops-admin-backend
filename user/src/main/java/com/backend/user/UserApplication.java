@@ -5,7 +5,6 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
-import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
@@ -26,7 +25,6 @@ import java.util.concurrent.ThreadPoolExecutor;
  * 注解说明：
  * @SpringBootApplication - 标识为Spring Boot应用程序，包含自动配置、组件扫描等功能
  * @EnableDiscoveryClient - 启用服务发现，允许应用程序注册到 Nacos 等服务注册中心
- * @EnableFeignClients(basePackages = "com.backend.user.client") - 启用 Feign 客户端，用于声明式 REST 服务调用
  * @EnableAspectJAutoProxy - 启用 AspectJ 自动代理，支持切面编程
  * @EnableAsync - 启用异步方法执行，支持 @Async 注解
  * @EnableMongoRepositories - 启用 MongoDB Repository 功能
@@ -38,7 +36,6 @@ import java.util.concurrent.ThreadPoolExecutor;
                 "com.backend.user"
         })
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.backend.user.client")
 @EnableAspectJAutoProxy
 @EnableAsync
 @MapperScan("com.backend.user.mapper")
