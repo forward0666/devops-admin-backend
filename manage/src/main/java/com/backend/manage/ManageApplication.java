@@ -64,9 +64,9 @@ public class ManageApplication {
         log.info("\uD83E\uDDF5 ThreadPool initialized: {}", executor);
 
         // ThreadPool pre-start core threads
-        if (executor instanceof ThreadPoolTaskExecutor tpe) {
-            tpe.prestartAllCoreThreads();
-            log.info("\uD83D\uDD25 ThreadPool pre-started {} core threads", tpe.getPoolSize());
+        if (executor instanceof ThreadPoolTaskExecutor tpe && tpe.getThreadPoolExecutor() != null) {
+            tpe.getThreadPoolExecutor().prestartAllCoreThreads();
+            log.info("\uD83D\uDD25 ThreadPool pre-started {} core threads", tpe.getThreadPoolExecutor().getPoolSize());
         }
 
     }
