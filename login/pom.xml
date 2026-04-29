@@ -26,12 +26,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
-        <!-- Spring Boot Starter MongoDB，用于简化 MongoDB 连接和操作 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
-        </dependency>
-
         <!-- Spring Boot Starter Redis，用于 Redis 客户端和缓存操作 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

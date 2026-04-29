@@ -1,6 +1,5 @@
 package com.backend.login.controller.login;
 
-import com.backend.login.service.audits.OperationLogService;
 import com.backend.login.dto.ApiResponseDto;
 import com.backend.login.dto.login.LoginRequestDto;
 import com.backend.login.dto.login.LoginResponseDto;
@@ -38,8 +37,6 @@ public class AuthController {
     @Autowired
     private SecurityService ipWhitelistService;
 
-    @Autowired
-    private OperationLogService operationLogService;
 
     /**
      * 用户登录接口
@@ -82,29 +79,8 @@ public class AuthController {
             // 处理登录逻辑，包含IP验证
             var loginResponse = authService.login(loginRequest, clientIP);
 
-            operationLogService.logUserOperation(
-                    loginResponse.user().getId(),
-                    loginRequest.username(),
-                    "LOGIN", "用户登录", "AUTH", null,
-                    request.getMethod(), request.getRequestURI(),
-                    clientIP, request.getHeader("User-Agent"),
-                    null, null, true, null, null, "AUTH"
-            );
-
             return ApiResponseDto.success("Login successful", loginResponse);
         } catch (Exception e) {
-            var clientIP = ipWhitelistService.getRealClientIP(
-                request.getHeader("X-Forwarded-For"),
-                request.getHeader("X-Real-IP"),
-                request.getRemoteAddr()
-            );
-            operationLogService.logUserOperation(
-                    null, loginRequest.username(),
-                    "LOGIN", "用户登录", "AUTH", null,
-                    request.getMethod(), request.getRequestURI(),
-                    clientIP, request.getHeader("User-Agent"),
-                    null, null, false, e.getMessage(), null, "AUTH"
-            );
             return ApiResponseDto.error("Login failed: " + e.getMessage());
         }
     }
