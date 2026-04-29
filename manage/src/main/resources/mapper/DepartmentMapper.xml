@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.backend.manage.mapper.system.DepartmentMapper">
+<mapper namespace="com.backend.manage.mapper.DepartmentMapper">
 
-    <resultMap id="DepartmentResultMap" type="com.backend.manage.entity.system.DepartmentEntity">
+    <resultMap id="DepartmentResultMap" type="com.backend.manage.entity.DepartmentEntity">
         <id property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
@@ -45,12 +45,12 @@
         WHERE manager_id = #{managerId}
     </select>
 
-    <insert id="insert" parameterType="com.backend.manage.entity.system.DepartmentEntity" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.manage.entity.DepartmentEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO department (name, description, manager_id, parent_id, type, user_count, created_at, updated_at)
         VALUES (#{name}, #{description}, #{managerId}, #{parentId}, #{type}, #{userCount}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.backend.manage.entity.system.DepartmentEntity">
+    <update id="update" parameterType="com.backend.manage.entity.DepartmentEntity">
         UPDATE department
         SET name = #{name}, description = #{description}, manager_id = #{managerId},
             parent_id = #{parentId}, type = #{type},
@@ -87,14 +87,14 @@
         WHERE name = #{name} AND id != #{id}
     </select>
 
-    <select id="findUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.system.UserEntity">
+    <select id="findUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.UserEntity">
         SELECT id, username, email, phone, full_name, department_id, role, active, created_at, updated_at
         FROM user
         WHERE department_id = #{departmentId}
         ORDER BY created_at DESC
     </select>
 
-    <select id="findRecentUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.system.UserEntity">
+    <select id="findRecentUsersByDepartmentId" parameterType="long" resultType="com.backend.manage.entity.UserEntity">
         SELECT id, username, email, phone, full_name, department_id, role, active, created_at, updated_at
         FROM user
         WHERE department_id = #{departmentId}

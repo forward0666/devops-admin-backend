@@ -1,6 +1,6 @@
 package com.backend.manage.config;
 
-import com.backend.manage.service.audits.OperationLogService;
+import com.backend.manage.service.OperationLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

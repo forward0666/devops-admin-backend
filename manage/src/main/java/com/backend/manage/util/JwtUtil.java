@@ -129,7 +129,7 @@ public class JwtUtil {
             return null;
         }
     }
-    
+
     /**
      * Extract all claims from JWT token payload
      */
