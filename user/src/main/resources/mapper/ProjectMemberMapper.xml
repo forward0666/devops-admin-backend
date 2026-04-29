@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.backend.user.mapper.ProjectMemberMapper">
 
@@ -39,29 +37,19 @@
     </select>
 
     <select id="findById" resultMap="ProjectMemberResultMap">
-        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.project_role, pm.status,
-               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
-        FROM project_member pm
-        WHERE pm.id = #{id}
+        SELECT * FROM project_member WHERE id = #{id}
     </select>
 
     <select id="findByProjectIdAndUserId" resultMap="ProjectMemberResultMap">
-        SELECT pm.id, pm.project_id, pm.user_id, pm.username, pm.full_name, pm.project_role, pm.status,
-               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active
-        FROM project_member pm
-        WHERE pm.project_id = #{projectId} AND pm.user_id = #{userId}
+        SELECT * FROM project_member WHERE project_id = #{projectId} AND user_id = #{userId}
     </select>
 
     <select id="existsByProjectIdAndUserId" resultType="int">
-        SELECT COUNT(1)
-        FROM project_member pm
-        WHERE pm.project_id = #{projectId} AND pm.user_id = #{userId}
+        SELECT COUNT(1) FROM project_member WHERE project_id = #{projectId} AND user_id = #{userId}
     </select>
 
     <select id="countByProjectId" resultType="int">
-        SELECT COUNT(1)
-        FROM project_member pm
-        WHERE pm.project_id = #{projectId}
+        SELECT COUNT(1) FROM project_member WHERE project_id = #{projectId}
     </select>
 
     <insert id="insert" parameterType="com.backend.user.entity.ProjectMemberEntity" useGeneratedKeys="true" keyProperty="id">
@@ -70,17 +58,17 @@
     </insert>
 
     <update id="update" parameterType="com.backend.user.entity.ProjectMemberEntity">
-        UPDATE project_member pm
+        UPDATE project_member
         <set>
-            <if test="projectRole != null">pm.project_role = #{projectRole},</if>
-            <if test="position != null">pm.position = #{position},</if>
-            <if test="status != null">pm.status = #{status},</if>
-            <if test="username != null">pm.username = #{username},</if>
-            <if test="fullName != null">pm.full_name = #{fullName},</if>
-            <if test="updatedBy != null">pm.updated_by = #{updatedBy},</if>
-            pm.updated_at = NOW()
+            <if test="projectRole != null">project_role = #{projectRole},</if>
+            <if test="position != null">position = #{position},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="username != null">username = #{username},</if>
+            <if test="fullName != null">full_name = #{fullName},</if>
+            <if test="updatedBy != null">updated_by = #{updatedBy},</if>
+            updated_at = NOW()
         </set>
-        WHERE pm.id = #{id}
+        WHERE id = #{id}
     </update>
 
     <delete id="deleteById">
