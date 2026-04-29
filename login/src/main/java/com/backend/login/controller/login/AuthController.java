@@ -37,6 +37,9 @@ public class AuthController {
     @Autowired
     private SecurityService ipWhitelistService;
 
+    @Autowired
+    private com.backend.login.service.audits.OperationLogService operationLogService;
+
 
     /**
      * 用户登录接口
@@ -79,8 +82,28 @@ public class AuthController {
             // 处理登录逻辑，包含IP验证
             var loginResponse = authService.login(loginRequest, clientIP);
 
+            // Log login operation
+            operationLogService.logUserOperation(
+                null, loginRequest.username(), "LOGIN", "User Login",
+                "AUTH", null, "POST", "/authLogIn",
+                clientIP, request.getHeader("User-Agent"),
+                null, null, true, null, "LOGIN");
+
             return ApiResponseDto.success("Login successful", loginResponse);
         } catch (Exception e) {
+            // Log failed login
+            try {
+                var clientIP = ipWhitelistService.getRealClientIP(
+                    request.getHeader("X-Forwarded-For"),
+                    request.getHeader("X-Real-IP"),
+                    request.getRemoteAddr()
+                );
+                operationLogService.logUserOperation(
+                    null, loginRequest.username(), "LOGIN", "User Login",
+                    "AUTH", null, "POST", "/authLogIn",
+                    clientIP, request.getHeader("User-Agent"),
+                    null, null, false, e.getMessage(), "LOGIN");
+            } catch (Exception ignored) {}
             return ApiResponseDto.error("Login failed: " + e.getMessage());
         }
     }
