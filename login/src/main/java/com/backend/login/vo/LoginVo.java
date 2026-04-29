@@ -19,7 +19,7 @@ public record LoginVo(
             user.getFullName(),
             user.getEmail(),
             user.getRole(),
-            user.getAvatar()
+            user.getAvatarUrl()
         );
     }
 }

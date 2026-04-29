@@ -58,7 +58,7 @@ public class AuthService {
      * 完整的登录流程，包括IP验证、用户认证、验证码验证和令牌生成
      *
      * @param loginRequest 登录请求对象，包含用户名、密码、验证码等信息
-     * @param clientIP 客户端IP地址，用于IP白名单验证
+     * @param clientIP     客户端IP地址，用于IP白名单验证
      * @return LoginResponseDto 登录响应对象，包含JWT令牌和用户信息
      * @throws RuntimeException 当认证失败时抛出异常
      */
@@ -128,7 +128,7 @@ public class AuthService {
      * 通过Feign客户端调用安全服务验证验证码的有效性
      *
      * @param codeKey 验证码密钥，用于标识验证码会话
-     * @param code 用户输入的验证码
+     * @param code    用户输入的验证码
      * @return boolean 验证码是否有效
      */
     private boolean validateVerificationCode(String codeKey, String code) {
@@ -278,8 +278,15 @@ public class AuthService {
         return login(loginRequest, null);
     }
 
-    /**
-     * 验证JWT令牌
-     * 通过安全服务验证JWT令牌的有效性，支持缓存优化
-     *
+    public void logout(String token) {
+        try {
+            String username = jwtUtil.getUsernameFromToken(token);
+            cacheService.clearByPrefix("token:validation:" + username + ":");
+            cacheService.clearByPrefix("login:lock:");
+            cacheService.clearByPrefix("login:fail:");
+            log.info("User logged out: {}", username);
+        } catch (Exception e) {
+            log.error("Logout failed: {}", e.getMessage());
+        }
+    }
 }
