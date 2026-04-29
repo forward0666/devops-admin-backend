@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.backend.login.mapper.SettingMapper">
+
+    <resultMap id="settingResultMap" type="com.backend.login.entity.SettingEntity">
+        <id property="id" column="id"/>
+        <result property="configKey" column="config_key"/>
+        <result property="configValue" column="config_value"/>
+        <result property="configType" column="config_type"/>
+        <result property="description" column="description"/>
+        <result property="isPublic" column="is_public"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByKey" resultMap="settingResultMap">
+        SELECT * FROM setting WHERE config_key = #{key}
+    </select>
+
+    <select id="findAll" resultMap="settingResultMap">
+        SELECT * FROM setting ORDER BY config_key
+    </select>
+
+    <select id="findPublicConfigs" resultMap="settingResultMap">
+        SELECT * FROM setting WHERE is_public = 1 ORDER BY config_key
+    </select>
+
+    <select id="findByType" resultMap="settingResultMap">
+        SELECT * FROM setting WHERE config_type = #{type} ORDER BY config_key
+    </select>
+
+    <select id="searchByKeyPattern" resultMap="settingResultMap">
+        SELECT * FROM setting WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key
+    </select>
+
+    <select id="findByKeyPrefix" resultMap="settingResultMap">
+        SELECT * FROM setting WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key
+    </select>
+
+    <select id="countByKey" resultType="int">
+        SELECT COUNT(*) FROM setting WHERE config_key = #{key}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO setting (config_key, config_value, config_type, description, is_public, created_at, updated_at)
+        VALUES (#{configKey}, #{configValue}, #{configType}, #{description}, #{isPublic}, NOW(), NOW())
+    </insert>
+
+    <update id="update">
+        UPDATE setting SET config_value = #{configValue}, config_type = #{configType},
+        description = #{description}, is_public = #{isPublic}, updated_at = NOW()
+        WHERE config_key = #{configKey}
+    </update>
+
+    <delete id="deleteByKey">
+        DELETE FROM setting WHERE config_key = #{key}
+    </delete>
+
+</mapper>
