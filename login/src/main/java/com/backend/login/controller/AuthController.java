@@ -1,10 +1,10 @@
-package com.backend.login.controller.login;
+package com.backend.login.controller;
 
 import com.backend.login.dto.ApiResponseDto;
-import com.backend.login.dto.login.LoginRequestDto;
-import com.backend.login.dto.login.LoginResponseDto;
-import com.backend.login.service.login.AuthService;
-import com.backend.login.service.system.SecurityService;
+import com.backend.login.dto.LoginRequestDto;
+import com.backend.login.dto.LoginResponseDto;
+import com.backend.login.service.AuthService;
+import com.backend.login.service.SecurityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,7 +38,7 @@ public class AuthController {
     private SecurityService ipWhitelistService;
 
     @Autowired
-    private com.backend.login.service.audits.OperationLogService operationLogService;
+    private com.backend.login.service.OperationLogService operationLogService;
 
 
     /**

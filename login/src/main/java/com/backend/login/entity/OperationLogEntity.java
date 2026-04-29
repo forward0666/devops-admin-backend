@@ -1,4 +1,4 @@
-package com.backend.login.entity.audits;
+package com.backend.login.entity;
 
 import lombok.Builder;
 import lombok.Data;

@@ -1,7 +1,7 @@
-package com.backend.login.vo.login;
+package com.backend.login.vo;
 
-import com.backend.login.entity.system.UserEntity;
-import com.backend.login.vo.system.UserVo;
+import com.backend.login.entity.UserEntity;
+import com.backend.login.vo.UserVo;
 
 public record LoginVo(
         String token,

@@ -1,17 +1,17 @@
-package com.backend.login.service.login;
+package com.backend.login.service;
 
 import com.backend.login.service.CacheService;
-import com.backend.login.service.system.SecurityService;
-import com.backend.login.service.system.SettingService;
+import com.backend.login.service.SecurityService;
+import com.backend.login.service.SettingService;
 import com.backend.login.client.SecurityServiceClient;
-import com.backend.login.dto.login.JwtGenerateRequestDto;
-import com.backend.login.dto.login.LoginRequestDto;
-import com.backend.login.dto.login.LoginResponseDto;
-import com.backend.login.entity.system.UserEntity;
-import com.backend.login.mapper.system.UserMapper;
+import com.backend.login.dto.JwtGenerateRequestDto;
+import com.backend.login.dto.LoginRequestDto;
+import com.backend.login.dto.LoginResponseDto;
+import com.backend.login.entity.UserEntity;
+import com.backend.login.mapper.UserMapper;
 import com.backend.login.service.CacheService;
-import com.backend.login.service.system.SecurityService;
-import com.backend.login.service.system.SettingService;
+import com.backend.login.service.SecurityService;
+import com.backend.login.service.SettingService;
 import com.backend.login.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,10 +1,10 @@
 package com.backend.login.filter;
 
 import com.backend.login.service.CacheService;
-import com.backend.login.service.login.AuthService;
+import com.backend.login.service.AuthService;
 import com.backend.login.client.SecurityServiceClient;
 import com.backend.login.service.CacheService;
-import com.backend.login.service.login.AuthService;
+import com.backend.login.service.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

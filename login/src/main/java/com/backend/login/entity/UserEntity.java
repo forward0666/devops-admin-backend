@@ -1,4 +1,4 @@
-package com.backend.login.entity.system;
+package com.backend.login.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

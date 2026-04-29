@@ -1,4 +1,4 @@
-package com.backend.login.entity.system;
+package com.backend.login.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;

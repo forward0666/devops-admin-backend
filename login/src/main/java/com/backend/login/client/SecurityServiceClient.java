@@ -1,7 +1,7 @@
 package com.backend.login.client;
 
-import com.backend.login.dto.login.JwtGenerateRequestDto;
-import com.backend.login.dto.login.JwtResponseDto;
+import com.backend.login.dto.JwtGenerateRequestDto;
+import com.backend.login.dto.JwtResponseDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

@@ -1,8 +1,8 @@
-package com.backend.login.service.system;
+package com.backend.login.service;
 
 import com.backend.login.service.CacheService;
-import com.backend.login.mapper.system.SystemConfigMapper;
-import com.backend.login.entity.system.SettingEntity;
+import com.backend.login.mapper.SystemConfigMapper;
+import com.backend.login.entity.SettingEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;

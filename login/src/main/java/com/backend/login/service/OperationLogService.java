@@ -1,6 +1,6 @@
-package com.backend.login.service.audits;
+package com.backend.login.service;
 
-import com.backend.login.entity.audits.OperationLogEntity;
+import com.backend.login.entity.OperationLogEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;

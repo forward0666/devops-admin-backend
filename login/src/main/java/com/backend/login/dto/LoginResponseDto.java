@@ -1,7 +1,7 @@
-package com.backend.login.dto.login;
+package com.backend.login.dto;
 
-import com.backend.login.entity.system.UserEntity;
-import com.backend.login.entity.system.UserEntity;
+import com.backend.login.entity.UserEntity;
+import com.backend.login.entity.UserEntity;
 
 /**
  * 登录响应数据传输对象

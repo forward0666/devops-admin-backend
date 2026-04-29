@@ -1,4 +1,4 @@
-package com.backend.login.dto.login;
+package com.backend.login.dto;
 
 import jakarta.validation.constraints.NotBlank;
 

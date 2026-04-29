@@ -3,10 +3,10 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.backend.login.mapper.system.UserMapper">
+<mapper namespace="com.backend.login.mapper.UserMapper">
 
     <!-- ================= ResultMap ================= -->
-    <resultMap id="UserResultMap" type="com.backend.login.entity.system.UserEntity">
+    <resultMap id="UserResultMap" type="com.backend.login.entity.UserEntity">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
@@ -78,7 +78,7 @@
     <!-- ================= 插入（核心修复） ================= -->
 
     <insert id="insert"
-            parameterType="com.backend.login.entity.system.UserEntity"
+            parameterType="com.backend.login.entity.UserEntity"
             useGeneratedKeys="true"
             keyProperty="id">
         INSERT INTO user (
@@ -125,7 +125,7 @@
 
     <!-- ================= 更新（核心修复） ================= -->
 
-    <update id="update" parameterType="com.backend.login.entity.system.UserEntity">
+    <update id="update" parameterType="com.backend.login.entity.UserEntity">
         UPDATE user
         SET
             username        = #{username},

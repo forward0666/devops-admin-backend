@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.backend.login.mapper.system.RoleMapper">
+<mapper namespace="com.backend.login.mapper.RoleMapper">
 
-    <resultMap id="roleResultMap" type="com.backend.login.entity.system.RoleEntity">
+    <resultMap id="roleResultMap" type="com.backend.login.entity.RoleEntity">
         <id property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="code" column="code"/>
@@ -36,12 +36,12 @@
         WHERE code = #{code} AND deleted_at IS NULL
     </select>
 
-    <insert id="insert" parameterType="com.backend.login.entity.system.RoleEntity" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.backend.login.entity.RoleEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO role (name, code, description, status, user_count, created_by, updated_by, created_at, updated_at)
         VALUES (#{name}, #{code}, #{description}, #{status}, #{userCount}, #{createdBy}, #{updatedBy}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.backend.login.entity.system.RoleEntity">
+    <update id="update" parameterType="com.backend.login.entity.RoleEntity">
         UPDATE role
         SET name = #{name},
             code = #{code},

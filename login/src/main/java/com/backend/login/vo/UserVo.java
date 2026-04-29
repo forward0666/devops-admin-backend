@@ -1,6 +1,6 @@
-package com.backend.login.vo.system;
+package com.backend.login.vo;
 
-import com.backend.login.entity.system.UserEntity;
+import com.backend.login.entity.UserEntity;
 
 public record UserVo(
         Long id,

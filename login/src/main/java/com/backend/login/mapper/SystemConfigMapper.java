@@ -1,6 +1,6 @@
-package com.backend.login.mapper.system;
+package com.backend.login.mapper;
 
-import com.backend.login.entity.system.SettingEntity;
+import com.backend.login.entity.SettingEntity;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;

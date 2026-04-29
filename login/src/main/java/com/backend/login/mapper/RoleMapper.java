@@ -1,6 +1,6 @@
-package com.backend.login.mapper.system;
+package com.backend.login.mapper;
 
-import com.backend.login.entity.system.RoleEntity;
+import com.backend.login.entity.RoleEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
