@@ -124,10 +124,6 @@ public class OperationLogMapper {
         if (sortBy != null && !sortBy.isEmpty()) {
             Sort.Direction dir = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
             query.with(Sort.by(dir, sortBy));
-        } else {
-            query = buildQueryFromTemplate("findOperationLogs");
-            buildCriteriaQuery(category, startDate, endDate).getCriteriaObject()
-                .forEach(query::addCriteria);
         }
 
         LocalDateTime queryStart = LocalDateTime.now().minusMonths(6);
