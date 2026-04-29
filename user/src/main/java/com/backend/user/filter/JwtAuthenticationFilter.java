@@ -62,7 +62,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (cacheService.isRedisAvailable()) {
                     isValidToken = cacheService.getCachedTokenValidation(username, token);
                     if (isValidToken != null) {
-                        log.info("Token validation from Redis cache: {}，path: {}", isValidToken, path);
+                        log.debug("Token validation from Redis cache: {}，path: {}", isValidToken, path);
                         if (!isValidToken) {
                             log.warn("Token validation failed - token is invalid according to Redis cache");
                             sendUnauthorizedResponse(response, "Invalid or expired token");
@@ -82,12 +82,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             return;
                         }
 
-                        log.info("Token validation successful locally");
+                        log.debug("Token validation successful locally");
 
                         // Store validation result in Redis
                         if (cacheService.isRedisAvailable()) {
                             cacheService.cacheTokenValidation(username, token, true);
-                            log.info("Stored token validation result in Redis");
+                            log.debug("Stored token validation result in Redis");
                         }
                     } catch (Exception e) {
                         log.error("Error validating token: {}", e.getMessage());
@@ -146,7 +146,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     String email = (String) tokenData.get("email");
 
-                    log.info("JWT validation successful for user: {} with role: {}", extractedUsername, role);
+                    log.debug("JWT validation successful for user: {} with role: {}", extractedUsername, role);
 
                     request.setAttribute("userId", userId);
                     request.setAttribute("username", extractedUsername);
@@ -215,7 +215,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
             Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
 
-            log.info("Extracted token claims: {}", claims);
+            log.debug("Extracted token claims: {}", claims);
 
             Map<String, Object> userInfo = new HashMap<>();
             userInfo.put("valid", true);
