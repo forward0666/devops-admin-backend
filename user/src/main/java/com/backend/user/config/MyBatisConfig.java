@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
  * Spring Boot会根据application.properties中的配置自动完成MyBatis的配置
  */
 @Configuration
-@MapperScan("com.backend.user.mapper")
+@MapperScan("com.backend.manage.mapper")
 public class MyBatisConfig {
     // Spring Boot会自动根据application.properties中的配置来配置MyBatis
     // 无需手动配置SqlSessionFactory，简化了配置过程

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.backend.user.mapper.ProjectMapper">
+
+    <resultMap id="ProjectResultMap" type="com.backend.user.entity.ProjectEntity">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="type" column="type"/>
+        <result property="status" column="status"/>
+        <result property="progress" column="progress"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="description" column="description"/>
+        <result property="techStack" column="tech_stack"/>
+        <result property="objectives" column="objectives"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="active" column="active"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="ProjectResultMap">
+        SELECT *
+        FROM project
+        WHERE active = true
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="findById" parameterType="long" resultMap="ProjectResultMap">
+        SELECT *
+        FROM project
+        WHERE id = #{id}
+          AND active = true
+    </select>
+
+    <insert id="insert"
+            parameterType="com.backend.user.entity.ProjectEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO project (
+            department_id, description, tech_stack, objectives,
+            created_by, updated_by, active
+        )
+        VALUES (
+                   #{departmentId}, #{description}, #{techStack}, #{objectives},
+                   #{createdBy}, #{updatedBy}, #{active}
+               )
+    </insert>
+
+    <update id="update" parameterType="com.backend.user.entity.ProjectEntity">
+        UPDATE project
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="type != null">type = #{type},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="progress != null">progress = #{progress},</if>
+            <if test="departmentId != null">department_id = #{departmentId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="techStack != null">tech_stack = #{techStack},</if>
+            <if test="objectives != null">objectives = #{objectives},</if>
+            updated_by = #{updatedBy},
+            <if test="active != null">active = #{active},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM project WHERE id = #{id}
+    </delete>
+
+    <select id="existsById" parameterType="long" resultType="int">
+        SELECT COUNT(*) FROM project WHERE id = #{id} AND active = true
+    </select>
+
+    <select id="existsByName" parameterType="string" resultType="int">
+        SELECT COUNT(*) FROM project WHERE name = #{name} AND active = true
+    </select>
+
+    <select id="search" parameterType="string" resultMap="ProjectResultMap">
+        SELECT *
+        FROM project
+        WHERE active = true
+          AND (name LIKE CONCAT('%', #{query}, '%')
+               OR type LIKE CONCAT('%', #{query}, '%')
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>
