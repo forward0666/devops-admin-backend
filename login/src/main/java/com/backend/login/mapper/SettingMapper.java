@@ -8,7 +8,7 @@ import java.util.List;
 @Mapper
 public interface SettingMapper {
 
-    @Results(id = "systemConfigResultMap", value = {
+    @Results(id = "settingResultMap", value = {
         @Result(property = "id", column = "id"),
         @Result(property = "configKey", column = "config_key"),
         @Result(property = "configValue", column = "config_value"),
@@ -21,11 +21,11 @@ public interface SettingMapper {
     @Select("SELECT * FROM setting WHERE config_key = #{key}")
     SettingEntity findByKey(@Param("key") String key);
 
-    @ResultMap("systemConfigResultMap")
+    @ResultMap("settingResultMap")
     @Select("SELECT * FROM setting ORDER BY config_key")
     List<SettingEntity> findAll();
 
-    @ResultMap("systemConfigResultMap")
+    @ResultMap("settingResultMap")
     @Select("SELECT * FROM setting WHERE is_public = true ORDER BY config_key")
     List<SettingEntity> findPublicConfigs();
 
@@ -45,15 +45,15 @@ public interface SettingMapper {
     @Select("SELECT COUNT(*) FROM setting WHERE config_key = #{key}")
     int countByKey(@Param("key") String key);
 
-    @ResultMap("systemConfigResultMap")
+    @ResultMap("settingResultMap")
     @Select("SELECT * FROM setting WHERE config_type = #{type} ORDER BY config_key")
     List<SettingEntity> findByType(@Param("type") String type);
 
-    @ResultMap("systemConfigResultMap")
+    @ResultMap("settingResultMap")
     @Select("SELECT * FROM setting WHERE config_key LIKE CONCAT('%', #{pattern}, '%') ORDER BY config_key")
     List<SettingEntity> searchByKeyPattern(@Param("pattern") String pattern);
 
-    @ResultMap("systemConfigResultMap")
+    @ResultMap("settingResultMap")
     @Select("SELECT * FROM setting WHERE config_key LIKE CONCAT(#{prefix}, '%') ORDER BY config_key")
     List<SettingEntity> findByKeyPrefix(@Param("prefix") String prefix);
 }
