@@ -1,0 +1,6 @@
+{
+  "findByProjectId": {
+    "collection": "domains",
+    "sort": { "createdAt": -1 }
+  }
+}

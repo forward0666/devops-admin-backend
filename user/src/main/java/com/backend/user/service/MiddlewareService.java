@@ -1,7 +1,7 @@
 package com.backend.user.service;
 
 import com.backend.user.entity.MiddlewareEntity;
-import com.backend.user.repository.MiddlewareRepository;
+import com.backend.user.mapper.MiddlewareMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +12,10 @@ import java.util.List;
 public class MiddlewareService {
 
     @Autowired
-    private MiddlewareRepository middlewareRepository;
+    private MiddlewareMapper middlewareMapper;
 
     public List<MiddlewareEntity> findByProjectId(Long projectId) {
-        return middlewareRepository.findByProjectId(projectId);
+        return middlewareMapper.findByProjectId(projectId);
     }
 
     public MiddlewareEntity create(Long projectId, MiddlewareEntity entity) {
@@ -23,11 +23,11 @@ public class MiddlewareService {
         entity.setProjectId(projectId);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return middlewareRepository.save(entity);
+        return middlewareMapper.save(entity);
     }
 
     public MiddlewareEntity update(String id, Long projectId, MiddlewareEntity entity) {
-        MiddlewareEntity existing = middlewareRepository.findById(id).orElse(null);
+        MiddlewareEntity existing = middlewareMapper.findById(id);
         if (existing == null || !existing.getProjectId().equals(projectId)) {
             return null;
         }
@@ -38,15 +38,15 @@ public class MiddlewareService {
         if (entity.getSvcAddr() != null) existing.setSvcAddr(entity.getSvcAddr());
         if (entity.getRemark() != null) existing.setRemark(entity.getRemark());
         existing.setUpdatedAt(LocalDateTime.now());
-        return middlewareRepository.save(existing);
+        return middlewareMapper.save(existing);
     }
 
     public boolean delete(String id, Long projectId) {
-        MiddlewareEntity existing = middlewareRepository.findById(id).orElse(null);
+        MiddlewareEntity existing = middlewareMapper.findById(id);
         if (existing == null || !existing.getProjectId().equals(projectId)) {
             return false;
         }
-        middlewareRepository.deleteById(id);
+        middlewareMapper.deleteById(id);
         return true;
     }
 
@@ -58,6 +58,6 @@ public class MiddlewareService {
             m.setCreatedAt(now);
             m.setUpdatedAt(now);
         }
-        middlewareRepository.saveAll(items);
+        middlewareMapper.saveAll(items);
     }
 }

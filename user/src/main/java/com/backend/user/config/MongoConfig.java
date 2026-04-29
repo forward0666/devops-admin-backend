@@ -14,13 +14,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
-import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableMongoRepositories(basePackages = "com.backend.user.repository", mongoTemplateRef = "projectMongoTemplate")
 @ConfigurationProperties(prefix = "spring.data.mongodb")
 @Data
 @EqualsAndHashCode(callSuper = false)

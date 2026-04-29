@@ -1,0 +1,6 @@
+{
+  "findByProjectId": {
+    "collection": "middleware",
+    "sort": { "createdAt": -1 }
+  }
+}
