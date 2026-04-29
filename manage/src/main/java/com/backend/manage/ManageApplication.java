@@ -18,7 +18,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -61,14 +60,13 @@ public class ManageApplication {
     private static void initAfterStartup(ApplicationContext ctx) {
         log.info("✅ ManageApplication started successfully!");
 
-        ExecutorService executor = ctx.getBean(ExecutorService.class);
-        log.info("🧵 ThreadPool initialized: {}", executor);
+        Executor executor = ctx.getBean(Executor.class);
+        log.info("\uD83E\uDDF5 ThreadPool initialized: {}", executor);
 
-        // ✅ 线程池预热（提前创建核心线程）
-        if (executor instanceof ThreadPoolExecutor) {
-            ((ThreadPoolExecutor) executor).prestartAllCoreThreads();
-            log.info("🔥 ThreadPool pre-started {} core threads",
-                    ((ThreadPoolExecutor) executor).getPoolSize());
+        // ThreadPool pre-start core threads
+        if (executor instanceof ThreadPoolTaskExecutor tpe) {
+            tpe.prestartAllCoreThreads();
+            log.info("\uD83D\uDD25 ThreadPool pre-started {} core threads", tpe.getPoolSize());
         }
 
     }
