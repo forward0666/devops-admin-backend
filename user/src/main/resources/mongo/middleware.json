@@ -1,6 +1,9 @@
 {
   "findByProjectId": {
     "collection": "middleware",
+    "filter": [
+      { "field": "projectId", "operator": "is", "param": "projectId" }
+    ],
     "sort": { "createdAt": -1 }
   }
 }

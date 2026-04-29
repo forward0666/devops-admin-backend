@@ -45,18 +45,60 @@ public class DomainMapper {
         Map<String, Object> template = templates != null ? templates.get("findByProjectId") : null;
         String collection = template != null ? (String) template.get("collection") : "domains";
 
-        Query query = new Query(Criteria.where("projectId").is(projectId));
-
-        if (template != null && template.containsKey("sort")) {
-            Map<String, Object> sortMap = (Map<String, Object>) template.get("sort");
-            for (Map.Entry<String, Object> entry : sortMap.entrySet()) {
-                query.with(Sort.by(entry.getValue().equals(-1) ? Sort.Direction.DESC : Sort.Direction.ASC, entry.getKey()));
-            }
-        } else {
-            query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (template != null && template.containsKey("filter")) {
+            Query query = buildQuery("findByProjectId", Map.of("projectId", projectId));
+            return mongoTemplate.find(query, DomainEntity.class, collection);
         }
 
+        // Fallback if no template
+        Query query = new Query(Criteria.where("projectId").is(projectId))
+            .with(Sort.by(Sort.Direction.DESC, "createdAt"));
         return mongoTemplate.find(query, DomainEntity.class, collection);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Query buildQuery(String templateName, Map<String, Object> params) {
+        Map<String, Object> template = templates.get(templateName);
+        if (template == null) return null;
+
+        Query query = new Query();
+
+        // Build filter from JSON
+        List<Map<String, Object>> filters = (List<Map<String, Object>>) template.get("filter");
+        if (filters != null) {
+            for (Map<String, Object> f : filters) {
+                String field = (String) f.get("field");
+                String operator = (String) f.get("operator");
+                Object value = params.get(f.get("param"));
+
+                Criteria criteria = switch (operator) {
+                    case "is" -> Criteria.where(field).is(value);
+                    case "ne" -> Criteria.where(field).ne(value);
+                    case "gte" -> Criteria.where(field).gte(value);
+                    case "lte" -> Criteria.where(field).lte(value);
+                    case "gt" -> Criteria.where(field).gt(value);
+                    case "lt" -> Criteria.where(field).lt(value);
+                    case "regex" -> Criteria.where(field).regex((String) value);
+                    case "in" -> Criteria.where(field).in((List<?>) value);
+                    default -> Criteria.where(field).is(value);
+                };
+                query.addCriteria(criteria);
+            }
+        }
+
+        // Build sort from JSON
+        Map<String, Object> sortMap = (Map<String, Object>) template.get("sort");
+        if (sortMap != null) {
+            for (Map.Entry<String, Object> entry : sortMap.entrySet()) {
+                query.with(Sort.by(
+                    entry.getValue() instanceof Number && ((Number) entry.getValue()).intValue() == -1
+                        ? Sort.Direction.DESC : Sort.Direction.ASC,
+                    entry.getKey()
+                ));
+            }
+        }
+
+        return query;
     }
 
     public DomainEntity findById(String id) {
