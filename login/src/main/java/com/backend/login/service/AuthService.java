@@ -6,7 +6,7 @@ import com.backend.login.service.SettingService;
 import com.backend.login.client.SecurityServiceClient;
 import com.backend.login.dto.JwtGenerateRequestDto;
 import com.backend.login.dto.LoginRequestDto;
-import com.backend.login.dto.LoginResponseDto;
+import com.backend.login.vo.LoginVo;
 import com.backend.login.entity.UserEntity;
 import com.backend.login.mapper.UserMapper;
 import com.backend.login.service.CacheService;
@@ -62,7 +62,7 @@ public class AuthService {
      * @return LoginResponseDto 登录响应对象，包含JWT令牌和用户信息
      * @throws RuntimeException 当认证失败时抛出异常
      */
-    public LoginResponseDto login(LoginRequestDto loginRequest, String clientIP) {
+    public LoginVo login(LoginRequestDto loginRequest, String clientIP) {
         log.info("处理用户登录请求，用户名: {}，来源IP: {}", loginRequest.username(), clientIP);
 
         // 步骤0: 验证客户端IP白名单/黑名单
@@ -120,7 +120,7 @@ public class AuthService {
         log.info("承载令牌生成成功: {}", loginRequest.username());
 
         // 步骤4: 返回包含令牌和用户详情的响应
-        return new LoginResponseDto(token, user);
+        return LoginVo.from(token, user);
     }
 
     /**
@@ -274,7 +274,7 @@ public class AuthService {
      * @param loginRequest 登录请求对象
      * @return LoginResponseDto 登录响应对象
      */
-    public LoginResponseDto login(LoginRequestDto loginRequest) {
+    public LoginVo login(LoginRequestDto loginRequest) {
         return login(loginRequest, null);
     }
 

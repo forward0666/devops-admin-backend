@@ -2,7 +2,7 @@ package com.backend.login.controller;
 
 import com.backend.login.dto.ApiResponseDto;
 import com.backend.login.dto.LoginRequestDto;
-import com.backend.login.dto.LoginResponseDto;
+import com.backend.login.vo.LoginVo;
 import com.backend.login.service.AuthService;
 import com.backend.login.service.SecurityService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class AuthController {
     private com.backend.login.service.OperationLogService operationLogService;
 
     @PostMapping("/authLogIn")
-    public ApiResponseDto<LoginResponseDto> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
+    public ApiResponseDto<LoginVo> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
         try {
             if (loginRequest.username() == null || loginRequest.username().isEmpty()) {
                 return ApiResponseDto.error("Username is required");
