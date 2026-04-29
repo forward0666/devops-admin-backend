@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.io.InputStream;
@@ -28,6 +29,8 @@ public class DomainMapper {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private Map<String, Map<String, Object>> templates;
 
+    private static final String DEFAULT_COLLECTION = "domains";
+
     @PostConstruct
     public void init() {
         try {
@@ -42,28 +45,59 @@ public class DomainMapper {
     }
 
     public List<DomainEntity> findByProjectId(Long projectId) {
-        Map<String, Object> template = templates != null ? templates.get("findByProjectId") : null;
-        String collection = template != null ? (String) template.get("collection") : "domains";
+        Query query = buildQuery("findByProjectId", Map.of("projectId", projectId));
+        return mongoTemplate.find(query, DomainEntity.class, getCollection("findByProjectId"));
+    }
 
-        if (template != null && template.containsKey("filter")) {
-            Query query = buildQuery("findByProjectId", Map.of("projectId", projectId));
-            return mongoTemplate.find(query, DomainEntity.class, collection);
+    public DomainEntity findById(String id) {
+        Query query = buildQuery("findById", Map.of("id", id));
+        return mongoTemplate.findOne(query, DomainEntity.class, getCollection("findById"));
+    }
+
+    public DomainEntity findByIdAndProjectId(String id, Long projectId) {
+        Query query = buildQuery("findByIdAndProjectId", Map.of("id", id, "projectId", projectId));
+        return mongoTemplate.findOne(query, DomainEntity.class, getCollection("findByIdAndProjectId"));
+    }
+
+    public DomainEntity insert(DomainEntity entity) {
+        mongoTemplate.insert(entity, DEFAULT_COLLECTION);
+        return entity;
+    }
+
+    public DomainEntity update(String id, Long projectId, Map<String, Object> fields) {
+        Query query = buildQuery("findByIdAndProjectId", Map.of("id", id, "projectId", projectId));
+        Update update = new Update();
+        fields.forEach(update::set);
+        update.set("updatedAt", java.time.LocalDateTime.now());
+        mongoTemplate.updateFirst(query, update, DomainEntity.class, DEFAULT_COLLECTION);
+        return mongoTemplate.findOne(query, DomainEntity.class, DEFAULT_COLLECTION);
+    }
+
+    public void deleteById(String id) {
+        Query query = buildQuery("findById", Map.of("id", id));
+        mongoTemplate.remove(query, DomainEntity.class, getCollection("findById"));
+    }
+
+    public void insertAll(List<DomainEntity> entities) {
+        mongoTemplate.insertAll(entities);
+    }
+
+    public String getCollection(String templateName) {
+        if (templates != null && templates.containsKey(templateName)) {
+            return (String) templates.get(templateName).get("collection");
         }
-
-        // Fallback if no template
-        Query query = new Query(Criteria.where("projectId").is(projectId))
-            .with(Sort.by(Sort.Direction.DESC, "createdAt"));
-        return mongoTemplate.find(query, DomainEntity.class, collection);
+        return DEFAULT_COLLECTION;
     }
 
     @SuppressWarnings("unchecked")
-    private Query buildQuery(String templateName, Map<String, Object> params) {
-        Map<String, Object> template = templates.get(templateName);
-        if (template == null) return null;
+    public Query buildQuery(String templateName, Map<String, Object> params) {
+        if (templates == null || !templates.containsKey(templateName)) {
+            return new Query();
+        }
 
+        Map<String, Object> template = templates.get(templateName);
         Query query = new Query();
 
-        // Build filter from JSON
         List<Map<String, Object>> filters = (List<Map<String, Object>>) template.get("filter");
         if (filters != null) {
             for (Map<String, Object> f : filters) {
@@ -86,7 +120,6 @@ public class DomainMapper {
             }
         }
 
-        // Build sort from JSON
         Map<String, Object> sortMap = (Map<String, Object>) template.get("sort");
         if (sortMap != null) {
             for (Map.Entry<String, Object> entry : sortMap.entrySet()) {
@@ -99,22 +132,5 @@ public class DomainMapper {
         }
 
         return query;
-    }
-
-    public DomainEntity findById(String id) {
-        return mongoTemplate.findById(id, DomainEntity.class, "domains");
-    }
-
-    public DomainEntity save(DomainEntity entity) {
-        mongoTemplate.save(entity, "domains");
-        return entity;
-    }
-
-    public void saveAll(List<DomainEntity> entities) {
-        mongoTemplate.insertAll(entities);
-    }
-
-    public void deleteById(String id) {
-        mongoTemplate.remove(Query.query(Criteria.where("_id").is(id)), "domains");
     }
 }

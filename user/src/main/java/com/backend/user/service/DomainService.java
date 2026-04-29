@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class DomainService {
@@ -23,26 +25,22 @@ public class DomainService {
         entity.setProjectId(projectId);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return domainMapper.save(entity);
+        return domainMapper.insert(entity);
     }
 
     public DomainEntity update(String id, Long projectId, DomainEntity entity) {
-        DomainEntity existing = domainMapper.findById(id);
-        if (existing == null || !existing.getProjectId().equals(projectId)) {
-            return null;
-        }
-        if (entity.getDomain() != null) existing.setDomain(entity.getDomain());
-        if (entity.getType() != null) existing.setType(entity.getType());
-        if (entity.getRemark() != null) existing.setRemark(entity.getRemark());
-        existing.setUpdatedAt(LocalDateTime.now());
-        return domainMapper.save(existing);
+        Map<String, Object> fields = new LinkedHashMap<>();
+        if (entity.getDomain() != null) fields.put("domain", entity.getDomain());
+        if (entity.getType() != null) fields.put("type", entity.getType());
+        if (entity.getEnv() != null) fields.put("env", entity.getEnv());
+        if (entity.getRemark() != null) fields.put("remark", entity.getRemark());
+        if (fields.isEmpty()) return domainMapper.findByIdAndProjectId(id, projectId);
+        return domainMapper.update(id, projectId, fields);
     }
 
     public boolean delete(String id, Long projectId) {
-        DomainEntity existing = domainMapper.findById(id);
-        if (existing == null || !existing.getProjectId().equals(projectId)) {
-            return false;
-        }
+        DomainEntity existing = domainMapper.findByIdAndProjectId(id, projectId);
+        if (existing == null) return false;
         domainMapper.deleteById(id);
         return true;
     }
@@ -55,6 +53,6 @@ public class DomainService {
             d.setCreatedAt(now);
             d.setUpdatedAt(now);
         }
-        domainMapper.saveAll(domains);
+        domainMapper.insertAll(domains);
     }
 }

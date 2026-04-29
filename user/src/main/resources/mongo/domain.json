@@ -5,5 +5,18 @@
       { "field": "projectId", "operator": "is", "param": "projectId" }
     ],
     "sort": { "createdAt": -1 }
+  },
+  "findById": {
+    "collection": "domains",
+    "filter": [
+      { "field": "_id", "operator": "is", "param": "id" }
+    ]
+  },
+  "findByIdAndProjectId": {
+    "collection": "domains",
+    "filter": [
+      { "field": "_id", "operator": "is", "param": "id" },
+      { "field": "projectId", "operator": "is", "param": "projectId" }
+    ]
   }
 }

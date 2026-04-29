@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MiddlewareService {
@@ -23,29 +25,25 @@ public class MiddlewareService {
         entity.setProjectId(projectId);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return middlewareMapper.save(entity);
+        return middlewareMapper.insert(entity);
     }
 
     public MiddlewareEntity update(String id, Long projectId, MiddlewareEntity entity) {
-        MiddlewareEntity existing = middlewareMapper.findById(id);
-        if (existing == null || !existing.getProjectId().equals(projectId)) {
-            return null;
-        }
-        if (entity.getName() != null) existing.setName(entity.getName());
-        if (entity.getProtocol() != null) existing.setProtocol(entity.getProtocol());
-        if (entity.getExternalAddr() != null) existing.setExternalAddr(entity.getExternalAddr());
-        if (entity.getInternalAddr() != null) existing.setInternalAddr(entity.getInternalAddr());
-        if (entity.getSvcAddr() != null) existing.setSvcAddr(entity.getSvcAddr());
-        if (entity.getRemark() != null) existing.setRemark(entity.getRemark());
-        existing.setUpdatedAt(LocalDateTime.now());
-        return middlewareMapper.save(existing);
+        Map<String, Object> fields = new LinkedHashMap<>();
+        if (entity.getName() != null) fields.put("name", entity.getName());
+        if (entity.getProtocol() != null) fields.put("protocol", entity.getProtocol());
+        if (entity.getExternalAddr() != null) fields.put("externalAddr", entity.getExternalAddr());
+        if (entity.getInternalAddr() != null) fields.put("internalAddr", entity.getInternalAddr());
+        if (entity.getSvcAddr() != null) fields.put("svcAddr", entity.getSvcAddr());
+        if (entity.getEnv() != null) fields.put("env", entity.getEnv());
+        if (entity.getRemark() != null) fields.put("remark", entity.getRemark());
+        if (fields.isEmpty()) return middlewareMapper.findByIdAndProjectId(id, projectId);
+        return middlewareMapper.update(id, projectId, fields);
     }
 
     public boolean delete(String id, Long projectId) {
-        MiddlewareEntity existing = middlewareMapper.findById(id);
-        if (existing == null || !existing.getProjectId().equals(projectId)) {
-            return false;
-        }
+        MiddlewareEntity existing = middlewareMapper.findByIdAndProjectId(id, projectId);
+        if (existing == null) return false;
         middlewareMapper.deleteById(id);
         return true;
     }
@@ -58,6 +56,6 @@ public class MiddlewareService {
             m.setCreatedAt(now);
             m.setUpdatedAt(now);
         }
-        middlewareMapper.saveAll(items);
+        middlewareMapper.insertAll(items);
     }
 }
