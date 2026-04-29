@@ -56,7 +56,7 @@ public class AuthController {
      * @param request HTTP请求对象，用于提取客户端IP地址
      * @return ApiResponseDto包含登录响应，成功时返回用户数据和令牌，失败时返回错误信息
      */
-    @PostMapping("/login")
+    @PostMapping("/authLogin")
     public ApiResponseDto<LoginResponseDto> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
         try {
             // 验证请求参数 - Java 21: 使用 switch 表达式
@@ -120,7 +120,7 @@ public class AuthController {
      *
      * @return ApiResponseDto指示操作结果，成功时返回成功信息，失败时返回错误信息
      */
-    @PostMapping("/logout")
+    @PostMapping("/authOut")
     public ApiResponseDto<Void> logout() {
         try {
             // 在实际实现中，这里会使令牌失效
