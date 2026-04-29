@@ -60,7 +60,7 @@ public class ManageApplication {
     private static void initAfterStartup(ApplicationContext ctx) {
         log.info("✅ ManageApplication started successfully!");
 
-        Executor executor = ctx.getBean(Executor.class);
+        Executor executor = ctx.getBean("applicationTaskExecutor", Executor.class);
         log.info("\uD83E\uDDF5 ThreadPool initialized: {}", executor);
 
         // ThreadPool pre-start core threads
