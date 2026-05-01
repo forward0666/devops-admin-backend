@@ -248,9 +248,14 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         int idx = 1;
                         for (Map<String, Object> m : items) {
                             sb.append(idx++).append(". ");
-                            if (m.containsKey("domainName")) {
-                                sb.append(getVal(m, "domainName", ""));
-                                if (m.containsKey("ip")) sb.append(" (").append(getVal(m, "ip", "")).append(")");
+                            if (m.containsKey("domainName") || m.containsKey("domain")) {
+                                String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
+                                sb.append(domainName);
+                                String env = getVal(m, "env", "").toString();
+                                String type = getVal(m, "type", "").toString();
+                                if (!env.isEmpty() || !type.isEmpty()) {
+                                    sb.append(" [").append(type).append("/").append(env).append("]");
+                                }
                             } else if (m.containsKey("name")) {
                                 sb.append(getVal(m, "name", ""));
                                 if (m.containsKey("type")) sb.append(" [").append(getVal(m, "type", "")).append("]");
