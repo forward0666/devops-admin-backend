@@ -220,10 +220,18 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
                         return replyText(token, chatId, messageId, "⚠️ 查询失败：" + response.getOrDefault("message", "未知错误"));
                     }
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> items = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : (res instanceof List ? (List<Map<String, Object>>) res : List.of());
+                    // 响应结构: {code:200, data: [...]} 或 {code:200, data: {data: [...]}}
+                    Object dataObj = response.get("data");
+                    List<Map<String, Object>> items;
+                    if (dataObj instanceof List) {
+                        items = (List<Map<String, Object>>) dataObj;
+                    } else if (dataObj instanceof Map) {
+                        Map<String, Object> inner = (Map<String, Object>) dataObj;
+                        Object innerData = inner.get("data");
+                        items = (innerData instanceof List) ? (List<Map<String, Object>>) innerData : List.of();
+                    } else {
+                        items = List.of();
+                    }
 
                     // 跟前端一样的角色过滤
                     if ("Member".equals(role) && items != null && !items.isEmpty()) {
