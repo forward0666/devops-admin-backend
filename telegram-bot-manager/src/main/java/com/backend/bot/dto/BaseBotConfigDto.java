@@ -59,6 +59,5 @@ public abstract class BaseBotConfigDto {
      * 
      * 生成建议：使用 UUID 或加密库生成的随机字符串
      */
-    @NotBlank(message = "Secret token is required")
     private String secretToken;
 }

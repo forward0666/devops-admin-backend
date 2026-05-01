@@ -75,7 +75,10 @@ public class BotCoreService {
                 .flatMap(savedConfig -> {
                     // 2. 注册 Webhook
                     String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName();
-                    return botClient.setWebhook(savedConfig.getBotToken(), webhookUrl, dto.getSecretToken())
+                    String secret = dto.getSecretToken() != null && !dto.getSecretToken().isBlank()
+                            ? dto.getSecretToken()
+                            : java.util.UUID.randomUUID().toString();
+                    return botClient.setWebhook(savedConfig.getBotToken(), webhookUrl, secret)
                             .thenReturn(savedConfig);
                 })
                 .flatMap(this::cacheBotEntity) // 3. 响应式缓存
