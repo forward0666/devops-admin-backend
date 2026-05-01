@@ -337,6 +337,6 @@ public final class TelegramConstants {
      */
     public static final String CALLBACK_FRONTEND_ADMIN_DOMAIN_ACTION = "FRONTEND_ADMIN_DOMAIN_ACTION";
 
-    public static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /new 取消。";
+    public static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /new 发起新请求。";
 
 }
