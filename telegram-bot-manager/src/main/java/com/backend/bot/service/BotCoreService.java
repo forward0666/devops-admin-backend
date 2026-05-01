@@ -182,6 +182,13 @@ public class BotCoreService {
     }
 
     /**
+     * 保存 Bot 配置
+     */
+    public Mono<BotConfigEntity> saveBot(BotConfigEntity bot) {
+        return botRepository.save(bot);
+    }
+
+    /**
      * 【重构】异步检查指定的 Chat ID 是否在 Bot 的白名单中 (使用 CacheTemplateService)
      *
      * @param botConfigId 机器人配置ID (对应 bot_config.id)

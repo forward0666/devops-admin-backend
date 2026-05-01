@@ -1,5 +1,6 @@
 package com.backend.bot.controller;
 
+import com.backend.bot.enums.BotType;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.vo.BotVo;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Bot查询管理控制器
- * 
- * 提供API接口用于查询Bot列表、详情和状态管理。
- */
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -26,11 +22,6 @@ public class BotQueryController {
 
     private final BotCoreService botCoreService;
 
-    /**
-     * 获取所有Bot列表
-     * 
-     * @return Bot列表
-     */
     @GetMapping
     public Mono<ResponseEntity<Map<String, Object>>> getAllBots() {
         return botCoreService.findAll()
@@ -42,12 +33,6 @@ public class BotQueryController {
                 });
     }
 
-    /**
-     * 根据名称获取Bot详情
-     * 
-     * @param name Bot名称
-     * @return Bot详情
-     */
     @GetMapping("/{name}")
     public Mono<ResponseEntity<Map<String, Object>>> getBotByName(@PathVariable String name) {
         return botCoreService.findByBotName(name)
@@ -57,23 +42,16 @@ public class BotQueryController {
                     data.put("bot", botVo);
                     return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
+                .defaultIfEmpty(HttpResponseUtils.notFound("Bot not found: " + name));
     }
 
-    /**
-     * 更新Bot状态
-     * 
-     * @param name Bot名称
-     * @param status 新状态 (0=禁用, 1=启用)
-     * @return 更新结果
-     */
     @PutMapping("/{name}/status")
     public Mono<ResponseEntity<Map<String, Object>>> updateBotStatus(
             @PathVariable String name,
             @RequestParam Integer status) {
 
         if (status != 0 && status != 1) {
-            return Mono.just(HttpResponseUtils.badRequest("状态值只能是 0 (禁用) 或 1 (启用)"));
+            return Mono.just(HttpResponseUtils.badRequest("Status must be 0 or 1"));
         }
 
         return botCoreService.updateBotStatusByName(name, status)
@@ -83,15 +61,9 @@ public class BotQueryController {
                     data.put("status", status);
                     return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
+                .defaultIfEmpty(HttpResponseUtils.notFound("Bot not found: " + name));
     }
-    
-    /**
-     * 获取Bot状态
-     * 
-     * @param name Bot名称
-     * @return Bot状态
-     */
+
     @GetMapping("/{name}/status")
     public Mono<ResponseEntity<Map<String, Object>>> getBotStatus(@PathVariable String name) {
         return botCoreService.findByBotName(name)
@@ -101,15 +73,9 @@ public class BotQueryController {
                     data.put("status", entity.getStatus());
                     return HttpResponseUtils.ok(data);
                 })
-                .defaultIfEmpty(HttpResponseUtils.notFound("未找到指定名称的Bot"));
+                .defaultIfEmpty(HttpResponseUtils.notFound("Bot not found: " + name));
     }
 
-    /**
-     * 删除Bot
-     * 
-     * @param name Bot名称
-     * @return 删除结果
-     */
     @DeleteMapping("/{name}")
     public Mono<ResponseEntity<Map<String, Object>>> deleteBot(@PathVariable String name) {
         return botCoreService.deleteByBotName(name)
@@ -128,6 +94,42 @@ public class BotQueryController {
                 });
     }
 
+    /**
+     * 更新 Bot 信息（类型、状态）
+     */
+    @PutMapping("/{name}")
+    public Mono<ResponseEntity<Map<String, Object>>> updateBot(
+            @PathVariable String name,
+            @RequestBody Map<String, Object> body) {
 
+        return botCoreService.findByBotName(name)
+                .flatMap(bot -> {
+                    if (body.containsKey("botType")) {
+                        try {
+                            bot.setBotType(BotType.valueOf((String) body.get("botType")));
+                        } catch (IllegalArgumentException e) {
+                            return Mono.just(HttpResponseUtils.badRequest("Invalid bot type: " + body.get("botType")));
+                        }
+                    }
+                    Integer status = body.containsKey("status") ? (Integer) body.get("status") : null;
+                    if (status != null && status != 0 && status != 1) {
+                        return Mono.just(HttpResponseUtils.badRequest("Status must be 0 or 1"));
+                    }
+                    if (status != null) {
+                        bot.setStatus(status);
+                    }
+                    return botCoreService.saveBot(bot)
+                            .map(saved -> {
+                                Map<String, Object> data = new HashMap<>();
+                                data.put("bot", botCoreService.convertToVo(saved));
+                                return HttpResponseUtils.ok(data);
+                            });
+                })
+                .defaultIfEmpty(HttpResponseUtils.notFound("Bot not found: " + name))
+                .onErrorResume(e -> {
+                    log.error("❌ Update bot failed: {}", name, e);
+                    return Mono.just(HttpResponseUtils.internalError("Update failed: " + e.getMessage()));
+                });
+    }
 
 }
