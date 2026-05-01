@@ -67,7 +67,6 @@ public class BotMenuService {
                 })
                 .switchIfEmpty(Mono.defer(() ->
                         botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
-                                .next()
                                 .map(this::entityToKeyboard)
                                 .doOnNext(markup -> {
                                     try {

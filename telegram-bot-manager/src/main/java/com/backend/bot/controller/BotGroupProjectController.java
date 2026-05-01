@@ -60,11 +60,9 @@ public class BotGroupProjectController {
 
     private Mono<Void> clearGroupProjectCache(String botName, Long chatId) {
         return redisTemplate.delete(
-                List.of(
                         "bot:groupProject:" + botName + ":" + chatId,
                         "bot:groupProject:list:" + botName
-                )
-        ).then();
+                ).then();
     }
 
     @DeleteMapping("/{id}")
