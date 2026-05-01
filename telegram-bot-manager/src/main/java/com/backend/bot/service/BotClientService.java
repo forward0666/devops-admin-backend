@@ -332,10 +332,11 @@ public class BotClientService {
     }
 
     public Mono<String> deleteWebhook(String token) {
-        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/deleteWebhook";
+        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/deleteWebhook?drop_pending_updates=true";
         return telegramWebClient.post()
                 .uri(url)
                 .retrieve()
-                .bodyToMono(String.class);
+                .bodyToMono(String.class)
+                .doOnNext(res -> log.info("deleteWebhook response: {}", res));
     }
 }

@@ -180,16 +180,14 @@ public class BotWebhookConfigController {
                             return Mono.error(new IllegalArgumentException("❌ Bot Token 缺失"));
                         }
                         return botClientService.deleteWebhook(botEntity.getBotToken())
+                                .doOnNext(res -> log.info("TG deleteWebhook response: {}", res))
                                 .flatMap(res -> {
-                                    botEntity.setWebhookUrl(null);
-                                    return botCoreService.saveBot(botEntity).thenReturn(res);
-                                })
-                                .map(res -> {
                                     if (res != null && res.contains("\"ok\":true")) {
-                                        return HttpResponseUtils.ok();
+                                        botEntity.setWebhookUrl(null);
+                                        return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
                                     }
-                                    return HttpResponseUtils.internalError("❌ 删除 Webhook 失败");
-                                });
+                                    return Mono.just(HttpResponseUtils.internalError("❌ 删除 Webhook 失败: " + res));
+                                })
                     })
                     .onErrorResume(IllegalArgumentException.class, e -> Mono.just(HttpResponseUtils.badRequest(e.getMessage())))
                     .onErrorResume(e -> {
@@ -198,6 +196,4 @@ public class BotWebhookConfigController {
                     });
         }).doFinally(LogUtils::clearMDC);
     }
-
-    /**
 }
