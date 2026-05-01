@@ -123,7 +123,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> replyNotImplemented(String token, Long chatId, Long messageId, String feature, String traceLogPrefix) {
-        String text = String.Sprintf("⚠️ %s功能开发中，敬请期待...", feature);
+        String text = String.format("⚠️ %s功能开发中，敬请期待...", feature);
         return botClientService.editMessageText(token, chatId, messageId, text, null)
                 .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null))
                 .then();
