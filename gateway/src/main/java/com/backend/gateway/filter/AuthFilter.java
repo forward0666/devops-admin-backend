@@ -80,13 +80,6 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
             final String routeId = WebExchangeUtils.getRouteId(exchange);
             final String ip = WebExchangeUtils.getClientIp(exchange);
 
-            // Check path whitelist first
-            if (isWhitelistedPath(path)) {
-                log.info("[traceId={}] ✅ Whitelisted path | IP={} | Route={} | Method={} | Path={}",
-                        traceId, ip, routeId, method, path);
-                return chain.filter(exchange);
-            }
-
             // 2. 阻塞验证 Callable：用于 Mono.fromCallable()，包含所有阻塞逻辑和 MDC 切换
             Callable<Boolean> validationCallable = () -> {
                 TraceIdUtils.setTraceId(traceId); // 异步线程开始时设置 MDC

@@ -36,9 +36,4 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
     protected boolean authorizedRequest(String method) {
         return false;
     }
-
-    @Override
-    protected boolean isWhitelistedPath(String path) {
-        return path != null && path.startsWith("/callback/");
-    }
 }

@@ -50,12 +50,13 @@ public class BotWebhookConfigController {
                                             String secretToken = dto.getSecretToken();
 
                                             return botClientService.setWebhook(token, url, secretToken)
-                                                    .map(resultJson -> {
+                                                    .flatMap(resultJson -> {
                                                         boolean success = resultJson != null && resultJson.contains("\"ok\":true");
                                                         if (success) {
-                                                            return HttpResponseUtils.ok();
+                                                            botEntity.setWebhookUrl(url);
+                                                            return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
                                                         } else {
-                                                            return HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误");
+                                                            return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误"));
                                                         }
                                                     })
                                                     .onErrorResume(e -> {

@@ -93,13 +93,9 @@ public class BotConfigEntity {
      * 可以根据业务需求扩展更多状态值。
      */
     private Integer status;
-    
-    /**
-     * 创建时间
-     * 
-     * 记录 Bot 配置的创建时间，由 R2DBC 审计功能自动管理。
-     * 使用 @CreatedDate 注解在 Repository 层自动设置。
-     */
+
+    private String webhookUrl;
+
     private LocalDateTime createdAt;
     
     /**

@@ -12,6 +12,7 @@ public class BotVo {
     private String botType;
     private LocalDateTime createdAt;
     private Integer status;
+    private String webhookUrl;
 
     // 不包含 botToken
 }
