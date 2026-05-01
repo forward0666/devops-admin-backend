@@ -124,13 +124,13 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                             .defaultIfEmpty(MenuType.createFallbackKeyboard(context.botEntity().getBotType().name()))
                             .flatMap(mainMenuMarkup ->
                                     botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
+                            )
                             .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
                             .doOnError(e -> {
                                 log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
-                                // 出错时也要清除处理状态
                                 userSessionService.clearUserSession(userId).contextWrite(reactor.util.context.Context.of(contextView)).subscribe();
                             })
-                            .then(); // 转换为Mono<Void>
+                            .then();
                 }));
     }
 
