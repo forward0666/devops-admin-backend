@@ -67,8 +67,8 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
         // 根据服务决定是否应用超时
         Mono<Void> filterChain = chain.filter(exchange);
         
-        // 仅对 telegram-bot-manager 服务应用 2 秒超时
-        if (isTelegramBotManager) {
+        // Webhook 路径不加超时（TG 需要异步处理），其他 API 保持 2 秒超时
+        if (isTelegramBotManager && !isWebhook) {
             filterChain = filterChain.timeout(REQUEST_TIMEOUT);
         }
         
