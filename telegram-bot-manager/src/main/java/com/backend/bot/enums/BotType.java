@@ -25,6 +25,11 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum BotType {
     
     /**
+     * 通用 Bot
+     */
+    GENERAL("general"),
+
+    /**
      * IP 白名单管理 Bot
      * 
      * 功能：用于管理系统和服务器的 IP 白名单
