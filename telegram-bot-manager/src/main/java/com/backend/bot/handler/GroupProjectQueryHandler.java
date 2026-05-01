@@ -35,10 +35,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     @Override
     public boolean supports(String callbackData) {
-        return callbackData.equals(PROJECT_INFO_ACTION)
-                || callbackData.equals(PROJECT_MEMBER_ACTION)
-                || callbackData.equals(PROJECT_DOMAIN_ACTION)
-                || callbackData.equals(PROJECT_MIDDLEWARE_ACTION);
+        return callbackData.equals("callback_data_" + PROJECT_INFO_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_MEMBER_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_MIDDLEWARE_ACTION);
     }
 
     @Override
@@ -60,7 +60,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
             log.info("{}🔍 GroupProjectQueryHandler: callbackData={}, chatId={}, botName={}", traceLogPrefix, callbackData, chatId, botName);
 
-            return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+            String action = callbackData.replace("callback_data_", "");
+        return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
                     .doOnNext(b -> log.info("{}🔍 Found binding: projectId={}, projectName={}", traceLogPrefix, b.getProjectId(), b.getProjectName()))
                     .switchIfEmpty(Mono.defer(() -> {
                         log.warn("{}⚠️ No group-project binding found for bot={}, chatId={}", traceLogPrefix, botName, chatId);
@@ -75,7 +76,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .defaultHeader("X-Internal-Call", "true")
                 .build();
 
-                        return switch (callbackData) {
+                        return switch (action) {
                             case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
                             case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", traceLogPrefix);
                             case PROJECT_DOMAIN_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🌐 域名列表", traceLogPrefix);
