@@ -36,4 +36,13 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
     protected boolean authorizedRequest(String method) {
         return false;
     }
+
+    /**
+     * /callback/ 路径不需要 X-Encrypted-Data 验证
+     * TG webhook 请求无法携带自定义 header
+     */
+    @Override
+    protected boolean isWhitelistedPath(String path) {
+        return path != null && path.startsWith("/callback/");
+    }
 }
