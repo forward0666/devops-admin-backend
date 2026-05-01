@@ -15,6 +15,8 @@ public interface ProjectMemberMapper {
 
     ProjectMemberEntity findByProjectIdAndUserId(@Param("projectId") Long projectId, @Param("userId") Long userId);
 
+    ProjectMemberEntity findByProjectIdAndTgUsername(@Param("projectId") Long projectId, @Param("tgUsername") String tgUsername);
+
     int insert(ProjectMemberEntity entity);
 
     int update(ProjectMemberEntity entity);

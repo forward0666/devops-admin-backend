@@ -41,6 +41,10 @@ public class ProjectMemberService {
         return projectMemberMapper.findByProjectIdAndUserId(projectId, userId);
     }
 
+    public ProjectMemberEntity findByProjectIdAndTgUsername(Long projectId, String tgUsername) {
+        return projectMemberMapper.findByProjectIdAndTgUsername(projectId, tgUsername);
+    }
+
     public List<Long> findProjectIdsByUserId(Long userId) {
         return projectMemberMapper.findProjectIdsByUserId(userId);
     }

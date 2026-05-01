@@ -33,12 +33,9 @@ public class MiddlewareController {
     public ApiResponseDto<List<MiddlewareVo>> list(@RequestParam Long projectId, HttpServletRequest request) {
         try {
             List<MiddlewareEntity> list = middlewareService.findByProjectId(projectId);
-            String projectRole = request.getHeader("X-Tg-Username") != null ? null : getProjectRole(request, projectId);
+            String projectRole = resolveProjectRole(request, projectId);
 
-            // Member: hide prod environment middlewares
-            if ("Member".equals(projectRole)) {
-                list = list.stream().filter(m -> !"prod".equals(m.getEnv())).toList();
-            }
+            list = applyMiddlewareFilter(list, projectRole);
 
             return ApiResponseDto.success("Success", list.stream().map(MiddlewareVo::fromEntity).toList());
         } catch (Exception e) {
@@ -124,15 +121,39 @@ public class MiddlewareController {
         }
     }
 
-    private String getProjectRole(HttpServletRequest request, Long projectId) {
+    /**
+     * 统一角色解析：优先 X-Tg-Username，其次 JWT
+     */
+    private String resolveProjectRole(HttpServletRequest request, Long projectId) {
+        String tgUsername = request.getHeader("X-Tg-Username");
+        if (tgUsername != null && !tgUsername.isBlank()) {
+            ProjectMemberEntity member = projectMemberService.findByProjectIdAndTgUsername(projectId, tgUsername);
+            return member != null ? member.getProjectRole() : "None";
+        }
+        return getProjectRoleFromJwt(request, projectId);
+    }
+
+    private String getProjectRoleFromJwt(HttpServletRequest request, Long projectId) {
         try {
             String token = request.getHeader("Authorization").substring(7);
             Long userId = jwtUtil.getUserIdFromToken(token);
-            if (userId == null) return "Member";
+            if (userId == null) return "None";
             ProjectMemberEntity member = projectMemberService.findByProjectIdAndUserId(projectId, userId);
-            return member != null ? member.getProjectRole() : "Member";
+            return member != null ? member.getProjectRole() : "None";
         } catch (Exception e) {
-            return "Member";
+            return "None";
         }
+    }
+
+    /**
+     * 按角色过滤中间件
+     * Administrator/DevOps/Leader: 全部可见
+     * Member: 隐藏 prod 环境
+     * None: 无权限，返回空
+     */
+    private List<MiddlewareEntity> applyMiddlewareFilter(List<MiddlewareEntity> list, String role) {
+        if ("None".equals(role)) return List.of();
+        if (!"Member".equals(role)) return list;
+        return list.stream().filter(m -> !"prod".equals(m.getEnv())).toList();
     }
 }

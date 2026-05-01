@@ -95,4 +95,15 @@
         SELECT DISTINCT project_id FROM project_member WHERE user_id = #{userId}
     </select>
 
+    <select id="findByProjectIdAndTgUsername" resultMap="ProjectMemberResultMap">
+        SELECT pm.id, pm.project_id, pm.user_id, u.username, u.full_name, pm.project_role, pm.position, pm.status,
+               pm.joined_at, pm.created_at, pm.updated_at, pm.created_by, pm.updated_by, pm.active,
+               u.role AS system_role, u.email, u.phone, u.tg_username, u.position AS user_position, u.department_id,
+               d.name AS department_name
+        FROM project_member pm
+        LEFT JOIN user u ON pm.user_id = u.id
+        LEFT JOIN department d ON u.department_id = d.id
+        WHERE pm.project_id = #{projectId} AND u.tg_username = #{tgUsername} AND pm.active = 1
+    </select>
+
 </mapper>

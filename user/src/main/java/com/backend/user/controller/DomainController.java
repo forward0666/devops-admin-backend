@@ -33,14 +33,9 @@ public class DomainController {
     public ApiResponseDto<List<DomainVo>> list(@RequestParam Long projectId, HttpServletRequest request) {
         try {
             List<DomainEntity> domains = domainService.findByProjectId(projectId);
-            String projectRole = request.getHeader("X-Tg-Username") != null ? null : getProjectRole(request, projectId);
+            String projectRole = resolveProjectRole(request, projectId);
 
-            // Member in prod: only show web type
-            if ("Member".equals(projectRole)) {
-                domains = domains.stream()
-                    .filter(d -> !"prod".equals(d.getEnv()) || "web".equals(d.getType()))
-                    .toList();
-            }
+            domains = applyDomainFilter(domains, projectRole);
 
             return ApiResponseDto.success("Success", domains.stream().map(DomainVo::fromEntity).toList());
         } catch (Exception e) {
@@ -117,15 +112,43 @@ public class DomainController {
         }
     }
 
-    private String getProjectRole(HttpServletRequest request, Long projectId) {
+    /**
+     * 统一角色解析：优先 X-Tg-Username，其次 JWT
+     */
+    private String resolveProjectRole(HttpServletRequest request, Long projectId) {
+        // bot 内部请求，通过 tgUsername 查角色
+        String tgUsername = request.getHeader("X-Tg-Username");
+        if (tgUsername != null && !tgUsername.isBlank()) {
+            ProjectMemberEntity member = projectMemberService.findByProjectIdAndTgUsername(projectId, tgUsername);
+            return member != null ? member.getProjectRole() : "None";
+        }
+        // 前端 JWT 请求
+        return getProjectRoleFromJwt(request, projectId);
+    }
+
+    private String getProjectRoleFromJwt(HttpServletRequest request, Long projectId) {
         try {
             String token = request.getHeader("Authorization").substring(7);
             Long userId = jwtUtil.getUserIdFromToken(token);
-            if (userId == null) return "Member";
+            if (userId == null) return "None";
             ProjectMemberEntity member = projectMemberService.findByProjectIdAndUserId(projectId, userId);
-            return member != null ? member.getProjectRole() : "Member";
+            return member != null ? member.getProjectRole() : "None";
         } catch (Exception e) {
-            return "Member";
+            return "None";
         }
+    }
+
+    /**
+     * 按角色过滤域名
+     * Administrator/DevOps/Leader: 全部可见
+     * Member: prod 环境只显示 web 类型
+     * None: 无权限，返回空
+     */
+    private List<DomainEntity> applyDomainFilter(List<DomainEntity> domains, String role) {
+        if ("None".equals(role)) return List.of();
+        if (!"Member".equals(role)) return domains;
+        return domains.stream()
+                .filter(d -> !"prod".equals(d.getEnv()) || "web".equals(d.getType()))
+                .toList();
     }
 }
