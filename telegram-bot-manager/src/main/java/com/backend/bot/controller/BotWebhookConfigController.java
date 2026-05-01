@@ -71,6 +71,49 @@ public class BotWebhookConfigController {
     }
 
     /**
+     * 重置待处理更新（清除 Telegram 请求队列）
+     */
+    @PostMapping("/resetPendingUpdates")
+    public Mono<ResponseEntity<Map<String, Object>>> resetPendingUpdates(@RequestParam String botName) {
+        return Mono.deferContextual(contextView -> {
+            LogUtils.syncTraceIdToMDC(contextView);
+            log.info("Resetting pending updates for botName: {}", botName);
+            return botCoreService.findByBotName(botName)
+                    .switchIfEmpty(Mono.error(new IllegalArgumentException("❌ Bot 不存在")))
+                    .flatMap(botEntity -> {
+                        if (botEntity.getBotToken() == null) {
+                            return Mono.error(new IllegalArgumentException("❌ Bot Token 缺失"));
+                        }
+                        String token = botEntity.getBotToken();
+                        return botClientService.getWebhookInfo(token)
+                                .flatMap(info -> {
+                                    if (!info.containsKey("ok") || !(Boolean) info.get("ok")) {
+                                        return Mono.just(HttpResponseUtils.internalError("❌ 获取 Webhook 信息失败"));
+                                    }
+                                    Map<String, Object> result = (Map<String, Object>) info.get("result");
+                                    String url = (String) result.get("url");
+                                    if (url == null || url.isBlank()) {
+                                        return Mono.just(HttpResponseUtils.ok("No webhook set"));
+                                    }
+                                    // 重新设置 webhook 会自动清空 pending updates
+                                    return botClientService.setWebhook(token, url, null)
+                                            .map(res -> {
+                                                if (res != null && res.contains("\"ok\":true")) {
+                                                    return HttpResponseUtils.ok();
+                                                }
+                                                return HttpResponseUtils.internalError("❌ 重置失败");
+                                            });
+                                });
+                    })
+                    .onErrorResume(IllegalArgumentException.class, e -> Mono.just(HttpResponseUtils.badRequest(e.getMessage())))
+                    .onErrorResume(e -> {
+                        log.error("❌ resetPendingUpdates failed for {}", botName, e);
+                        return Mono.just(HttpResponseUtils.internalError("❌ 重置时发生错误"));
+                    });
+        }).doFinally(LogUtils::clearMDC);
+    }
+
+    /**
      * 查询 Bot 的 Webhook 状态。
      */
     @GetMapping("/getWebhookInfo")
