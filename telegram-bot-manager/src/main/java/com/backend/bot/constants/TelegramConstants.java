@@ -25,7 +25,7 @@ package com.backend.bot.constants;
 public final class TelegramConstants {
 
     public static final String COMMAND_START = "/start";
-    public static final String COMMAND_CANCEL = "/cancel";
+    public static final String COMMAND_CANCEL = "/new";
     public static final String COMMAND_HELP = "/help";
     public static final String COMMAND_ABOUT = "/about";
     public static final String COMMAND_SETTINGS = "/settings";
@@ -39,7 +39,7 @@ public final class TelegramConstants {
      */
     public static final String[] GROUP_COMMANDS_TO_CLEANUP = {
         "/start",
-        "/cancel",
+        "/new",
         "/help",
         "/about",
         "/settings"
@@ -337,6 +337,6 @@ public final class TelegramConstants {
      */
     public static final String CALLBACK_FRONTEND_ADMIN_DOMAIN_ACTION = "FRONTEND_ADMIN_DOMAIN_ACTION";
 
-    public static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。";
+    public static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /new 取消。";
 
 }

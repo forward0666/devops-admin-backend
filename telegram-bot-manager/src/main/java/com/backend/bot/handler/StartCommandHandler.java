@@ -37,7 +37,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private static final int DELETE_DELAY_SECONDS = TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
 
     // 🌟 警告消息常量
-    private static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。";
+    private static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /new 取消。";
     private static final InlineKeyboardMarkupDto EMPTY_MENU = new InlineKeyboardMarkupDto(java.util.List.of());
 
     @Override
