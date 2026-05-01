@@ -8,6 +8,7 @@ import com.backend.bot.repository.BotGroupProjectRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import org.springframework.core.ParameterizedTypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private static final Duration GP_CACHE_TTL = Duration.ofSeconds(300);
     private static final Duration USER_CACHE_TTL = Duration.ofSeconds(60);
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE = new ParameterizedTypeReference<>() {};
 
     private static final String PROJECT_INFO_ACTION = "PROJECT_INFO_ACTION";
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
@@ -143,7 +144,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         Mono<Map<String, Object>> fetchFromRemote = webClient.get()
                 .uri("/projectMember?projectId={projectId}", projectId)
                 .retrieve()
-                .bodyToMono(MAP_TYPE)
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .flatMap(response -> {
                     try {
                         return redisTemplate.opsForValue().set(membersCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
@@ -185,7 +186,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         Mono<Map<String, Object>> fetchFromRemote = webClient.get()
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
-                .bodyToMono(MAP_TYPE)
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .flatMap(response -> {
                     try {
                         return redisTemplate.opsForValue().set(projectCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
@@ -259,7 +260,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         webClient.get()
                                 .uri(uri)
                                 .retrieve()
-                                .bodyToMono(MAP_TYPE)
+                                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                                 .flatMap(response -> {
                                     try {
                                         return redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
