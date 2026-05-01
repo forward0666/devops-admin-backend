@@ -6,11 +6,13 @@ import com.backend.bot.vo.BotGroupProjectVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,6 +22,7 @@ import java.util.Map;
 public class BotGroupProjectController {
 
     private final BotGroupProjectRepository botGroupProjectRepository;
+    private final ReactiveStringRedisTemplate redisTemplate;
 
     @GetMapping("/bot/{botName}")
     public Mono<ResponseEntity<Map<String, Object>>> getByBotName(@PathVariable String botName) {
@@ -34,6 +37,8 @@ public class BotGroupProjectController {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         return botGroupProjectRepository.save(entity)
+                .flatMap(saved -> clearGroupProjectCache(saved.getBotName(), saved.getChatId())
+                        .thenReturn(saved))
                 .map(saved -> HttpResponseUtils.ok(Map.of("groupProject", BotGroupProjectVo.fromEntity(saved))));
     }
 
@@ -47,14 +52,26 @@ public class BotGroupProjectController {
                     existing.setUpdatedAt(LocalDateTime.now());
                     return botGroupProjectRepository.save(existing);
                 })
+                .flatMap(saved -> clearGroupProjectCache(saved.getBotName(), saved.getChatId())
+                        .thenReturn(saved))
                 .map(saved -> HttpResponseUtils.ok(Map.of("groupProject", BotGroupProjectVo.fromEntity(saved))))
                 .defaultIfEmpty(HttpResponseUtils.notFound("Not found: " + id));
+    }
+
+    private Mono<Void> clearGroupProjectCache(String botName, Long chatId) {
+        return redisTemplate.delete(
+                List.of(
+                        "bot:groupProject:" + botName + ":" + chatId,
+                        "bot:groupProject:list:" + botName
+                )
+        ).then();
     }
 
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Map<String, Object>>> delete(@PathVariable Long id) {
         return botGroupProjectRepository.findById(id)
                 .flatMap(entity -> botGroupProjectRepository.delete(entity)
+                        .flatMap(v -> clearGroupProjectCache(entity.getBotName(), entity.getChatId()))
                         .thenReturn(HttpResponseUtils.ok(Map.of("deleted", id))))
                 .defaultIfEmpty(HttpResponseUtils.notFound("Not found: " + id));
     }

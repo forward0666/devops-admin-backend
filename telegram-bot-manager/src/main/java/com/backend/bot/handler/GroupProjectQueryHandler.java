@@ -7,13 +7,17 @@ import com.backend.bot.entity.BotGroupProjectEntity;
 import com.backend.bot.repository.BotGroupProjectRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.util.LogUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +30,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private final BotGroupProjectRepository botGroupProjectRepository;
     private final BotClientService botClientService;
     private final WebClient.Builder webClientBuilder;
+    private final ReactiveStringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final Duration GP_CACHE_TTL = Duration.ofSeconds(300);
+    private static final Duration USER_CACHE_TTL = Duration.ofSeconds(60);
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private static final String PROJECT_INFO_ACTION = "PROJECT_INFO_ACTION";
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
@@ -63,7 +73,25 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
             log.info("{}🔍 GroupProjectQueryHandler: action={}, chatId={}, botName={}, tgUsername={}", traceLogPrefix, action, chatId, botName, tgUsername);
 
-            return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+            String gpCacheKey = "bot:groupProject:" + botName + ":" + chatId;
+            return redisTemplate.opsForValue().get(gpCacheKey)
+                    .flatMap(cached -> {
+                        try {
+                            return Mono.just(objectMapper.readValue(cached, BotGroupProjectEntity.class));
+                        } catch (Exception e) {
+                            log.warn("{}⚠️ Failed to deserialize cached groupProject, fetching from DB", traceLogPrefix);
+                            return Mono.empty();
+                        }
+                    })
+                    .switchIfEmpty(botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+                            .flatMap(entity -> {
+                                try {
+                                    String json = objectMapper.writeValueAsString(entity);
+                                    return redisTemplate.opsForValue().set(gpCacheKey, json, GP_CACHE_TTL).thenReturn(entity);
+                                } catch (Exception e) {
+                                    return Mono.just(entity);
+                                }
+                            }))
                     .doOnNext(b -> log.info("{}🔍 Found binding: projectId={}, projectName={}", traceLogPrefix, b.getProjectId(), b.getProjectName()))
                     .switchIfEmpty(Mono.defer(() -> {
                         log.warn("{}⚠️ No group-project binding found for bot={}, chatId={}", traceLogPrefix, botName, chatId);
@@ -111,10 +139,28 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         if (tgUsername == null || tgUsername.isBlank()) {
              return Mono.just("None");
         }
-        return webClient.get()
-                .uri("/projectMember?projectId={projectId}", projectId)
-                .retrieve()
-                .bodyToMono(Map.class)
+        String membersCacheKey = "bot:projectMembers:" + projectId;
+        return redisTemplate.opsForValue().get(membersCacheKey)
+                .flatMap(cached -> {
+                    try {
+                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                    } catch (Exception e) {
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(
+                        webClient.get()
+                                .uri("/projectMember?projectId={projectId}", projectId)
+                                .retrieve()
+                                .bodyToMono(Map.class)
+                                .flatMap(response -> {
+                                    try {
+                                        return redisTemplate.opsForValue().set(membersCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
+                                    } catch (Exception e) {
+                                        return Mono.just(response);
+                                    }
+                                })
+                )
                 .map(response -> {
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
@@ -136,10 +182,28 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
         log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
-        return webClient.get()
-                .uri("/project/{id}", binding.getProjectId())
-                .retrieve()
-                .bodyToMono(Map.class)
+        String projectCacheKey = "bot:project:" + binding.getProjectId();
+        return redisTemplate.opsForValue().get(projectCacheKey)
+                .flatMap(cached -> {
+                    try {
+                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                    } catch (Exception e) {
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(
+                        webClient.get()
+                                .uri("/project/{id}", binding.getProjectId())
+                                .retrieve()
+                                .bodyToMono(Map.class)
+                                .flatMap(response -> {
+                                    try {
+                                        return redisTemplate.opsForValue().set(projectCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
+                                    } catch (Exception e) {
+                                        return Mono.just(response);
+                                    }
+                                })
+                )
                 .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
                     Object code = project.get("code");
@@ -175,10 +239,37 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private Mono<Void> fetchList(WebClient webClient, BotGroupProjectEntity binding, String uri,
                                   String token, Long chatId, Long messageId, String title, String role, String traceLogPrefix) {
         log.info("{}🔍 Fetching list: title={}, role={}", traceLogPrefix, title, role);
-        return webClient.get()
-                .uri(uri)
-                .retrieve()
-                .bodyToMono(Map.class)
+        // Determine cache key based on URI
+        String cacheKey;
+        if (uri.contains("/projectMember")) {
+            cacheKey = "bot:projectMembers:" + binding.getProjectId();
+        } else if (uri.contains("/domain/")) {
+            cacheKey = "bot:domains:" + binding.getProjectId();
+        } else {
+            cacheKey = "bot:middlewares:" + binding.getProjectId();
+        }
+
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                    } catch (Exception e) {
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(
+                        webClient.get()
+                                .uri(uri)
+                                .retrieve()
+                                .bodyToMono(Map.class)
+                                .flatMap(response -> {
+                                    try {
+                                        return redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
+                                    } catch (Exception e) {
+                                        return Mono.just(response);
+                                    }
+                                })
+                )
                 .flatMap(response -> {
                     // 检查响应 code
                     Object code = response.get("code");
