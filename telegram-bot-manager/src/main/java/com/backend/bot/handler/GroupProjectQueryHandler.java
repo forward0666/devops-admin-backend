@@ -140,6 +140,17 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
              return Mono.just("None");
         }
         String membersCacheKey = "bot:projectMembers:" + projectId;
+        Mono<Map<String, Object>> fetchFromRemote = webClient.get()
+                .uri("/projectMember?projectId={projectId}", projectId)
+                .retrieve()
+                .bodyToMono(MAP_TYPE)
+                .flatMap(response -> {
+                    try {
+                        return redisTemplate.opsForValue().set(membersCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
+                    } catch (Exception e) {
+                        return Mono.just(response);
+                    }
+                });
         return redisTemplate.opsForValue().get(membersCacheKey)
                 .flatMap(cached -> {
                     try {
@@ -148,19 +159,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         return Mono.empty();
                     }
                 })
-                .switchIfEmpty(
-                        webClient.get()
-                                .uri("/projectMember?projectId={projectId}", projectId)
-                                .retrieve()
-                                .bodyToMono(Map.class)
-                                .flatMap(response -> {
-                                    try {
-                                        return redisTemplate.opsForValue().set(membersCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
-                                    } catch (Exception e) {
-                                        return Mono.just(response);
-                                    }
-                                })
-                )
+                .switchIfEmpty(fetchFromRemote)
                 .map(response -> {
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
@@ -183,6 +182,17 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
         log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
         String projectCacheKey = "bot:project:" + binding.getProjectId();
+        Mono<Map<String, Object>> fetchFromRemote = webClient.get()
+                .uri("/project/{id}", binding.getProjectId())
+                .retrieve()
+                .bodyToMono(MAP_TYPE)
+                .flatMap(response -> {
+                    try {
+                        return redisTemplate.opsForValue().set(projectCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
+                    } catch (Exception e) {
+                        return Mono.just(response);
+                    }
+                });
         return redisTemplate.opsForValue().get(projectCacheKey)
                 .flatMap(cached -> {
                     try {
@@ -191,19 +201,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         return Mono.empty();
                     }
                 })
-                .switchIfEmpty(
-                        webClient.get()
-                                .uri("/project/{id}", binding.getProjectId())
-                                .retrieve()
-                                .bodyToMono(Map.class)
-                                .flatMap(response -> {
-                                    try {
-                                        return redisTemplate.opsForValue().set(projectCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
-                                    } catch (Exception e) {
-                                        return Mono.just(response);
-                                    }
-                                })
-                )
+                .switchIfEmpty(fetchFromRemote)
                 .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
                     Object code = project.get("code");
@@ -261,7 +259,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         webClient.get()
                                 .uri(uri)
                                 .retrieve()
-                                .bodyToMono(Map.class)
+                                .bodyToMono(MAP_TYPE)
                                 .flatMap(response -> {
                                     try {
                                         return redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
