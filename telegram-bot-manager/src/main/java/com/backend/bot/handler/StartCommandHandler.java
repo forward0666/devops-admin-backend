@@ -121,7 +121,8 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
                 .then(Mono.defer(() -> {
                     return botMenuService.findMainMenuByBotName(context.botName(), 1)
-                            .defaultIfEmpty(MenuType.createFallbackKeyboard(context.botEntity().getBotType().name()))
+                            .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
+                            .filter(markup -> markup != null)
                             .flatMap(mainMenuMarkup ->
                                     botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
                             )
