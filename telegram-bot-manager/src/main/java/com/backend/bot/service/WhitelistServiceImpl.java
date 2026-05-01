@@ -1,6 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.util.LogUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;

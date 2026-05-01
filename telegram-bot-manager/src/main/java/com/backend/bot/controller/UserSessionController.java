@@ -6,6 +6,7 @@ import com.backend.bot.service.UserSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -30,6 +31,8 @@ public class UserSessionController {
 
     private final UserSessionService userSessionService;
     private final RedisUserSessionService redisUserSessionService;
+    private final ReactiveStringRedisTemplate redisTemplate;
+
 
     /**
      * 获取用户会话状态
