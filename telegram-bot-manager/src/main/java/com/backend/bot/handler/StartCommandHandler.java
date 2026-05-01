@@ -38,6 +38,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
     // 🌟 警告消息常量
     private static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /cancel 取消。";
+    private static final InlineKeyboardMarkupDto EMPTY_MENU = new InlineKeyboardMarkupDto(java.util.List.of());
 
     @Override
     public boolean support(BotUpdateDto update) {
@@ -121,10 +122,10 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
                 .then(botMenuService.findMainMenuByBotName(context.botName(), 1)
                         .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
-                        .defaultIfEmpty(null)
+                        .defaultIfEmpty(EMPTY_MENU)
                 )
                 .flatMap(mainMenuMarkup -> {
-                    if (mainMenuMarkup == null) {
+                    if (mainMenuMarkup == EMPTY_MENU) {
                         log.warn("{}⚠️ No menu found for bot={} in DB or fallback", logPrefix, context.botName());
                         return userSessionService.clearUserSession(userId).then();
                     }
