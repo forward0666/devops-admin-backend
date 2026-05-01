@@ -102,6 +102,8 @@ public class BotQueryController {
             @PathVariable String name,
             @RequestBody Map<String, Object> body) {
 
+        log.info("✏️ Update bot request: name={}, body={}", name, body);
+
         return botCoreService.findByBotName(name)
                 .flatMap(bot -> {
                     if (body.containsKey("botType")) {
