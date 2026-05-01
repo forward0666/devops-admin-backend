@@ -44,7 +44,7 @@ public class BlacklistController {
                                     String[] parts = key.split(":");
                                     if (parts.length >= 4) {
                                         item.put("botName", parts[2]);
-                                        item.put("chatId", parts[3]);
+                                        item.put("userId", parts[3]);
                                     }
                                     item.put("redisKey", key);
 
@@ -73,8 +73,8 @@ public class BlacklistController {
     }
 
     @DeleteMapping("/remove")
-    public Mono<ResponseEntity<Map<String, Object>>> remove(@RequestParam String botName, @RequestParam String chatId) {
-        String key = "bot:blacklist:" + botName + ":" + chatId;
+    public Mono<ResponseEntity<Map<String, Object>>> remove(@RequestParam String botName, @RequestParam String userId) {
+        String key = "bot:blacklist:" + botName + ":" + userId;
         return redisTemplate.delete(key)
                 .map(deleted -> {
                     log.info("🔓 Removed blacklist: botName={}, chatId={}", botName, chatId);

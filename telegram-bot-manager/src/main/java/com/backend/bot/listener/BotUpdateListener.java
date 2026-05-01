@@ -58,6 +58,7 @@ public class BotUpdateListener {
         final String traceId = event.traceId();
 
         Long chatId = extractChatId(botUpdate).orElse(null);
+        Long userId = extractUserId(botUpdate);
         String userInfo = extractUserInfo(botUpdate);
 
         Mono<Void> processingPipeline = Mono.defer(() -> {
@@ -92,7 +93,7 @@ public class BotUpdateListener {
                                 if (Boolean.TRUE.equals(isAllowed)) {
                                     return Mono.just(botConfigEntity);
                                 } else {
-                                    return checkAndBlacklist(botName, chatId, userInfo)
+                                    return checkAndBlacklist(botName, userId, userInfo)
                                             .flatMap(blacklisted -> {
                                                 if (blacklisted) {
                                                     log.warn("🚫 Rejected update for bot {} from BLACKLISTED user: {}", botName, userInfo);
@@ -153,9 +154,16 @@ public class BotUpdateListener {
      * 检查未授权用户并拉黑：第一次警告，第二次起直接拉黑
      * @return true=已拉黑, false=首次未授权
      */
-    private Mono<Boolean> checkAndBlacklist(String botName, Long chatId, String userInfo) {
-        String counterKey = "bot:unauthorized:" + botName + ":" + chatId;
-        String blacklistKey = "bot:blacklist:" + botName + ":" + chatId;
+    private Long extractUserId(BotUpdateDto update) {
+        com.backend.bot.dto.UserDto user = null;
+        if (update.message() != null) user = update.message().from();
+        else if (update.callbackQuery() != null) user = update.callbackQuery().from();
+        return user != null ? user.id() : null;
+    }
+
+    private Mono<Boolean> checkAndBlacklist(String botName, Long userId, String userInfo) {
+        String counterKey = "bot:unauthorized:" + botName + ":" + userId;
+        String blacklistKey = "bot:blacklist:" + botName + ":" + userId;
 
         return redisTemplate.hasKey(blacklistKey)
                 .flatMap(isBlacklisted -> {
