@@ -117,11 +117,12 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         Long chatId = context.chatId();
         Long userId = context.userId();
 
-        // 并行：设置 session + 查询菜单
+        // 并行：设置 session + 查询菜单（菜单可能为 null，用 defaultIfEmpty 包裹）
         return Mono.zip(
                 userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null),
                 botMenuService.findMainMenuByBotName(context.botName(), 1)
                         .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
+                        .defaultIfEmpty(null) // 防止 Mono.empty() 导致 zip 永远不完成
         ).flatMap(tuple -> {
             InlineKeyboardMarkupDto mainMenuMarkup = tuple.getT2();
             if (mainMenuMarkup == null) {
