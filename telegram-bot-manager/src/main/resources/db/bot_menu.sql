@@ -12,6 +12,5 @@ CREATE TABLE IF NOT EXISTS bot_menu (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_bot_name (bot_name),
     INDEX idx_bot_name_level (bot_name, menu_level),
-    UNIQUE INDEX uk_bot_menu_key (bot_name, menu_key),
-    UNIQUE INDEX uk_bot_menu_sort (bot_name, menu_level, COALESCE(parent_id, 0), sort_order)
+    UNIQUE INDEX uk_bot_menu_key (bot_name, menu_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Telegram Bot 菜单配置';
