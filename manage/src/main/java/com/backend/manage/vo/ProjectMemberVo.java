@@ -31,12 +31,12 @@ public record ProjectMemberVo(
                 entity.getProjectRole(),
                 entity.getPosition(),
                 entity.getStatus(),
-                null,  // systemRole - not in entity
-                null,  // email - not in entity
-                null,  // phone - not in entity
-                null,  // tgUsername - not in entity
-                null,  // departmentName - not in entity
-                null,  // userPosition - not in entity
+                entity.getSystemRole(),
+                entity.getEmail(),
+                entity.getPhone(),
+                entity.getTgUsername(),
+                entity.getDepartmentName(),
+                entity.getUserPosition(),
                 entity.getJoinedAt(),
                 entity.getCreatedAt()
         );

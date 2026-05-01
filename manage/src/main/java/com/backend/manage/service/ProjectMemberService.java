@@ -68,8 +68,6 @@ public class ProjectMemberService {
         if (data.getProjectRole() != null) member.setProjectRole(data.getProjectRole());
         if (data.getPosition() != null) member.setPosition(data.getPosition());
         if (data.getStatus() != null) member.setStatus(data.getStatus());
-        if (data.getFullName() != null) member.setFullName(data.getFullName());
-        if (data.getUsername() != null) member.setUsername(data.getUsername());
         member.setUpdatedBy(data.getUpdatedBy());
 
         projectMemberMapper.update(member);

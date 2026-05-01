@@ -16,8 +16,6 @@ public class ProjectMemberEntity {
     private Long id;
     private Long projectId;
     private Long userId;
-    private String username;
-    private String fullName;
     private String projectRole;
     private String position;
     private String status;
@@ -27,4 +25,12 @@ public class ProjectMemberEntity {
     private Long createdBy;
     private Long updatedBy;
     private boolean active;
+
+    // System info from users table (not persisted)
+    private String systemRole;
+    private String email;
+    private String phone;
+    private String tgUsername;
+    private String departmentName;
+    private String userPosition;
 }
