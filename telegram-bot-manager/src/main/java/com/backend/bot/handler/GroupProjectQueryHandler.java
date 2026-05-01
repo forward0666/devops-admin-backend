@@ -156,9 +156,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(getVal(m, "tgUsername", ""))))
                             .map(m -> String.valueOf(getVal(m, "projectRole", "Member")))
                             .findFirst()
-                            .orElse("Member");
+                            .orElse("None");
                 })
-                .onErrorReturn("Member"); // 查询失败按 Member 处理
+                .onErrorReturn("None");
     }
 
     private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
