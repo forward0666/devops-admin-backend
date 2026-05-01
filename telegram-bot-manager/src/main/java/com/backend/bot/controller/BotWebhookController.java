@@ -63,6 +63,7 @@ public class BotWebhookController {
                     .flatMap(isBlacklisted -> {
                         if (Boolean.TRUE.equals(isBlacklisted)) {
                             if (isPrivate) {
+                                log.debug("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
                                 return Mono.empty();
                             }
                             return botCoreService.findByBotName(botName)
