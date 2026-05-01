@@ -73,7 +73,7 @@ public class MiddlewareService {
 
     private void evictMiddlewareCache(Long projectId) {
         try {
-            redisTemplate.delete("bot:middlewares:" + projectId);
+            redisTemplate.delete(redisTemplate.keys("bot:middlewares:" + projectId + ":*"));
         } catch (Exception e) {
             log.warn("清除中间件缓存失败: projectId={}", projectId, e);
         }

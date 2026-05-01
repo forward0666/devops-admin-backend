@@ -70,7 +70,7 @@ public class DomainService {
 
     private void evictDomainCache(Long projectId) {
         try {
-            redisTemplate.delete("bot:domains:" + projectId);
+            redisTemplate.delete(redisTemplate.keys("bot:domains:" + projectId + ":*"));
         } catch (Exception e) {
             log.warn("清除域名缓存失败: projectId={}", projectId, e);
         }

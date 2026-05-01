@@ -216,9 +216,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         if (uri.contains("/projectMember")) {
             cacheKey = "bot:projectMembers:" + binding.getProjectId();
         } else if (uri.contains("/domain/")) {
-            cacheKey = "bot:domains:" + binding.getProjectId();
+            cacheKey = "bot:domains:" + binding.getProjectId() + ":" + role;
         } else {
-            cacheKey = "bot:middlewares:" + binding.getProjectId();
+            cacheKey = "bot:middlewares:" + binding.getProjectId() + ":" + role;
         }
 
         return cacheOrFetch(cacheKey, USER_CACHE_TTL,
