@@ -4,6 +4,7 @@ import com.backend.bot.entity.BotMenuEntity;
 import com.backend.bot.service.BotMenuService;
 import com.backend.bot.util.LogUtils;
 import com.backend.bot.vo.BotMenuVo;
+import lombok.RequiredArgsConstructor;
 import network.HttpResponseUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
