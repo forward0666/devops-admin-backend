@@ -1,6 +1,5 @@
 package com.backend.bot.controller;
 
-import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.dto.SetWebhookDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
@@ -24,7 +23,6 @@ public class BotWebhookConfigController {
 
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
-    private final TelegramProperties telegramProperties;
 
     /**
      * 手动设置 Bot 的 Webhook URL。
@@ -48,14 +46,20 @@ public class BotWebhookConfigController {
                                                 return Mono.just(HttpResponseUtils.badRequest("❌ Bot Token 缺失"));
                                             }
                                             String token = botEntity.getBotToken();
-                                            String url = appendGatewayHeader(dto.getUrl());
-                                            String secretToken = dto.getSecretToken();
+                                            String url = dto.getUrl();
+                                            // 用前端传的 secret 拼接 Gateway header 参数
+                                            String gatewaySecret = dto.getSecretToken();
+                                            if (gatewaySecret != null && !gatewaySecret.isBlank()) {
+                                                String separator = url.contains("?") ? "&" : "?";
+                                                url = url + separator + "header_X-Encrypted-Data=" + gatewaySecret;
+                                            }
+                                            String finalUrl = url;
 
-                                            return botClientService.setWebhook(token, url, secretToken)
+                                            return botClientService.setWebhook(token, finalUrl, null)
                                                     .flatMap(resultJson -> {
                                                         boolean success = resultJson != null && resultJson.contains("\"ok\":true");
                                                         if (success) {
-                                                            botEntity.setWebhookUrl(url);
+                                                            botEntity.setWebhookUrl(finalUrl);
                                                             return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
                                                         } else {
                                                             return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误"));
@@ -165,11 +169,4 @@ public class BotWebhookConfigController {
      * 给 webhook URL 拼接 Gateway BotAuth header 参数
      * Cloudflare 会将 query 参数转为 request header
      */
-    private String appendGatewayHeader(String url) {
-        if (url == null || url.isBlank()) return url;
-        String secret = telegramProperties.getGatewayBotSecret();
-        if (secret == null || secret.isBlank()) return url;
-        String separator = url.contains("?") ? "&" : "?";
-        return url + separator + "header_X-Encrypted-Data=" + secret;
-    }
 }
