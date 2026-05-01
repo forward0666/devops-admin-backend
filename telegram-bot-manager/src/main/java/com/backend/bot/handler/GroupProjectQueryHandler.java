@@ -242,7 +242,29 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     sb.append(title).append("\n");
                     sb.append("项目：").append(binding.getProjectName()).append("\n\n");
 
-                    if (items == null || items.isEmpty()) {
+                    // 域名列表按环境分组
+                    if (items != null && !items.isEmpty() && title.contains("域名")) {
+                        Map<String, List<Map<String, Object>>> grouped = items.stream()
+                                .collect(java.util.stream.Collectors.groupingBy(
+                                        d -> String.valueOf(getVal(d, "env", "其他")),
+                                        java.util.stream.Collectors.toList()
+                                ));
+                        for (Map.Entry<String, List<Map<String, Object>>> entry : grouped.entrySet()) {
+                            sb.append("环境：").append(entry.getKey()).append("\n");
+                            int idx = 1;
+                            for (Map<String, Object> m : entry.getValue()) {
+                                String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
+                                String type = getVal(m, "type", "").toString();
+                                String remark = getVal(m, "remark", "").toString();
+                                sb.append(idx++).append(". ").append(domainName);
+                                sb.append(" ").append(type);
+                                if (!remark.isEmpty()) sb.append("/").append(remark);
+                                sb.append("\n");
+                            }
+                            sb.append("\n");
+                        }
+                        sb.append("共 ").append(items.size()).append(" 条");
+                    } else if (items == null || items.isEmpty()) {
                         sb.append("暂无数据");
                     } else {
                         int idx = 1;
