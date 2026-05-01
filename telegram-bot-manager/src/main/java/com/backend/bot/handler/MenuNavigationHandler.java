@@ -116,7 +116,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                 })
                 .then();
     }
-     /*
+
     private int getDeletionDelay(String callbackData) {
         // 使用统一的菜单删除延迟常量
         return TelegramConstants.MENU_DELETE_DELAY_SECONDS;
