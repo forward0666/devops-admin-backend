@@ -1,14 +1,16 @@
 package com.backend.bot.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
-import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/blacklist")
@@ -17,6 +19,9 @@ import org.springframework.http.ResponseEntity;
 public class BlacklistController {
 
     private final ReactiveStringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final TypeReference<Map<String, String>> STRING_MAP_TYPE = new TypeReference<>() {};
 
     @GetMapping("/list")
     public Mono<ResponseEntity<Map<String, Object>>> list(@RequestParam(required = false) String botName) {
@@ -33,7 +38,8 @@ public class BlacklistController {
                     return redisTemplate.opsForValue().multiGet(keys)
                             .map(values -> {
                                 List<Map<String, Object>> result = new ArrayList<>();
-                                for (String key : keys) {
+                                for (int i = 0; i < keys.size(); i++) {
+                                    String key = keys.get(i);
                                     Map<String, Object> item = new HashMap<>();
                                     String[] parts = key.split(":");
                                     if (parts.length >= 4) {
@@ -41,6 +47,24 @@ public class BlacklistController {
                                         item.put("chatId", parts[3]);
                                     }
                                     item.put("redisKey", key);
+
+                                    // 解析用户信息 JSON
+                                    String raw = values.get(i);
+                                    if (raw != null) {
+                                        try {
+                                            // raw format: "userId=123, username=John, tgUsername=@john, chatId=456"
+                                            // 解析 key=value 格式
+                                            String[] pairs = raw.split(", ");
+                                            for (String pair : pairs) {
+                                                String[] kv = pair.split("=", 2);
+                                                if (kv.length == 2) {
+                                                    item.put(kv[0].trim(), kv[1].trim());
+                                                }
+                                            }
+                                        } catch (Exception e) {
+                                            item.put("userInfo", raw);
+                                        }
+                                    }
                                     result.add(item);
                                 }
                                 return HttpResponseUtils.ok(Map.of("blacklist", result));
