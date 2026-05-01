@@ -15,12 +15,11 @@ public class CallbackConstants {
     public static final String DOMAIN_WHITELIST_ACTION = "callback_data_DOMAIN_WHITELIST_ACTION";
     public static final String FRONTEND_WEB_ACTION = "callback_data_FRONTEND_WEB_DOMAIN_ACTION";
     public static final String FRONTEND_ADMIN_ACTION = "callback_data_FRONTEND_ADMIN_DOMAIN_ACTION";
-//    public static final String MIDDLEWARE_ACTION = "callback_data_MIDDLEWARE_DOMAIN_ACTION";
 
     // --- 用户会话状态常量 (用于 TextUpdateHandler) ---
     /** 等待前台域名 IP 输入 */
     public static final String STATE_AWAITING_FRONTEND_WEB_IP = "AWAITING_FRONTEND_WEB_IP";
     /** 等待后台域名 IP 输入 */
     public static final String STATE_AWAITING_FRONTEND_ADMIN_IP = "AWAITING_FRONTEND_ADMIN_IP";
-//    public static final String STATE_AWAITING_MIDDLEWARE_IP = "AWAITING_MIDDLEWARE_IP";
+
 }

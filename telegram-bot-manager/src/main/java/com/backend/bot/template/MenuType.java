@@ -4,8 +4,8 @@ import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Telegram 键盘模板的工厂类。
- * 负责根据 BotType 查找并实例化正确的模板。
+ * Telegram 键盘模板的工具类。
+ * 提供兜底键盘创建逻辑，当数据库菜单不可用时使用。
  */
 @Slf4j
 public class MenuType {
@@ -25,7 +25,7 @@ public class MenuType {
     }
 
     /**
-     * 硬编码兜底：保留原有逻辑
+     * 硬编码兜底：菜单已迁移到数据库存储，此处返回 null 由调用方处理。
      */
     public static InlineKeyboardMarkupDto createFallbackKeyboard(String inputType) {
         if (inputType == null || inputType.isBlank()) {
@@ -37,24 +37,7 @@ public class MenuType {
                 ? inputType.substring(CALLBACK_PREFIX.length())
                 : inputType;
 
-        MenuTemplate template = switch (keyword.toUpperCase()) {
-            case "IP_WHITE_LIST" -> new IpWhitelistMenu();
-            case "DOMAIN_WHITELIST_ACTION" -> new IpWhitelistSubMenu();
-            case "FRONTEND_WEB_DOMAIN_ACTION", "FRONTEND_ADMIN_DOMAIN_ACTION" -> null;
-            default -> {
-                log.warn("Unknown keyboard keyword encountered: {}", keyword);
-                yield null;
-            }
-        };
-
-        return template != null ? template.createKeyboard() : null;
-    }
-
-    /**
-     * @deprecated 应该使用 createDynamicKeyboard("IP_WHITE_LIST") 替代
-     */
-    @Deprecated
-    public static InlineKeyboardMarkupDto createMainMenu() {
-        return createDynamicKeyboard("IP_WHITE_LIST");
+        log.warn("No fallback keyboard for keyword: {} (menus are now database-driven)", keyword);
+        return null;
     }
 }
