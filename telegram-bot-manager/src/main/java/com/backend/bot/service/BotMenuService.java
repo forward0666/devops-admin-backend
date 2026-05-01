@@ -23,8 +23,6 @@ public class BotMenuService {
     private final BotMenuRepository botMenuRepository;
     private final ObjectMapper objectMapper;
 
-    private static final TypeReference<List<Map<String, String>>> BUTTONS_TYPE = new TypeReference<>() {};
-
     public Flux<BotMenuEntity> findByBotName(String botName) {
         return botMenuRepository.findByBotNameOrderByLevelAndSort(botName);
     }
@@ -73,13 +71,20 @@ public class BotMenuService {
             if (entity.getButtons() == null || entity.getButtons().isBlank()) {
                 return markup;
             }
-            List<Map<String, String>> buttons = objectMapper.readValue(entity.getButtons(), BUTTONS_TYPE);
-            for (Map<String, String> row : buttons) {
-                if (row == null || (row.isEmpty())) {
-                    // 空行 = 分隔线
+            List<List<Map<String, String>>> rows = objectMapper.readValue(entity.getButtons(), new TypeReference<>() {});
+            for (List<Map<String, String>> row : rows) {
+                if (row == null || row.isEmpty()) {
                     markup.addRow();
-                } else if (row.containsKey("text") && row.containsKey("callbackData")) {
-                    markup.addRow(new InlineKeyboardButtonDto(row.get("text"), row.get("callbackData")));
+                } else {
+                    InlineKeyboardButtonDto[] buttons = row.stream()
+                            .filter(b -> b != null && b.containsKey("text") && b.containsKey("callbackData"))
+                            .map(b -> new InlineKeyboardButtonDto(b.get("text"), b.get("callbackData")))
+                            .toArray(InlineKeyboardButtonDto[]::new);
+                    if (buttons.length > 0) {
+                        markup.addRow(buttons);
+                    } else {
+                        markup.addRow();
+                    }
                 }
             }
             return markup;
