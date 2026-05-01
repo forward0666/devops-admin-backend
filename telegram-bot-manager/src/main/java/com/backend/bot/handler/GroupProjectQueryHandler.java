@@ -141,26 +141,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
              return Mono.just("None");
         }
         String membersCacheKey = "bot:projectMembers:" + projectId;
-        Mono<Map<String, Object>> fetchFromRemote = webClient.get()
-                .uri("/projectMember?projectId={projectId}", projectId)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .flatMap(response -> {
-                    try {
-                        return redisTemplate.opsForValue().set(membersCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
-                    } catch (Exception e) {
-                        return Mono.just(response);
-                    }
-                });
-        return redisTemplate.opsForValue().get(membersCacheKey)
-                .flatMap(cached -> {
-                    try {
-                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(fetchFromRemote)
+        return cacheOrFetch(membersCacheKey, USER_CACHE_TTL,
+                webClient.get().uri("/projectMember?projectId={projectId}", projectId).retrieve())
                 .map(response -> {
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
@@ -183,26 +165,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
         log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
         String projectCacheKey = "bot:project:" + binding.getProjectId();
-        Mono<Map<String, Object>> fetchFromRemote = webClient.get()
-                .uri("/project/{id}", binding.getProjectId())
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .flatMap(response -> {
-                    try {
-                        return redisTemplate.opsForValue().set(projectCacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
-                    } catch (Exception e) {
-                        return Mono.just(response);
-                    }
-                });
-        return redisTemplate.opsForValue().get(projectCacheKey)
-                .flatMap(cached -> {
-                    try {
-                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(fetchFromRemote)
+        return cacheOrFetch(projectCacheKey, USER_CACHE_TTL,
+                webClient.get().uri("/project/{id}", binding.getProjectId()).retrieve())
                 .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
                     Object code = project.get("code");
@@ -248,27 +212,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
             cacheKey = "bot:middlewares:" + binding.getProjectId();
         }
 
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(cached -> {
-                    try {
-                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(
-                        webClient.get()
-                                .uri(uri)
-                                .retrieve()
-                                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                                .flatMap(response -> {
-                                    try {
-                                        return redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(response), USER_CACHE_TTL).thenReturn(response);
-                                    } catch (Exception e) {
-                                        return Mono.just(response);
-                                    }
-                                })
-                )
+        return cacheOrFetch(cacheKey, USER_CACHE_TTL,
+                webClient.get().uri(uri).retrieve())
                 .flatMap(response -> {
                     // 检查响应 code
                     Object code = response.get("code");
@@ -356,5 +301,27 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private Object getVal(Map<String, Object> data, String key, Object defaultVal) {
         Object val = data.get(key);
         return (val != null) ? val : defaultVal;
+    }
+
+    private Mono<Map<String, Object>> cacheOrFetch(String cacheKey, Duration ttl,
+                                                      WebClient.ResponseSpec responseSpec) {
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
+                    } catch (Exception e) {
+                        return Mono.<Map<String, Object>>empty();
+                    }
+                })
+                .switchIfEmpty(
+                        responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                                .flatMap(response -> {
+                                    try {
+                                        return redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(response), ttl).thenReturn(response);
+                                    } catch (Exception e) {
+                                        return Mono.just(response);
+                                    }
+                                })
+                );
     }
 }
