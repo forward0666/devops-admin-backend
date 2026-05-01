@@ -64,20 +64,21 @@ public class BotWebhookController {
                         if (Boolean.TRUE.equals(isBlacklisted)) {
                             if (isPrivate) {
                                 log.debug("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
-                                final Long msgId = extractMessageId(botUpdate);
-                                return botCoreService.findByBotName(botName)
-                                        .flatMap(bot -> {
-                                            if (msgId != null) {
-                                                return botClientService.deleteMessage(bot.getBotToken(), chatId, msgId);
-                                            }
-                                            return Mono.empty();
-                                        });
+                                return Mono.empty();
                             }
                             return botCoreService.findByBotName(botName)
-                                    .flatMap(bot -> botClientService.sendMessage(
-                                            bot.getBotToken(), chatId,
-                                            "⚠️ 您已在黑名单中，无法使用该 Bot。\n如需解封请联系管理员。"
-                                    ))
+                                    .flatMap(bot -> {
+                                        final Long msgId = extractMessageId(botUpdate);
+                                        // 先发黑名单提示，再删用户消息
+                                        Mono<Void> sendWarning = botClientService.sendMessage(
+                                                bot.getBotToken(), chatId,
+                                                "⚠️ 您已在黑名单中，无法使用该 Bot。\n如需解封请联系管理员。"
+                                        );
+                                        Mono<Void> deleteMsg = msgId != null
+                                                ? botClientService.deleteMessage(bot.getBotToken(), chatId, msgId)
+                                                : Mono.empty();
+                                        return sendWarning.then(deleteMsg);
+                                    })
                                     .then(Mono.empty());
                         }
                         return LogUtils.processWebhookUpdateAndPublishEvent(
