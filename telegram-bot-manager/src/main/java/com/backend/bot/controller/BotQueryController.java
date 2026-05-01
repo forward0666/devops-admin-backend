@@ -123,6 +123,7 @@ public class BotQueryController {
                     if (status != null) {
                         bot.setStatus(status);
                     }
+                    bot.setUpdatedAt(java.time.LocalDateTime.now());
                     return botCoreService.saveBot(bot)
                             .map(saved -> {
                                 Map<String, Object> data = new HashMap<>();

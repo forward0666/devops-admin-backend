@@ -158,6 +158,7 @@ public class BotCoreService {
             vo.setId(botEntity.getId());
             vo.setBotName(botEntity.getBotName());
             vo.setBotUsername(botEntity.getBotUsername());
+            vo.setBotType(botEntity.getBotType() != null ? botEntity.getBotType().getDbValue() : null);
             vo.setStatus(botEntity.getStatus());
             vo.setCreatedAt(botEntity.getCreatedAt());
         }

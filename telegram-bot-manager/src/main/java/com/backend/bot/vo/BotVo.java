@@ -9,6 +9,7 @@ public class BotVo {
     private Long id;
     private String botName;
     private String botUsername;
+    private String botType;
     private LocalDateTime createdAt;
     private Integer status;
 
