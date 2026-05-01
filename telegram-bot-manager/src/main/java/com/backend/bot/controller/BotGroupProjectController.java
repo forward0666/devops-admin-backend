@@ -37,6 +37,20 @@ public class BotGroupProjectController {
                 .map(saved -> HttpResponseUtils.ok(Map.of("groupProject", BotGroupProjectVo.fromEntity(saved))));
     }
 
+    @PutMapping("/{id}")
+    public Mono<ResponseEntity<Map<String, Object>>> update(@PathVariable Long id, @RequestBody BotGroupProjectEntity entity) {
+        return botGroupProjectRepository.findById(id)
+                .flatMap(existing -> {
+                    existing.setChatTitle(entity.getChatTitle());
+                    existing.setProjectId(entity.getProjectId());
+                    existing.setProjectName(entity.getProjectName());
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    return botGroupProjectRepository.save(existing);
+                })
+                .map(saved -> HttpResponseUtils.ok(Map.of("groupProject", BotGroupProjectVo.fromEntity(saved))))
+                .defaultIfEmpty(HttpResponseUtils.notFound("Not found: " + id));
+    }
+
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<Map<String, Object>>> delete(@PathVariable Long id) {
         return botGroupProjectRepository.findById(id)
