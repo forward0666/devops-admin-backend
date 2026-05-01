@@ -31,7 +31,6 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private final BotGroupProjectRepository botGroupProjectRepository;
     private final BotClientService botClientService;
     private final WebClient.Builder webClientBuilder;
-    private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
