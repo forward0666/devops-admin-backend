@@ -257,8 +257,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
                                 sb.append(idx++).append(". ").append(domainName);
-                                sb.append(" ").append(type);
-                                if (!remark.isEmpty()) sb.append("/").append(remark);
+                                sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
                             sb.append("\n");
