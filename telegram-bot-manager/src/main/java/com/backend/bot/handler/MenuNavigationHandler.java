@@ -1,6 +1,5 @@
 package com.backend.bot.handler;
 
-import com.backend.bot.constants.CallbackConstants;
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
@@ -116,32 +115,8 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                     return Mono.empty();
                 })
                 .then();
-
-    /**
-     * 根据回调数据返回菜单的标题。
-     */
-    private String getMenuTitle(String callbackData) {
-        // 检查是否是进入二级菜单
-        if (callbackData.equals(CallbackConstants.DOMAIN_WHITELIST_ACTION)) {
-            return "域名加白";
-        }
-
-        // 检查是否是返回操作，并尝试返回主菜单标题
-        // 假设 IP_WHITE_LIST 是主菜单的导航标识
-        if (callbackData.contains("IP_WHITE_LIST")) {
-            return "主菜单";
-        }
-
-        // 尝试从回调数据中提取一个有意义的部分作为标题
-        String keyword = callbackData.replace("callback_data_", "").replace("_ACTION", "");
-        // 优化：替换下划线为空格并首字母大写，使其更具可读性
-        return keyword.replace('_', ' ').toLowerCase();
     }
-
-    /**
-     * 统一返回菜单的销毁延迟时间。
-     * 假设 TelegramConstants.MENU_DELETE_DELAY_SECONDS 是一个 int 类型的常量。
-     */
+     /*
     private int getDeletionDelay(String callbackData) {
         // 使用统一的菜单删除延迟常量
         return TelegramConstants.MENU_DELETE_DELAY_SECONDS;
