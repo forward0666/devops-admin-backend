@@ -24,6 +24,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
 
     private final BotClientService botClientService;
     private final UserSessionService userSessionService;
+    private final InteractiveMessageService interactiveMessageService;
     private final List<CallbackActionHandler> actionHandlers;
 
 
@@ -102,9 +103,14 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         String token = context.token();
         Long chatId = context.chatId();
         
-        // 1. 取消待删除任务
-        Mono<Void> cancelTimerMono = userSessionService.cancelPendingDeletion(userId)
-                .doOnSuccess(v -> log.debug("{}✅ User {} interaction detected. Canceled pending menu deletion timer.", logPrefix, userId))
+        // 1. 重置删除计时器（取消旧的，重新开始5秒倒计时）
+        Long messageId = context.messageId();
+        int delaySeconds = com.backend.bot.constants.TelegramConstants.MENU_DELETE_DELAY_SECONDS;
+        Mono<Void> resetTimerMono = userSessionService.cancelPendingDeletion(userId)
+                .then(messageId != null ? interactiveMessageService.scheduleMessageDeletion(
+                        token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
+                ).contextWrite(contextView) : Mono.empty())
+                .doOnSuccess(v -> log.debug("{}✅ User {} interaction detected. Reset deletion timer to {}s.", logPrefix, userId, delaySeconds))
                 .onErrorResume(e -> Mono.empty());
         
         // 2. 回答回调查询 - 不显示加载提示，直接处理
@@ -128,8 +134,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     return handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView);
                 });
         
-        // 按顺序执行：取消计时器 -> 执行处理器
-        return cancelTimerMono.then(handlerMono);
+        // 按顺序执行：重置计时器 -> 执行处理器
+        return resetTimerMono.then(handlerMono);
     }
     
     private Mono<Void> processCallbackWithoutCancel(HandlerContext context, String logPrefix, ContextView contextView, 
