@@ -54,37 +54,42 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         Long messageId = ctx.messageId();
         String botName = ctx.botName();
         String callbackData = botUpdate.callbackQuery().data();
+        String action = callbackData.replace("callback_data_", "");
+        String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
+                ? botUpdate.callbackQuery().from().username() : null;
 
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            log.info("{}🔍 GroupProjectQueryHandler: callbackData={}, chatId={}, botName={}", traceLogPrefix, callbackData, chatId, botName);
+            log.info("{}🔍 GroupProjectQueryHandler: action={}, chatId={}, botName={}, tgUsername={}", traceLogPrefix, action, chatId, botName, tgUsername);
 
-            String action = callbackData.replace("callback_data_", "");
-        return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+            return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
                     .doOnNext(b -> log.info("{}🔍 Found binding: projectId={}, projectName={}", traceLogPrefix, b.getProjectId(), b.getProjectName()))
                     .switchIfEmpty(Mono.defer(() -> {
                         log.warn("{}⚠️ No group-project binding found for bot={}, chatId={}", traceLogPrefix, botName, chatId);
                         return Mono.empty();
-                }))
+                    }))
                     .flatMap(binding -> {
                         if (binding.getProjectId() == null) {
                             return replyNoBinding(token, chatId, messageId);
                         }
 
-        String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
-                ? botUpdate.callbackQuery().from().username() : null;
-        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL)
-                .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
-                .build();
+                        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL)
+                                .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
+                                .build();
 
-                        return switch (action) {
-                            case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
-                            case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", traceLogPrefix);
-                            case PROJECT_DOMAIN_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🌐 域名列表", traceLogPrefix);
-                            case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, binding, "/middleware/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🔧 中间件列表", traceLogPrefix);
-                            default -> Mono.empty();
-                        };
+                        // 先查 TG 用户的 project role
+                        return resolveUserRole(webClient, binding.getProjectId(), tgUsername, traceLogPrefix)
+                                .flatMap(role -> {
+                                    log.info("{}🔍 Resolved role: {} for tgUsername={}", traceLogPrefix, role, tgUsername);
+                                    return switch (action) {
+                                        case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
+                                        case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", null, traceLogPrefix);
+                                        case PROJECT_DOMAIN_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🌐 域名列表", role, traceLogPrefix);
+                                        case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, binding, "/middleware/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🔧 中间件列表", role, traceLogPrefix);
+                                        default -> Mono.empty();
+                                    };
+                                });
                     })
                     .switchIfEmpty(Mono.defer(() -> replyNoBinding(token, chatId, messageId)))
                     .onErrorResume(e -> {
@@ -95,9 +100,35 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         });
     }
 
+    /**
+     * 查询 TG 用户在项目中的角色
+     * 通过 projectMember 接口获取成员列表，匹配 username
+     */
+    private Mono<String> resolveUserRole(WebClient webClient, Long projectId, String tgUsername, String traceLogPrefix) {
+        if (tgUsername == null || tgUsername.isBlank()) {
+            return Mono.just("Member"); // 未知用户按 Member 处理
+        }
+        return webClient.get()
+                .uri("/projectMember?projectId={projectId}", projectId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .map(response -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> members = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : List.of();
+                    return members.stream()
+                            .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("username", ""))))
+                            .map(m -> String.valueOf(m.getOrDefault("projectRole", "Member")))
+                            .findFirst()
+                            .orElse("Member");
+                })
+                .onErrorReturn("Member"); // 查询失败按 Member 处理
+    }
+
     private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
-        log.info("{}🔍 Fetching project info: projectId={}, url={}/project/{}", traceLogPrefix, binding.getProjectId(), USER_SERVICE_URL, binding.getProjectId());
+        log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
         return webClient.get()
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
@@ -124,8 +155,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> fetchList(WebClient webClient, BotGroupProjectEntity binding, String uri,
-                                  String token, Long chatId, Long messageId, String title, String traceLogPrefix) {
-        log.info("{}🔍 Fetching list: title={}, url={}{}", traceLogPrefix, title, USER_SERVICE_URL, uri);
+                                  String token, Long chatId, Long messageId, String title, String role, String traceLogPrefix) {
+        log.info("{}🔍 Fetching list: title={}, role={}", traceLogPrefix, title, role);
         return webClient.get()
                 .uri(uri)
                 .retrieve()
@@ -133,20 +164,23 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .flatMap(response -> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
-                    List<?> items = res.containsKey("data") ? (List<?>) res.get("data") : (res instanceof List ? (List<?>) res : List.of());
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> items = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : (res instanceof List ? (List<Map<String, Object>>) res : List.of());
+
+                    // 跟前端一样的角色过滤
+                    if ("Member".equals(role) && items != null && !items.isEmpty()) {
+                        items = applyMemberFilter(items, title);
+                    }
 
                     StringBuilder sb = new StringBuilder();
                     sb.append(title).append("\n");
                     sb.append("项目：").append(binding.getProjectName()).append("\n\n");
 
-                    if (items.isEmpty()) {
+                    if (items == null || items.isEmpty()) {
                         sb.append("暂无数据");
                     } else {
                         int idx = 1;
-                        for (Object item : items) {
-                            if (!(item instanceof Map)) continue;
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> m = (Map<String, Object>) item;
+                        for (Map<String, Object> m : items) {
                             sb.append(idx++).append(". ");
                             if (m.containsKey("domainName")) {
                                 sb.append(m.get("domainName"));
@@ -170,6 +204,27 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     log.warn("{}⚠️ Failed to fetch {}: {}", traceLogPrefix, title, e.getMessage());
                     return replyText(token, chatId, messageId, "⚠️ 查询失败：" + e.getMessage());
                 });
+    }
+
+    /**
+     * Member 角色过滤：跟前端逻辑一致
+     * 域名：prod 环境只显示 web 类型
+     * 中间件：隐藏 prod 环境
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> applyMemberFilter(List<Map<String, Object>> items, String title) {
+        if (title.contains("域名")) {
+            // Member: prod 环境只显示 web 类型
+            return items.stream()
+                    .filter(d -> !"prod".equals(String.valueOf(d.getOrDefault("env", ""))) || "web".equals(String.valueOf(d.getOrDefault("type", ""))))
+                    .toList();
+        } else if (title.contains("中间件")) {
+            // Member: 隐藏 prod 环境
+            return items.stream()
+                    .filter(m -> !"prod".equals(String.valueOf(m.getOrDefault("env", ""))))
+                    .toList();
+        }
+        return items;
     }
 
     private Mono<Void> replyText(String token, Long chatId, Long messageId, String text) {
