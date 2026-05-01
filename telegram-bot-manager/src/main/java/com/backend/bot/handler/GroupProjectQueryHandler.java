@@ -36,7 +36,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private static final Duration GP_CACHE_TTL = Duration.ofSeconds(300);
     private static final Duration USER_CACHE_TTL = Duration.ofSeconds(60);
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE = new ParameterizedTypeReference<>() {};
+    private static final TypeReference<Map<String, Object>> JACKSON_MAP_TYPE = new TypeReference<>() {};
 
     private static final String PROJECT_INFO_ACTION = "PROJECT_INFO_ACTION";
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
@@ -155,7 +155,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return redisTemplate.opsForValue().get(membersCacheKey)
                 .flatMap(cached -> {
                     try {
-                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
                     } catch (Exception e) {
                         return Mono.empty();
                     }
@@ -197,7 +197,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return redisTemplate.opsForValue().get(projectCacheKey)
                 .flatMap(cached -> {
                     try {
-                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
                     } catch (Exception e) {
                         return Mono.empty();
                     }
@@ -251,7 +251,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return redisTemplate.opsForValue().get(cacheKey)
                 .flatMap(cached -> {
                     try {
-                        return Mono.just(objectMapper.readValue(cached, MAP_TYPE));
+                        return Mono.just(objectMapper.readValue(cached, JACKSON_MAP_TYPE));
                     } catch (Exception e) {
                         return Mono.empty();
                     }
