@@ -24,7 +24,7 @@ public record ProjectMemberVo(
     public static ProjectMemberVo fromEntity(ProjectMemberEntity member) {
         return new ProjectMemberVo(
             member.getId(), member.getProjectId(), member.getUserId(),
-            member.getUsername(), member.getFullName(), member.getProjectRole(),
+            null, null, member.getProjectRole(),
             member.getPosition(), member.getStatus(), member.getSystemRole(),
             member.getEmail(), member.getPhone(), member.getTgUsername(),
             member.getDepartmentName(), member.getUserPosition(),
