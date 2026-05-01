@@ -127,7 +127,6 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                     };
                                 });
                     })
-                    .switchIfEmpty(Mono.defer(() -> replyNoBinding(token, chatId, messageId)))
                     .onErrorResume(e -> {
                         log.error("{}❌ GroupProjectQueryHandler error: {}", traceLogPrefix, e.getMessage(), e);
                         return botClientService.sendMessage(token, chatId, "⚠️ 查询失败，请稍后再试。", null).then();
