@@ -64,7 +64,14 @@ public class BotWebhookController {
                         if (Boolean.TRUE.equals(isBlacklisted)) {
                             if (isPrivate) {
                                 log.debug("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
-                                return Mono.empty();
+                                final Long msgId = extractMessageId(botUpdate);
+                                return botCoreService.findByBotName(botName)
+                                        .flatMap(bot -> {
+                                            if (msgId != null) {
+                                                return botClientService.deleteMessage(bot.getBotToken(), chatId, msgId);
+                                            }
+                                            return Mono.empty();
+                                        });
                             }
                             return botCoreService.findByBotName(botName)
                                     .flatMap(bot -> botClientService.sendMessage(
@@ -78,5 +85,11 @@ public class BotWebhookController {
                         );
                     });
         }).doFinally(LogUtils::clearMDC);
+    }
+
+    private Long extractMessageId(BotUpdateDto update) {
+        if (update.message() != null) return update.message().messageId();
+        if (update.callbackQuery() != null) return update.callbackQuery().message().messageId();
+        return null;
     }
 }
