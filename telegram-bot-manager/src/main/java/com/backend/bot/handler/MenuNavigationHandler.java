@@ -39,10 +39,10 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     @Override
     public boolean supports(String callbackData) {
         if (callbackData == null) return false;
-        // 先检查硬编码是否能返回键盘
+        // 支持 fallback 硬编码
         if (MenuType.createFallbackKeyboard(callbackData) != null) return true;
-        // 其他 callback_data_ 可能在数据库中有菜单，但这里保守起见只支持硬编码
-        // 数据库菜单的匹配会在 handle() 中处理
+        // 支持数据库中的菜单（callback_data_ 前缀的都可能是菜单导航）
+        if (callbackData.startsWith("callback_data_")) return true;
         return false;
     }
 
@@ -83,34 +83,39 @@ public class MenuNavigationHandler implements CallbackActionHandler {
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            // 先从数据库查，查不到用硬编码
-            Mono<InlineKeyboardMarkupDto> keyboardMono = botMenuService.findKeyboardByBotNameAndMenuKey(context.botName(), menuKey)
-                    .defaultIfEmpty(fallbackMarkup);
-
-            return keyboardMono.flatMap(newMarkup -> {
-                if (newMarkup == null) return Mono.empty();
-                return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
-                    .doOnSuccess(response -> {
-                        // 5. 重新调度删除任务
-                        interactiveMessageService.scheduleMessageDeletion(
-                                token,
-                                userId,
-                                chatId,
-                                messageId,
-                                delaySeconds,
-                                logIdentifier,
-                                contextView
-                        ).subscribe();
+            // 先从数据库查
+            return botMenuService.findKeyboardByBotNameAndMenuKey(context.botName(), menuKey)
+                    .flatMap(newMarkup -> {
+                        if (newMarkup == null || newMarkup.isEmpty()) return Mono.empty();
+                        return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
                     })
-                    .onErrorResume(e -> {
-                        log.warn("{}⚠️ Non-400 error occurred during message edit (ID: {}). Reason: {}. Not sending new message.",
-                                traceLogPrefix, messageId, e.getMessage());
-                        return Mono.empty();
-                    })
-                    .then();
-            });
+                    // DB 查不到 → 试试 fallback 硬编码
+                    .switchIfEmpty(Mono.defer(() -> {
+                        if (fallbackMarkup != null && !fallbackMarkup.isEmpty()) {
+                            return editWithKeyboard(token, chatId, messageId, menuText, fallbackMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
+                        }
+                        // 都没有 → 不是菜单导航，返回 Mono.error 让后续 handler 处理
+                        return Mono.error(new UnsupportedOperationException("Not a menu navigation callback"));
+                    }))
+                    // 不是菜单导航，静默跳过
+                    .onErrorResume(UnsupportedOperationException.class, e -> Mono.empty());
         });
     }
+
+    private Mono<Void> editWithKeyboard(String token, Long chatId, Long messageId, String menuText,
+                                          InlineKeyboardMarkupDto newMarkup, Long userId, String logIdentifier,
+                                          int delaySeconds, ContextView contextView, String traceLogPrefix) {
+        return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
+                .doOnSuccess(response -> {
+                    interactiveMessageService.scheduleMessageDeletion(
+                            token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
+                    ).subscribe();
+                })
+                .onErrorResume(e -> {
+                    log.warn("{}⚠️ Non-400 error during message edit (ID: {}). Reason: {}.", traceLogPrefix, messageId, e.getMessage());
+                    return Mono.empty();
+                })
+                .then();
 
     /**
      * 根据回调数据返回菜单的标题。
