@@ -148,10 +148,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
                     StringBuilder sb = new StringBuilder();
                     sb.append("📋 *项目信息*\n\n");
-                    sb.append("项目名称：").append(data.getOrDefault("projectName", binding.getProjectName())).append("\n");
+                    sb.append("项目名称：").append(data.getOrDefault("name", binding.getProjectName())).append("\n");
+                    sb.append("类型：").append(data.getOrDefault("type", "暂无")).append("\n");
                     sb.append("项目描述：").append(data.getOrDefault("description", "暂无")).append("\n");
                     sb.append("技术栈：").append(data.getOrDefault("techStack", "暂无")).append("\n");
                     sb.append("状态：").append(data.getOrDefault("status", "未知")).append("\n");
+                    sb.append("进度：").append(data.getOrDefault("progress", 0)).append("%\n");
                     sb.append("创建时间：").append(data.getOrDefault("createdAt", "暂无")).append("\n");
 
                     return replyText(token, chatId, messageId, sb.toString());
