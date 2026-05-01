@@ -146,7 +146,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .map(response -> {
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
-                        return "Member";
+                        return "None";
                     }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
