@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/blacklist")
@@ -18,7 +19,7 @@ public class BlacklistController {
     private final ReactiveStringRedisTemplate redisTemplate;
 
     @GetMapping("/list")
-    public Mono<Map<String, Object>> list(@RequestParam(required = false) String botName) {
+    public Mono<ResponseEntity<Map<String, Object>>> list(@RequestParam(required = false) String botName) {
         String pattern = botName != null && !botName.isBlank()
                 ? "bot:blacklist:" + botName + ":*"
                 : "bot:blacklist:*";
@@ -48,7 +49,7 @@ public class BlacklistController {
     }
 
     @DeleteMapping("/remove")
-    public Mono<Map<String, Object>> remove(@RequestParam String botName, @RequestParam String chatId) {
+    public Mono<ResponseEntity<Map<String, Object>>> remove(@RequestParam String botName, @RequestParam String chatId) {
         String key = "bot:blacklist:" + botName + ":" + chatId;
         return redisTemplate.delete(key)
                 .map(deleted -> {
