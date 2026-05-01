@@ -121,7 +121,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> members = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : List.of();
                     return members.stream()
-                            .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("username", ""))))
+                            .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("tgUsername", ""))))
                             .map(m -> String.valueOf(m.getOrDefault("projectRole", "Member")))
                             .findFirst()
                             .orElse("Member");
@@ -172,6 +172,11 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .retrieve()
                 .bodyToMono(Map.class)
                 .flatMap(response -> {
+                    // 检查响应 code
+                    Object code = response.get("code");
+                    if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
+                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + response.getOrDefault("message", "未知错误"));
+                    }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
                     @SuppressWarnings("unchecked")
@@ -193,13 +198,16 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         for (Map<String, Object> m : items) {
                             sb.append(idx++).append(". ");
                             if (m.containsKey("domainName")) {
-                                sb.append(m.get("domainName"));
-                                if (m.containsKey("ip")) sb.append(" (").append(m.get("ip")).append(")");
+                                sb.append(getVal(m, "domainName", ""));
+                                if (m.containsKey("ip")) sb.append(" (").append(getVal(m, "ip", "")).append(")");
                             } else if (m.containsKey("name")) {
-                                sb.append(m.get("name"));
+                                sb.append(getVal(m, "name", ""));
+                                if (m.containsKey("type")) sb.append(" [").append(getVal(m, "type", "")).append("]");
+                                if (m.containsKey("env")) sb.append(" (").append(getVal(m, "env", "")).append(")");
                             } else if (m.containsKey("username")) {
-                                sb.append(m.get("username"));
-                                if (m.containsKey("projectRole")) sb.append(" [").append(m.get("projectRole")).append("]");
+                                sb.append(getVal(m, "username", ""));
+                                if (m.containsKey("fullName")) sb.append(" (").append(getVal(m, "fullName", "")).append(")");
+                                if (m.containsKey("projectRole")) sb.append(" [").append(getVal(m, "projectRole", "")).append("]");
                             } else {
                                 sb.append(m.toString());
                             }
@@ -226,12 +234,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         if (title.contains("域名")) {
             // Member: prod 环境只显示 web 类型
             return items.stream()
-                    .filter(d -> !"prod".equals(String.valueOf(d.getOrDefault("env", ""))) || "web".equals(String.valueOf(d.getOrDefault("type", ""))))
+                    .filter(d -> !"prod".equals(String.valueOf(getVal(d, "env", ""))) || "web".equals(String.valueOf(getVal(d, "type", ""))))
                     .toList();
         } else if (title.contains("中间件")) {
             // Member: 隐藏 prod 环境
             return items.stream()
-                    .filter(m -> !"prod".equals(String.valueOf(m.getOrDefault("env", ""))))
+                    .filter(m -> !"prod".equals(String.valueOf(getVal(m, "env", ""))))
                     .toList();
         }
         return items;
