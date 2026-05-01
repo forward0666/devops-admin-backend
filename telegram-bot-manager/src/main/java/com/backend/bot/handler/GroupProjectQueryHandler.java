@@ -96,8 +96,6 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
         log.info("{}🔍 Fetching project info: projectId={}, url={}/project/{}", traceLogPrefix, binding.getProjectId(), USER_SERVICE_URL, binding.getProjectId());
         return webClient.get()
-                                           String token, Long chatId, Long messageId, String traceLogPrefix) {
-        return webClient.get()
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
                 .bodyToMono(Map.class)
