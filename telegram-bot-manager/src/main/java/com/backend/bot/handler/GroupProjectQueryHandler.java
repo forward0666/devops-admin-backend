@@ -116,13 +116,17 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .retrieve()
                 .bodyToMono(Map.class)
                 .map(response -> {
+                    Object code = response.get("code");
+                    if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
+                        return "Member";
+                    }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> members = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : List.of();
                     return members.stream()
-                            .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("tgUsername", ""))))
-                            .map(m -> String.valueOf(m.getOrDefault("projectRole", "Member")))
+                            .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(getVal(m, "tgUsername", ""))))
+                            .map(m -> String.valueOf(getVal(m, "projectRole", "Member")))
                             .findFirst()
                             .orElse("Member");
                 })
@@ -138,6 +142,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .bodyToMono(Map.class)
                 .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
+                    Object code = project.get("code");
+                    if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
+                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + project.getOrDefault("message", "未知错误"));
+                    }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> data = project.containsKey("data") ? (Map<String, Object>) project.get("data") : project;
 
