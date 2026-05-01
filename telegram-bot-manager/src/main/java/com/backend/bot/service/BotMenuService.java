@@ -8,10 +8,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +24,9 @@ public class BotMenuService {
 
     private final BotMenuRepository botMenuRepository;
     private final ObjectMapper objectMapper;
+    private final ReactiveStringRedisTemplate redisTemplate;
+
+    private static final Duration MENU_CACHE_TTL = Duration.ofSeconds(300);
 
     public Flux<BotMenuEntity> findByBotName(String botName) {
         return botMenuRepository.findByBotNameOrderByLevelAndSort(botName);
@@ -32,11 +37,15 @@ public class BotMenuService {
     }
 
     public Mono<BotMenuEntity> save(BotMenuEntity entity) {
-        return botMenuRepository.save(entity);
+        return botMenuRepository.save(entity)
+                .doOnNext(saved -> evictMenuCache(saved.getBotName()));
     }
 
     public Mono<Void> deleteById(Long id) {
-        return botMenuRepository.deleteById(id);
+        return botMenuRepository.findById(id)
+                .flatMap(e -> botMenuRepository.deleteById(id).then(Mono.just(e)))
+                .doOnNext(e -> evictMenuCache(e.getBotName()))
+                .then();
     }
 
     /**
@@ -44,25 +53,85 @@ public class BotMenuService {
      * 用于 MenuType.createDynamicKeyboard() 的数据库查询
      */
     public Mono<InlineKeyboardMarkupDto> findKeyboardByBotNameAndMenuKey(String botName, String menuKey) {
-        return botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
-                .map(this::entityToKeyboard)
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.debug("No menu found in DB for bot={} menuKey={}, will use fallback", botName, menuKey);
-                    return Mono.empty();
-                }));
+        String cacheKey = "bot:menu:" + botName + ":key:" + menuKey;
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        InlineKeyboardMarkupDto markup = objectMapper.readValue(cached, InlineKeyboardMarkupDto.class);
+                        log.debug("Cache hit for key={}", cacheKey);
+                        return Mono.just(markup);
+                    } catch (Exception e) {
+                        log.warn("Cache deserialization failed for key={}, will query DB", cacheKey);
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() ->
+                        botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
+                                .next()
+                                .map(this::entityToKeyboard)
+                                .doOnNext(markup -> {
+                                    try {
+                                        String json = objectMapper.writeValueAsString(markup);
+                                        redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
+                                    } catch (Exception e) {
+                                        log.warn("Failed to cache menu key={}", cacheKey, e);
+                                    }
+                                })
+                                .switchIfEmpty(Mono.defer(() -> {
+                                    log.debug("No menu found in DB for bot={} menuKey={}, will use fallback", botName, menuKey);
+                                    return Mono.empty();
+                                }))
+                ));
     }
 
     /**
      * 根据 botName + menuLevel 查找主菜单（level=1）的第一个菜单并转换
      */
     public Mono<InlineKeyboardMarkupDto> findMainMenuByBotName(String botName, int menuLevel) {
-        return botMenuRepository.findByBotNameAndMenuLevel(botName, menuLevel)
-                .next()
-                .map(this::entityToKeyboard)
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.debug("No main menu found in DB for bot={} level={}, will use fallback", botName, menuLevel);
-                    return Mono.empty();
-                }));
+        String cacheKey = "bot:menu:" + botName + ":main:" + menuLevel;
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        InlineKeyboardMarkupDto markup = objectMapper.readValue(cached, InlineKeyboardMarkupDto.class);
+                        log.debug("Cache hit for key={}", cacheKey);
+                        return Mono.just(markup);
+                    } catch (Exception e) {
+                        log.warn("Cache deserialization failed for key={}, will query DB", cacheKey);
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() ->
+                        botMenuRepository.findByBotNameAndMenuLevel(botName, menuLevel)
+                                .next()
+                                .map(this::entityToKeyboard)
+                                .doOnNext(markup -> {
+                                    try {
+                                        String json = objectMapper.writeValueAsString(markup);
+                                        redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
+                                    } catch (Exception e) {
+                                        log.warn("Failed to cache menu key={}", cacheKey, e);
+                                    }
+                                })
+                                .switchIfEmpty(Mono.defer(() -> {
+                                    log.debug("No main menu found in DB for bot={} level={}, will use fallback", botName, menuLevel);
+                                    return Mono.empty();
+                                }))
+                ));
+    }
+
+    /**
+     * 清除指定 botName 的所有菜单缓存
+     */
+    public Mono<Void> deleteCacheByBotName(String botName) {
+        return redisTemplate.keys("bot:menu:" + botName + ":*")
+                .flatMap(redisTemplate::delete)
+                .then();
+    }
+
+    private void evictMenuCache(String botName) {
+        redisTemplate.keys("bot:menu:" + botName + ":*")
+                .flatMap(redisTemplate::delete)
+                .subscribe();
     }
 
     private InlineKeyboardMarkupDto entityToKeyboard(BotMenuEntity entity) {

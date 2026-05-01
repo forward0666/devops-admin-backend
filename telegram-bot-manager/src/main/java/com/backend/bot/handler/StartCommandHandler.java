@@ -117,22 +117,24 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         Long chatId = context.chatId();
         Long userId = context.userId();
 
-        // 先设置正在处理/start的状态，防止重复点击
-        return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
-                .then(Mono.defer(() -> {
-                    return botMenuService.findMainMenuByBotName(context.botName(), 1)
-                            .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
-                            .filter(markup -> markup != null)
-                            .flatMap(mainMenuMarkup ->
-                                    botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
-                            )
-                            .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
-                            .doOnError(e -> {
-                                log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
-                                userSessionService.clearUserSession(userId).contextWrite(reactor.util.context.Context.of(contextView)).subscribe();
-                            })
-                            .then();
-                }));
+        // 并行：设置 session + 查询菜单
+        return Mono.zip(
+                userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null),
+                botMenuService.findMainMenuByBotName(context.botName(), 1)
+                        .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
+        ).flatMap(tuple -> {
+            InlineKeyboardMarkupDto mainMenuMarkup = tuple.getT2();
+            if (mainMenuMarkup == null) {
+                return Mono.empty();
+            }
+            return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
+                    .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
+                    .doOnError(e -> {
+                        log.error("{}❌ Failed to send initial menu message.", logPrefix, e);
+                        userSessionService.clearUserSession(userId).contextWrite(reactor.util.context.Context.of(contextView)).subscribe();
+                    })
+                    .then();
+        });
     }
 
     /**

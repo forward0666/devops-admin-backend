@@ -53,12 +53,12 @@ public class BotMenuController {
                         if (e.getSortOrder() == null) e.setSortOrder(0);
                     })
                     .flatMap(botMenuService::save)
-                    .map(saved -> {
+                    .flatMap(saved -> {
                         Map<String, Object> data = new HashMap<>();
                         data.put("menu", BotMenuVo.fromEntity(saved));
-                        return data;
-                    })
-                    .flatMap(data -> Mono.just(ResponseEntity.status(201).body(data)));
+                        return botMenuService.deleteCacheByBotName(saved.getBotName())
+                                .thenReturn(ResponseEntity.status(201).body(data));
+                    });
         }).doFinally(LogUtils::clearMDC);
     }
 
@@ -79,7 +79,8 @@ public class BotMenuController {
                         return existing;
                     }))
                     .flatMap(botMenuService::save)
-                    .map(saved -> HttpResponseUtils.ok(Map.of("menu", BotMenuVo.fromEntity(saved))))
+                    .flatMap(saved -> botMenuService.deleteCacheByBotName(saved.getBotName())
+                            .thenReturn(HttpResponseUtils.ok(Map.of("menu", BotMenuVo.fromEntity(saved)))))
                     .defaultIfEmpty(HttpResponseUtils.badRequest("Menu not found"));
         }).doFinally(LogUtils::clearMDC);
     }
@@ -90,7 +91,8 @@ public class BotMenuController {
             LogUtils.syncTraceIdToMDC(ctx);
             return botMenuService.findById(id)
                     .flatMap(existing -> botMenuService.deleteById(id).thenReturn(existing))
-                    .map(deleted -> HttpResponseUtils.ok(Map.of()))
+                    .flatMap(deleted -> botMenuService.deleteCacheByBotName(deleted.getBotName())
+                            .thenReturn(HttpResponseUtils.ok(Map.of())))
                     .defaultIfEmpty(HttpResponseUtils.badRequest("Menu not found"));
         }).doFinally(LogUtils::clearMDC);
     }
