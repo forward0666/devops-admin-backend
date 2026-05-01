@@ -19,6 +19,10 @@ public class ProjectMemberEntity {
     private String projectRole;
     private String position;
     private String status;
+    @org.springframework.data.annotation.Transient
+    private String username;
+    @org.springframework.data.annotation.Transient
+    private String fullName;
     private LocalDateTime joinedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

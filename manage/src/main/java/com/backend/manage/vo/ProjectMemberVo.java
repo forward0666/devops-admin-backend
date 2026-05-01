@@ -26,7 +26,7 @@ public record ProjectMemberVo(
                 entity.getId(),
                 entity.getProjectId(),
                 entity.getUserId(),
-                null, null,
+                entity.getUsername(), entity.getFullName(),
                 entity.getProjectRole(),
                 entity.getPosition(),
                 entity.getStatus(),
