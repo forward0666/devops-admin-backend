@@ -120,8 +120,8 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                     .flatMap(authorized -> {
                         if (!authorized) {
                             // 失败路径：不需要额外的 MDC.set/clear，因为 HttpResponseUtils 及其后的日志应依赖 Logback 配置
-                            log.warn("[traceId={}] ❌ Request blocked | IP={} | Route={} | Method={} | Path={}",
-                                    traceId, ip, routeId, method, path);
+                            log.warn("[traceId={}] ❌ Request blocked | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
+                                    traceId, ip, routeId, method, path, exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data"));
                             // 返回一个带响应的 Mono
                             return HttpResponseUtils.write(exchange,
                                     HttpResponseUtils.unauthorized("Unauthorized or service unavailable"));
