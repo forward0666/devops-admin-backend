@@ -72,15 +72,16 @@ public class UserSessionController {
      */
     @GetMapping("/stats")
     public Mono<ResponseEntity<Map<String, Object>>> getSessionStats() {
-        // 注意：这里需要实现一个获取所有活跃会话的方法
-        // 暂时返回模拟数据
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalSessions", 0);
-        stats.put("activeSessions", 0);
-        stats.put("expiredSessions", 0);
-        stats.put("averageSessionDuration", "0 minutes");
-        
-        return Mono.just(HttpResponseUtils.ok(stats));
+        // 扫描 Redis 中的 user:session:* keys 来统计
+        return redisTemplate.keys("user:session:*")
+                .count()
+                .map(total -> {
+                    Map<String, Object> stats = new HashMap<>();
+                    stats.put("totalSessions", total);
+                    stats.put("activeSessions", total); // 所有在 Redis 中的都是 active
+                    stats.put("expiredSessions", 0);
+                    return HttpResponseUtils.ok(stats);
+                });
     }
 
     /**
@@ -92,10 +93,23 @@ public class UserSessionController {
     @GetMapping("/active")
     public Mono<ResponseEntity<Map<String, Object>>> getActiveSessions(
             @RequestParam(defaultValue = "100") Integer limit) {
-        // 注意：这里需要实现一个获取所有活跃会话的方法
-        // 暂时返回空列表
-        return Mono.just(HttpResponseUtils.ok(
-                Map.of("sessions", new Object[0], "limit", limit)));
+        return redisTemplate.keys("user:session:*")
+                .take(limit)
+                .flatMap(key -> redisTemplate.opsForValue().get(key)
+                        .map(value -> {
+                            Map<String, Object> session = new HashMap<>();
+                            session.put("key", key);
+                            session.put("value", value);
+                            return session;
+                        }))
+                .collectList()
+                .map(sessions -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("sessions", sessions);
+                    data.put("limit", limit);
+                    data.put("total", sessions.size());
+                    return HttpResponseUtils.ok(data);
+                });
     }
 
     /**
