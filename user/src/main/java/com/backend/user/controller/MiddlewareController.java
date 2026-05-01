@@ -33,7 +33,7 @@ public class MiddlewareController {
     public ApiResponseDto<List<MiddlewareVo>> list(@RequestParam Long projectId, HttpServletRequest request) {
         try {
             List<MiddlewareEntity> list = middlewareService.findByProjectId(projectId);
-            String projectRole = getProjectRole(request, projectId);
+            String projectRole = request.getHeader("X-Tg-Username") != null ? null : getProjectRole(request, projectId);
 
             // Member: hide prod environment middlewares
             if ("Member".equals(projectRole)) {

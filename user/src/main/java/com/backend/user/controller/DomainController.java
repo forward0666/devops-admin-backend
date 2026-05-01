@@ -33,7 +33,7 @@ public class DomainController {
     public ApiResponseDto<List<DomainVo>> list(@RequestParam Long projectId, HttpServletRequest request) {
         try {
             List<DomainEntity> domains = domainService.findByProjectId(projectId);
-            String projectRole = getProjectRole(request, projectId);
+            String projectRole = request.getHeader("X-Tg-Username") != null ? null : getProjectRole(request, projectId);
 
             // Member in prod: only show web type
             if ("Member".equals(projectRole)) {
