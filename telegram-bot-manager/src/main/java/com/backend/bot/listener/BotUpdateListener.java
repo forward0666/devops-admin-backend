@@ -30,7 +30,7 @@ public class BotUpdateListener {
     private final ReactiveStringRedisTemplate redisTemplate;
 
     private static final int MAX_UNAUTHORIZED_ATTEMPTS = 2;
-    private static final Duration BLACKLIST_TTL = Duration.ofHours(24);
+    private static final Duration BLACKLIST_TTL = Duration.ofDays(30);
 
     public BotUpdateListener(
             BotCoreService botCoreService,
