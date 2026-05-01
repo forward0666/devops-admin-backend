@@ -2,7 +2,9 @@ package com.backend.user.service;
 
 import com.backend.user.entity.DomainEntity;
 import com.backend.user.mapper.DomainMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -10,11 +12,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class DomainService {
 
     @Autowired
     private DomainMapper domainMapper;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     public List<DomainEntity> findByProjectId(Long projectId) {
         return domainMapper.findByProjectId(projectId);
@@ -25,7 +31,9 @@ public class DomainService {
         entity.setProjectId(projectId);
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        return domainMapper.insert(entity);
+        domainMapper.insert(entity);
+        evictDomainCache(projectId);
+        return entity;
     }
 
     public DomainEntity update(String id, Long projectId, DomainEntity entity) {
@@ -35,13 +43,16 @@ public class DomainService {
         if (entity.getEnv() != null) fields.put("env", entity.getEnv());
         if (entity.getRemark() != null) fields.put("remark", entity.getRemark());
         if (fields.isEmpty()) return domainMapper.findByIdAndProjectId(id, projectId);
-        return domainMapper.update(id, projectId, fields);
+        domainMapper.update(id, projectId, fields);
+        evictDomainCache(projectId);
+        return domainMapper.findByIdAndProjectId(id, projectId);
     }
 
     public boolean delete(String id, Long projectId) {
         DomainEntity existing = domainMapper.findByIdAndProjectId(id, projectId);
         if (existing == null) return false;
         domainMapper.deleteById(id);
+        evictDomainCache(projectId);
         return true;
     }
 
@@ -54,5 +65,14 @@ public class DomainService {
             d.setUpdatedAt(now);
         }
         domainMapper.insertAll(domains);
+        evictDomainCache(projectId);
+    }
+
+    private void evictDomainCache(Long projectId) {
+        try {
+            redisTemplate.delete("bot:domains:" + projectId);
+        } catch (Exception e) {
+            log.warn("清除域名缓存失败: projectId={}", projectId, e);
+        }
     }
 }

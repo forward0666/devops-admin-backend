@@ -4,6 +4,7 @@ import com.backend.manage.entity.ProjectEntity;
 import com.backend.manage.mapper.ProjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,9 @@ public class ProjectService {
 
     @Autowired
     private ProjectMapper projectMapper;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Transactional(readOnly = true)
     public List<ProjectEntity> getAllProjects() {
@@ -43,6 +47,7 @@ public class ProjectService {
         if (project.getProgress() == null) project.setProgress(0);
 
         projectMapper.insert(project);
+        evictProjectCache(project.getId());
         log.info("项目创建成功: " + project.getName());
 
         return project;
@@ -72,6 +77,7 @@ public class ProjectService {
         project.setUpdatedAt(LocalDateTime.now());
 
         projectMapper.update(project);
+        evictProjectCache(id);
         log.info("项目更新成功: " + id);
 
         return project;
@@ -83,6 +89,7 @@ public class ProjectService {
             return false;
         }
         projectMapper.deleteById(id);
+        evictProjectCache(id);
         log.info("项目删除成功: " + id);
         return true;
     }
@@ -90,5 +97,13 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ProjectEntity> searchProjects(String query) {
         return projectMapper.search(query);
+    }
+
+    private void evictProjectCache(Long projectId) {
+        try {
+            redisTemplate.delete("bot:project:" + projectId);
+        } catch (Exception e) {
+            log.warn("清除项目缓存失败: projectId={}", projectId, e);
+        }
     }
 }

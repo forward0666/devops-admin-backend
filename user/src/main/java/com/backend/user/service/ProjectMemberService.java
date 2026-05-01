@@ -117,6 +117,7 @@ public class ProjectMemberService {
             return false;
         }
         projectMemberMapper.deleteById(id);
+        evictMemberCache(member.getProjectId());
         log.info("项目成员移除成功: id={}", id);
         return true;
     }

@@ -6,6 +6,7 @@ import com.backend.manage.mapper.ProjectMemberMapper;
 import com.backend.manage.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,9 @@ public class ProjectMemberService {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Transactional(readOnly = true)
     public List<ProjectMemberEntity> getMembersByProjectId(Long projectId) {
@@ -55,6 +59,7 @@ public class ProjectMemberService {
         }
 
         projectMemberMapper.insert(data);
+        evictMemberCache(data.getProjectId());
         log.info("项目成员添加成功: projectId={}, userId={}", data.getProjectId(), data.getUserId());
         return data;
     }
@@ -71,6 +76,7 @@ public class ProjectMemberService {
         member.setUpdatedBy(data.getUpdatedBy());
 
         projectMemberMapper.update(member);
+        evictMemberCache(member.getProjectId());
         log.info("项目成员更新成功: id={}", id);
         return member;
     }
@@ -78,6 +84,7 @@ public class ProjectMemberService {
     public boolean removeMember(Long projectId, Long userId) {
         int rows = projectMemberMapper.deleteByProjectIdAndUserId(projectId, userId);
         if (rows > 0) {
+            evictMemberCache(projectId);
             log.info("项目成员移除成功: projectId={}, userId={}", projectId, userId);
             return true;
         }
@@ -90,7 +97,16 @@ public class ProjectMemberService {
             return false;
         }
         projectMemberMapper.deleteById(id);
+        evictMemberCache(member.getProjectId());
         log.info("项目成员移除成功: id={}", id);
         return true;
+    }
+
+    private void evictMemberCache(Long projectId) {
+        try {
+            redisTemplate.delete("bot:projectMembers:" + projectId);
+        } catch (Exception e) {
+            log.warn("清除成员缓存失败: projectId={}", projectId, e);
+        }
     }
 }
