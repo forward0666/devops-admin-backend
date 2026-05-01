@@ -64,7 +64,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             return replyNoBinding(token, chatId, messageId);
                         }
 
-                        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL).build();
+        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL)
+                .defaultHeader("X-Internal-Call", "true")
+                .build();
 
                         return switch (callbackData) {
                             case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);

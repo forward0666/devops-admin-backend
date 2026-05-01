@@ -34,6 +34,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
+        // Skip JWT validation for internal service calls
+        if ("true".equals(request.getHeader("X-Internal-Call"))) {
+            log.debug("Skipping JWT validation for internal call to path: {}", path);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         // Skip JWT validation for OPTIONS requests (CORS preflight)
         if ("OPTIONS".equals(method)) {
             log.debug("Skipping JWT validation for OPTIONS request to path: {}", path);
