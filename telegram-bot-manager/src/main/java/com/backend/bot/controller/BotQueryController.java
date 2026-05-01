@@ -111,6 +111,9 @@ public class BotQueryController {
                             return Mono.just(HttpResponseUtils.badRequest("Invalid bot type: " + body.get("botType")));
                         }
                     }
+                    if (body.containsKey("token") && body.get("token") != null && !((String) body.get("token")).isBlank()) {
+                        bot.setBotToken((String) body.get("token"));
+                    }
                     Integer status = body.containsKey("status") ? (Integer) body.get("status") : null;
                     if (status != null && status != 0 && status != 1) {
                         return Mono.just(HttpResponseUtils.badRequest("Status must be 0 or 1"));
