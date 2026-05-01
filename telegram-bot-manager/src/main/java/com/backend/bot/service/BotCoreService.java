@@ -47,14 +47,16 @@ public class BotCoreService {
             ObjectMapper objectMapper,
             BotAuthorizedChatRepository authorizedChatRepository,
             @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler,
-            CacheTemplateService cacheTemplateService) { // 🌟 注入 CacheTemplateService
+            CacheTemplateService cacheTemplateService,
+            TelegramProperties telegramProperties) {
         this.botRepository = botRepository;
         this.botClient = botClient;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.authorizedChatRepository = authorizedChatRepository;
         this.blockingTaskScheduler = blockingTaskScheduler;
-        this.cacheTemplateService = cacheTemplateService; // 🌟 赋值
+        this.cacheTemplateService = cacheTemplateService;
+        this.telegramProperties = telegramProperties;
     }
 
     /**
