@@ -14,57 +14,33 @@ public class MenuType {
     private static final String CALLBACK_PREFIX = "callback_data_";
 
     /**
-     * 根据 botType 字符串生成 InlineKeyboardMarkup 的工厂方法。
+     * 静态方法：尝试从数据库加载菜单，查不到再用硬编码兜底。
+     * 仅用于非 Spring 管理的场景或兼容旧调用。
      *
-     * @param inputType 机器人类型字符串 (BotEntity.botType) 或回调数据
-     * @return InlineKeyboardMarkupDto 对象
+     * @deprecated 推荐使用 BotMenuService 的响应式方法
      */
     public static InlineKeyboardMarkupDto createDynamicKeyboard(String inputType) {
+        // 纯静态方法无法注入 BotMenuService，直接使用硬编码兜底
+        return createFallbackKeyboard(inputType);
+    }
+
+    /**
+     * 硬编码兜底：保留原有逻辑
+     */
+    public static InlineKeyboardMarkupDto createFallbackKeyboard(String inputType) {
         if (inputType == null || inputType.isBlank()) {
             return null;
         }
 
-        // 1. 检查输入是初始 BotType 还是回调数据
         boolean isCallback = inputType.startsWith(CALLBACK_PREFIX);
-
-        // 提取用于匹配的关键词
         String keyword = isCallback
                 ? inputType.substring(CALLBACK_PREFIX.length())
-                : inputType; // 非回调时，keyword 即为原始 botType
+                : inputType;
 
-        // 统一转为大写进行匹配
         MenuTemplate template = switch (keyword.toUpperCase()) {
-
-            // --- A. 初始 BotType 匹配：返回对应的主菜单 ---
-            // 初始 botType 触发时，直接返回该 bot 的主菜单
             case "IP_WHITE_LIST" -> new IpWhitelistMenu();
-
-//            case "TOOL" -> new ToolMenu();
-//
-//            case "CUSTOMER_SERVICE" -> new CustomerServiceMenu();
-
-            // --- B. 回调数据匹配：返回二级菜单或最终操作键盘 ---
-
-            // 注意：这里的 case 需要与你在 Step 1 定义的 **按钮回调数据** 匹配
             case "DOMAIN_WHITELIST_ACTION" -> new IpWhitelistSubMenu();
-
-
-            // 🌟 新增：最终操作的回调数据，返回 null
-            case "FRONTEND_WEB_DOMAIN_ACTION", "FRONTEND_ADMIN_DOMAIN_ACTION" -> {
-                yield null; // 明确返回 null，表示不生成新键盘
-            }
-
-
-//            case "ASSET_INFO_ACTION" -> new AssetInfoMenu();
-//            case "DEVOP_DUTY_ACTION" -> new DevopDutyMenu();
-//
-//            case "TOOL_CORE_ACTION" -> new ToolCoreSubMenu();
-//            case "TOOL_CONFIG_ACTION" -> new ToolConfigSubMenu();
-//
-//            case "CS_CONTACT_ACTION" -> new ContactActionMenu();
-//            case "CS_FAQ_ACTION" -> new FaqActionMenu();
-
-
+            case "FRONTEND_WEB_DOMAIN_ACTION", "FRONTEND_ADMIN_DOMAIN_ACTION" -> null;
             default -> {
                 log.warn("Unknown keyboard keyword encountered: {}", keyword);
                 yield null;
@@ -75,9 +51,6 @@ public class MenuType {
     }
 
     /**
-     * 🌟 遗留方法：为了兼容 StartCommandHandler 的旧调用方式，但现在 StartCommandHandler 应该直接调用
-     * createDynamicKeyboard("IP_WHITE_LIST") 来获取主菜单。
-     *
      * @deprecated 应该使用 createDynamicKeyboard("IP_WHITE_LIST") 替代
      */
     @Deprecated

@@ -8,6 +8,7 @@ import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.RedisUserSessionService;
 import com.backend.bot.service.UserSessionService;
+import com.backend.bot.service.BotMenuService;
 import com.backend.bot.template.MenuType;
 import com.backend.bot.util.BotUserUtils; // 引入新工具类
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,6 +31,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final UserSessionService userSessionService;
     private final RedisUserSessionService redisUserSessionService;
     private final ObjectMapper objectMapper;
+    private final BotMenuService botMenuService;
 
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
     private static final int DELETE_DELAY_SECONDS = TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
@@ -118,9 +120,10 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         // 先设置正在处理/start的状态，防止重复点击
         return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
                 .then(Mono.defer(() -> {
-                    InlineKeyboardMarkupDto mainMenuMarkup = MenuType.createDynamicKeyboard("IP_WHITE_LIST");
-
-                    return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
+                    return botMenuService.findMainMenuByBotName(context.botName(), 1)
+                            .defaultIfEmpty(MenuType.createFallbackKeyboard(context.botEntity().getBotType().name()))
+                            .flatMap(mainMenuMarkup ->
+                                    botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
                             .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
                             .doOnError(e -> {
                                 log.error("{}❌ Failed to send initial menu message.", logPrefix, e);

@@ -7,6 +7,7 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.BotMenuService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.template.MenuType;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
+    private final BotMenuService botMenuService;
 
     // 修复: 将秒数占位符从 %d 更改为 %s，以避免 java.util.IllegalFormatConversionException
     // 优化: 缩短菜单提示文本，移除“当前菜单:”前缀、菜单名称及其周围的方括号【】，只保留计时器信息
@@ -36,8 +38,12 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
     @Override
     public boolean supports(String callbackData) {
-        // 只有当 MenuType 能返回键盘时才支持
-        return MenuType.createDynamicKeyboard(callbackData) != null;
+        if (callbackData == null) return false;
+        // 先检查硬编码是否能返回键盘
+        if (MenuType.createFallbackKeyboard(callbackData) != null) return true;
+        // 其他 callback_data_ 可能在数据库中有菜单，但这里保守起见只支持硬编码
+        // 数据库菜单的匹配会在 handle() 中处理
+        return false;
     }
 
     @Override
@@ -58,28 +64,32 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
         String callbackData = botUpdate.callbackQuery().data();
 
-        // 1. 获取新的键盘
-        InlineKeyboardMarkupDto newMarkup = MenuType.createDynamicKeyboard(callbackData);
+        // 1. 获取新的键盘（优先从数据库查询，fallback 到硬编码）
+        final InlineKeyboardMarkupDto fallbackMarkup = MenuType.createFallbackKeyboard(callbackData);
+        final String menuKey = callbackData.startsWith("callback_data_")
+                ? callbackData.substring("callback_data_".length())
+                : callbackData;
 
         // 2. 确定计时器时间 (int)
         int delaySeconds = getDeletionDelay(callbackData);
 
         // 3. 动态生成菜单文本
-        // 由于模板中已移除菜单标题，这里不再使用 getMenuTitle() 的结果
-
-        // 🌟 FIX: 将 delaySeconds 显式转换为 String，以匹配 MENU_PROMPT_TEXT_TEMPLATE 中的 %s 占位符
         String menuText = String.format(
                 MENU_PROMPT_TEXT_TEMPLATE,
-                String.valueOf(delaySeconds) // 转换为 String 解决 IllegalFormatConversionException
+                String.valueOf(delaySeconds)
         );
 
         // 使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            // 4. 编辑当前消息，更新键盘和文本
-            // BotClientService.editMessageText 已经在 API 层处理了 400 Bad Request
-            return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
+            // 先从数据库查，查不到用硬编码
+            Mono<InlineKeyboardMarkupDto> keyboardMono = botMenuService.findKeyboardByBotNameAndMenuKey(context.botName(), menuKey)
+                    .defaultIfEmpty(fallbackMarkup);
+
+            return keyboardMono.flatMap(newMarkup -> {
+                if (newMarkup == null) return Mono.empty();
+                return botClientService.editMessageText(token, chatId, messageId, menuText, newMarkup)
                     .doOnSuccess(response -> {
                         // 5. 重新调度删除任务
                         interactiveMessageService.scheduleMessageDeletion(
@@ -92,13 +102,13 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                                 contextView
                         ).subscribe();
                     })
-                    // 只需要处理编辑失败时的致命错误 (如网络、鉴权等)
                     .onErrorResume(e -> {
                         log.warn("{}⚠️ Non-400 error occurred during message edit (ID: {}). Reason: {}. Not sending new message.",
                                 traceLogPrefix, messageId, e.getMessage());
                         return Mono.empty();
                     })
                     .then();
+            });
         });
     }
 
