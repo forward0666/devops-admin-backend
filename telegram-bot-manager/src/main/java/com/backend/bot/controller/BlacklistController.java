@@ -77,7 +77,7 @@ public class BlacklistController {
         String key = "bot:blacklist:" + botName + ":" + userId;
         return redisTemplate.delete(key)
                 .map(deleted -> {
-                    log.info("🔓 Removed blacklist: botName={}, chatId={}", botName, chatId);
+                    log.info("🔓 Removed blacklist: botName={}, userId={}", botName, userId);
                     return HttpResponseUtils.ok(Map.of("message", "Blacklist removed"));
                 });
     }

@@ -4,7 +4,6 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.CallbackQueryDto;
 import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
-import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.util.LogUtils;
@@ -37,15 +36,18 @@ public class BotWebhookController {
             @RequestBody BotUpdateDto botUpdate
     ) {
         return Mono.deferContextual(contextView -> {
-            // 提取用户 ID 和 chatId
-            UserDto user = null;
-            Long chatId = null;
+            // 提取用户和聊天信息（一次性赋值，确保 effectively final）
+            final UserDto user;
+            final Long chatId;
             if (botUpdate.message() != null) {
                 user = botUpdate.message().from();
                 chatId = botUpdate.message().chat().id();
             } else if (botUpdate.callbackQuery() != null) {
                 user = botUpdate.callbackQuery().from();
                 chatId = botUpdate.callbackQuery().message().chat().id();
+            } else {
+                user = null;
+                chatId = null;
             }
 
             if (user == null || user.id() == null) {
@@ -54,17 +56,15 @@ public class BotWebhookController {
                 );
             }
 
-            String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
-            boolean isPrivate = chatId != null && chatId.equals(user.id());
+            final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
+            final boolean isPrivate = chatId != null && chatId.equals(user.id());
 
             return redisTemplate.hasKey(blacklistKey)
                     .flatMap(isBlacklisted -> {
                         if (Boolean.TRUE.equals(isBlacklisted)) {
                             if (isPrivate) {
-                                // 私聊：静默丢弃
                                 return Mono.empty();
                             }
-                            // 群聊：回复黑名单提示
                             return botCoreService.findByBotName(botName)
                                     .flatMap(bot -> botClientService.sendMessage(
                                             bot.getBotToken(), chatId,
