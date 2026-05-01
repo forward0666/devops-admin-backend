@@ -157,6 +157,23 @@ public class BotCoreService {
     }
 
     /**
+     * 获取所有 Bot 列表
+     */
+    public reactor.core.publisher.Flux<BotVo> findAll() {
+        return botRepository.findAll()
+                .map(this::convertToVo);
+    }
+
+    /**
+     * 根据名称删除 Bot
+     */
+    public Mono<Boolean> deleteByBotName(String botName) {
+        return botRepository.findByBotName(botName)
+                .flatMap(bot -> botRepository.delete(bot).then(Mono.just(true)))
+                .defaultIfEmpty(false);
+    }
+
+    /**
      * 【重构】异步检查指定的 Chat ID 是否在 Bot 的白名单中 (使用 CacheTemplateService)
      *
      * @param botConfigId 机器人配置ID (对应 bot_config.id)

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-@EnableMongoRepositories(basePackages = "com.backend.manage.repository.mongo")
 @ConfigurationProperties(prefix = "spring.data.mongodb")
 @Data
 @EqualsAndHashCode(callSuper=false)

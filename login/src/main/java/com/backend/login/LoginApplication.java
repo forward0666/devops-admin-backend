@@ -32,6 +32,14 @@ public class LoginApplication {
 
     private static void initAfterStartup(ApplicationContext ctx) {
         log.info("✅ LoginApplication started successfully!");
+        ExecutorService executor = ctx.getBean(ExecutorService.class);
+        log.info("🧵 ThreadPool initialized: {}", executor);
 
+        // ✅ 线程池预热（提前创建核心线程）
+        if (executor instanceof ThreadPoolExecutor) {
+            ((ThreadPoolExecutor) executor).prestartAllCoreThreads();
+            log.info("🔥 ThreadPool pre-started {} core threads",
+                    ((ThreadPoolExecutor) executor).getPoolSize());
+        }
     }
 }

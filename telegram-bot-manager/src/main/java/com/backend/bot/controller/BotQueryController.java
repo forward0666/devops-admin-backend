@@ -33,11 +33,13 @@ public class BotQueryController {
      */
     @GetMapping
     public Mono<ResponseEntity<Map<String, Object>>> getAllBots() {
-        // 注意：这里需要添加一个获取所有Bot的方法到BotCoreService
-        // 暂时返回空列表
-        Map<String, Object> data = new HashMap<>();
-        data.put("bots", List.of());
-        return Mono.just(HttpResponseUtils.ok(data));
+        return botCoreService.findAll()
+                .collectList()
+                .map(bots -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("bots", bots);
+                    return HttpResponseUtils.ok(data);
+                });
     }
 
     /**
@@ -110,12 +112,20 @@ public class BotQueryController {
      */
     @DeleteMapping("/{name}")
     public Mono<ResponseEntity<Map<String, Object>>> deleteBot(@PathVariable String name) {
-        // 注意：需要添加根据名称删除Bot的方法到BotCoreService
-        // 暂时返回成功
-        Map<String, Object> data = new HashMap<>();
-        data.put("botName", name);
-        
-        return Mono.just(HttpResponseUtils.ok(data));
+        return botCoreService.deleteByBotName(name)
+                .map(deleted -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("botName", name);
+                    if (Boolean.TRUE.equals(deleted)) {
+                        return HttpResponseUtils.ok(data);
+                    } else {
+                        return HttpResponseUtils.notFound("Bot not found: " + name);
+                    }
+                })
+                .onErrorResume(e -> {
+                    log.error("❌ Delete bot failed: {}", name, e);
+                    return Mono.just(HttpResponseUtils.internalError("Delete failed: " + e.getMessage()));
+                });
     }
 
 
