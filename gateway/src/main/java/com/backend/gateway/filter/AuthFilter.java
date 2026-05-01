@@ -44,6 +44,11 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
         return false;
     }
 
+    /** 白名单路径，子类可覆盖 */
+    protected boolean isWhitelistedPath(String path) {
+        return false;
+    }
+
     public GatewayFilter apply(T config) {
         if (!config.isEnabled()) {
             return (exchange, chain) -> chain.filter(exchange);
@@ -74,6 +79,13 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
             final String path = WebExchangeUtils.getPath(exchange);
             final String routeId = WebExchangeUtils.getRouteId(exchange);
             final String ip = WebExchangeUtils.getClientIp(exchange);
+
+            // Check path whitelist first
+            if (isWhitelistedPath(path)) {
+                log.info("[traceId={}] ✅ Whitelisted path | IP={} | Route={} | Method={} | Path={}",
+                        traceId, ip, routeId, method, path);
+                return chain.filter(exchange);
+            }
 
             // 2. 阻塞验证 Callable：用于 Mono.fromCallable()，包含所有阻塞逻辑和 MDC 切换
             Callable<Boolean> validationCallable = () -> {

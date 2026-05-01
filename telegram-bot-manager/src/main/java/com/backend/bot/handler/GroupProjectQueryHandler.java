@@ -109,7 +109,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
      */
     private Mono<String> resolveUserRole(WebClient webClient, Long projectId, String tgUsername, String traceLogPrefix) {
         if (tgUsername == null || tgUsername.isBlank()) {
-            return return Mono.just("None");
+             return Mono.just("None");
         }
         return webClient.get()
                 .uri("/projectMember?projectId={projectId}", projectId)
