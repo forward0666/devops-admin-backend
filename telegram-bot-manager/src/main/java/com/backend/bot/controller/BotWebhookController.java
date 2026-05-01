@@ -70,9 +70,12 @@ public class BotWebhookController {
                                     .flatMap(bot -> {
                                         final Long msgId = extractMessageId(botUpdate);
                                         // 先发黑名单提示，再删用户消息
+                                        String warnMsg = String.format(
+                                                "⚠️ 用户 %s (%s) 已在黑名单中，无法使用该 Bot。\n如需解封请联系管理员。",
+                                                user.firstName() != null ? user.firstName() : "",
+                                                user.username() != null ? "@" + user.username() : "N/A");
                                         Mono<Void> sendWarning = botClientService.sendMessage(
-                                                bot.getBotToken(), chatId,
-                                                "⚠️ 您已在黑名单中，无法使用该 Bot。\n如需解封请联系管理员。"
+                                                bot.getBotToken(), chatId, warnMsg
                                         );
                                         Mono<Void> deleteMsg = msgId != null
                                                 ? botClientService.deleteMessage(bot.getBotToken(), chatId, msgId)
