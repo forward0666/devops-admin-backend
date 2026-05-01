@@ -75,8 +75,9 @@ public class BotCoreService {
 
         return botRepository.save(config)
                 .flatMap(savedConfig -> {
-                    // 2. 注册 Webhook
-                    String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName();
+                    // 2. 注册 Webhook（Cloudflare 会将 query 参数转为 header）
+                    String secret = telegramProperties.getGatewayBotSecret();
+                    String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName() + (secret != null && !secret.isBlank() ? "?header_X-Encrypted-Data=" + secret : "");
                     String secret = dto.getSecretToken() != null && !dto.getSecretToken().isBlank()
                             ? dto.getSecretToken()
                             : java.util.UUID.randomUUID().toString();

@@ -43,4 +43,6 @@ public class TelegramProperties {
      * - 需要在应用启动前配置好
      */
     private String webhookDomain;
+
+    private String gatewayBotSecret;
 }

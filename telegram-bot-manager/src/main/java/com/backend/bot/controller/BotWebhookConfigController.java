@@ -1,5 +1,6 @@
 package com.backend.bot.controller;
 
+import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.dto.SetWebhookDto;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.BotCoreService;
@@ -23,6 +24,7 @@ public class BotWebhookConfigController {
 
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
+    private final TelegramProperties telegramProperties;
 
     /**
      * 手动设置 Bot 的 Webhook URL。
@@ -46,7 +48,7 @@ public class BotWebhookConfigController {
                                                 return Mono.just(HttpResponseUtils.badRequest("❌ Bot Token 缺失"));
                                             }
                                             String token = botEntity.getBotToken();
-                                            String url = dto.getUrl();
+                                            String url = appendGatewayHeader(dto.getUrl());
                                             String secretToken = dto.getSecretToken();
 
                                             return botClientService.setWebhook(token, url, secretToken)
@@ -157,5 +159,17 @@ public class BotWebhookConfigController {
                 })
                 // 步骤 2: 使用 LogUtils 抽象的 MDC 清理方法
                 .doFinally(LogUtils::clearMDC);
+    }
+
+    /**
+     * 给 webhook URL 拼接 Gateway BotAuth header 参数
+     * Cloudflare 会将 query 参数转为 request header
+     */
+    private String appendGatewayHeader(String url) {
+        if (url == null || url.isBlank()) return url;
+        String secret = telegramProperties.getGatewayBotSecret();
+        if (secret == null || secret.isBlank()) return url;
+        String separator = url.contains("?") ? "&" : "?";
+        return url + separator + "header_X-Encrypted-Data=" + secret;
     }
 }
