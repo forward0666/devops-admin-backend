@@ -330,4 +330,12 @@ public class BotClientService {
                         })
                 );
     }
+
+    public Mono<String> deleteWebhook(String token) {
+        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/deleteWebhook";
+        return telegramWebClient.post()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(String.class);
+    }
 }

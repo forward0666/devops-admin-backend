@@ -166,7 +166,38 @@ public class BotWebhookConfigController {
     }
 
     /**
-     * 给 webhook URL 拼接 Gateway BotAuth header 参数
-     * Cloudflare 会将 query 参数转为 request header
+     * 删除 Webhook
      */
+    @DeleteMapping("/deleteWebhook")
+    public Mono<ResponseEntity<Map<String, Object>>> deleteWebhook(@RequestParam String botName) {
+        return Mono.deferContextual(contextView -> {
+            LogUtils.syncTraceIdToMDC(contextView);
+            log.info("Deleting webhook for botName: {}", botName);
+            return botCoreService.findByBotName(botName)
+                    .switchIfEmpty(Mono.error(new IllegalArgumentException("❌ Bot 不存在")))
+                    .flatMap(botEntity -> {
+                        if (botEntity.getBotToken() == null) {
+                            return Mono.error(new IllegalArgumentException("❌ Bot Token 缺失"));
+                        }
+                        return botClientService.deleteWebhook(botEntity.getBotToken())
+                                .flatMap(res -> {
+                                    botEntity.setWebhookUrl(null);
+                                    return botCoreService.saveBot(botEntity).thenReturn(res);
+                                })
+                                .map(res -> {
+                                    if (res != null && res.contains("\"ok\":true")) {
+                                        return HttpResponseUtils.ok();
+                                    }
+                                    return HttpResponseUtils.internalError("❌ 删除 Webhook 失败");
+                                });
+                    })
+                    .onErrorResume(IllegalArgumentException.class, e -> Mono.just(HttpResponseUtils.badRequest(e.getMessage())))
+                    .onErrorResume(e -> {
+                        log.error("❌ deleteWebhook failed for {}", botName, e);
+                        return Mono.just(HttpResponseUtils.internalError("❌ 删除时发生错误"));
+                    });
+        }).doFinally(LogUtils::clearMDC);
+    }
+
+    /**
 }
