@@ -20,7 +20,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(15)
+@Order(5)
 public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private final BotGroupProjectRepository botGroupProjectRepository;
@@ -31,7 +31,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
     private static final String PROJECT_DOMAIN_ACTION = "PROJECT_DOMAIN_ACTION";
     private static final String PROJECT_MIDDLEWARE_ACTION = "PROJECT_MIDDLEWARE_ACTION";
-    private static final String USER_SERVICE_URL = "http://user:8084";
+    private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
 
     @Override
     public boolean supports(String callbackData) {
@@ -43,7 +43,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     @Override
     public int getOrder() {
-        return 15;
+        return 5;
     }
 
     @Override
