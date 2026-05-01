@@ -82,6 +82,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         return resolveUserRole(webClient, binding.getProjectId(), tgUsername, traceLogPrefix)
                                 .flatMap(role -> {
                                     log.info("{}🔍 Resolved role: {} for tgUsername={}", traceLogPrefix, role, tgUsername);
+                                    if ("None".equals(role)) {
+                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看。");
+                                    }
                                     return switch (action) {
                                         case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
                                         case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", null, traceLogPrefix);
@@ -106,7 +109,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
      */
     private Mono<String> resolveUserRole(WebClient webClient, Long projectId, String tgUsername, String traceLogPrefix) {
         if (tgUsername == null || tgUsername.isBlank()) {
-            return Mono.just("Member"); // 未知用户按 Member 处理
+            return return Mono.just("None");
         }
         return webClient.get()
                 .uri("/projectMember?projectId={projectId}", projectId)
