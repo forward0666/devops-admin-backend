@@ -72,8 +72,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             return replyNoBinding(token, chatId, messageId);
                         }
 
+        String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
+                ? botUpdate.callbackQuery().from().username() : null;
         WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL)
-                .defaultHeader("X-Internal-Call", "true")
+                .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
                 .build();
 
                         return switch (action) {

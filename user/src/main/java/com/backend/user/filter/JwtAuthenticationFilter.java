@@ -34,9 +34,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Skip JWT validation for internal service calls
-        if ("true".equals(request.getHeader("X-Internal-Call"))) {
-            log.debug("Skipping JWT validation for internal call to path: {}", path);
+        // Skip JWT validation for internal Telegram bot calls
+        String tgUsername = request.getHeader("X-Tg-Username");
+        if (tgUsername != null && !tgUsername.isBlank()) {
+            log.debug("Skipping JWT validation for TG bot call to path: {}, username={}", path, tgUsername);
             filterChain.doFilter(request, response);
             return;
         }
