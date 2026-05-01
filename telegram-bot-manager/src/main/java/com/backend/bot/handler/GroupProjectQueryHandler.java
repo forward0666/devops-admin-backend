@@ -58,7 +58,14 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
+            log.info("{}🔍 GroupProjectQueryHandler: callbackData={}, chatId={}, botName={}", traceLogPrefix, callbackData, chatId, botName);
+
             return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+                    .doOnNext(b -> log.info("{}🔍 Found binding: projectId={}, projectName={}", traceLogPrefix, b.getProjectId(), b.getProjectName()))
+                    .switchIfEmpty(Mono.defer(() -> {
+                        log.warn("{}⚠️ No group-project binding found for bot={}, chatId={}", traceLogPrefix, botName, chatId);
+                        return Mono.empty();
+                }))
                     .flatMap(binding -> {
                         if (binding.getProjectId() == null) {
                             return replyNoBinding(token, chatId, messageId);
@@ -87,6 +94,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
+        log.info("{}🔍 Fetching project info: projectId={}, url={}/project/{}", traceLogPrefix, binding.getProjectId(), USER_SERVICE_URL, binding.getProjectId());
+        return webClient.get()
+                                           String token, Long chatId, Long messageId, String traceLogPrefix) {
         return webClient.get()
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
@@ -114,6 +124,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private Mono<Void> fetchList(WebClient webClient, BotGroupProjectEntity binding, String uri,
                                   String token, Long chatId, Long messageId, String title, String traceLogPrefix) {
+        log.info("{}🔍 Fetching list: title={}, url={}{}", traceLogPrefix, title, USER_SERVICE_URL, uri);
         return webClient.get()
                 .uri(uri)
                 .retrieve()
