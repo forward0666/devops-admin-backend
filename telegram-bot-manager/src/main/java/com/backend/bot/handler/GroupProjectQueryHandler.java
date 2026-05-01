@@ -144,14 +144,23 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return cacheOrFetch(membersCacheKey, USER_CACHE_TTL,
                 webClient.get().uri("/projectMember?projectId={projectId}", projectId).retrieve())
                 .map(response -> {
+                    log.debug("{}🔍 Member response: {}", traceLogPrefix, response);
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
                         return "None";
                     }
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> members = res.containsKey("data") ? (List<Map<String, Object>>) res.get("data") : List.of();
+                    // response.data 可能是 List（直接返回数组）或 Map（再包一层）
+                    Object dataObj = response.get("data");
+                    List<Map<String, Object>> members;
+                    if (dataObj instanceof List) {
+                        members = (List<Map<String, Object>>) dataObj;
+                    } else if (dataObj instanceof Map) {
+                        Object inner = ((Map<String, Object>) dataObj).get("data");
+                        members = (inner instanceof List) ? (List<Map<String, Object>>) inner : List.of();
+                    } else {
+                        members = List.of();
+                    }
+                    log.debug("{}🔍 Members count: {}, tgUsername: {}", traceLogPrefix, members.size(), tgUsername);
                     return members.stream()
                             .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(getVal(m, "tgUsername", ""))))
                             .map(m -> String.valueOf(getVal(m, "projectRole", "Member")))
