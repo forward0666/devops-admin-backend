@@ -106,7 +106,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         
         // 1. 重置删除计时器（取消旧的，重新开始5秒倒计时）
         Long messageId = context.messageId();
-        int delaySeconds = com.backend.bot.constants.TelegramConstants.MENU_DELETE_DELAY_SECONDS;
+        // 数据展示类 callback（项目信息/成员/域名/中间件）保留 30 秒，菜单导航保留 10 秒
+        int delaySeconds = callbackData.contains("_ACTION") ? 30 : TelegramConstants.MENU_DELETE_DELAY_SECONDS;
         Mono<Void> resetTimerMono = userSessionService.cancelPendingDeletion(userId)
                 .then(messageId != null ? interactiveMessageService.scheduleMessageDeletion(
                         token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
