@@ -6,7 +6,6 @@ import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.BotGroupProjectEntity;
 import com.backend.bot.repository.BotGroupProjectRepository;
 import com.backend.bot.service.BotClientService;
-import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.core.ParameterizedTypeReference;
@@ -18,7 +17,6 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.util.context.ContextView;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,7 +30,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private final BotGroupProjectRepository botGroupProjectRepository;
     private final BotClientService botClientService;
-    private final InteractiveMessageService interactiveMessageService;
+    private final WebClient.Builder webClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -130,11 +128,6 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     .onErrorResume(e -> {
                         log.error("{}❌ GroupProjectQueryHandler error: {}", traceLogPrefix, e.getMessage(), e);
                         return botClientService.sendMessage(token, chatId, "⚠️ 查询失败，请稍后再试。", null).then();
-                    })
-                    .doOnSuccess(v -> {
-                        interactiveMessageService.scheduleMessageDeletion(
-                                token, userId, chatId, messageId, 10, ctx.logIdentifier(), contextView
-                        ).subscribe();
                     })
                     .then();
         });
