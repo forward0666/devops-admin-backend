@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -30,7 +31,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
     private static final String PROJECT_DOMAIN_ACTION = "PROJECT_DOMAIN_ACTION";
     private static final String PROJECT_MIDDLEWARE_ACTION = "PROJECT_MIDDLEWARE_ACTION";
-    private static final String MANAGE_SERVICE_URL = "http://manage:8083";
+    private static final String USER_SERVICE_URL = "http://user:8084";
 
     @Override
     public boolean supports(String callbackData) {
@@ -60,31 +61,30 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
             return botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
                     .flatMap(binding -> {
                         if (binding.getProjectId() == null) {
-                            return replyNoBinding(token, chatId, messageId, traceLogPrefix);
+                            return replyNoBinding(token, chatId, messageId);
                         }
 
-                        WebClient webClient = webClientBuilder.baseUrl(MANAGE_SERVICE_URL).build();
+                        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL).build();
 
                         return switch (callbackData) {
-                            case PROJECT_INFO_ACTION -> fetchAndReplyProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
-                            case PROJECT_MEMBER_ACTION -> replyNotImplemented(token, chatId, messageId, "成员列表", traceLogPrefix);
-                            case PROJECT_DOMAIN_ACTION -> replyNotImplemented(token, chatId, messageId, "域名列表", traceLogPrefix);
-                            case PROJECT_MIDDLEWARE_ACTION -> replyNotImplemented(token, chatId, messageId, "中间件", traceLogPrefix);
+                            case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
+                            case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", traceLogPrefix);
+                            case PROJECT_DOMAIN_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🌐 域名列表", traceLogPrefix);
+                            case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, binding, "/middleware/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🔧 中间件列表", traceLogPrefix);
                             default -> Mono.empty();
                         };
                     })
-                    .switchIfEmpty(Mono.defer(() -> replyNoBinding(token, chatId, messageId, traceLogPrefix)))
+                    .switchIfEmpty(Mono.defer(() -> replyNoBinding(token, chatId, messageId)))
                     .onErrorResume(e -> {
                         log.error("{}❌ GroupProjectQueryHandler error: {}", traceLogPrefix, e.getMessage(), e);
-                        return botClientService.sendMessage(token, chatId, "⚠️ 查询失败，请稍后再试。", null)
-                                .then();
+                        return botClientService.sendMessage(token, chatId, "⚠️ 查询失败，请稍后再试。", null).then();
                     })
                     .then();
         });
     }
 
-    private Mono<Void> fetchAndReplyProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
-                                                  String token, Long chatId, Long messageId, String traceLogPrefix) {
+    private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
+                                           String token, Long chatId, Long messageId, String traceLogPrefix) {
         return webClient.get()
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
@@ -94,38 +94,77 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     Map<String, Object> data = project.containsKey("data") ? (Map<String, Object>) project.get("data") : project;
 
                     StringBuilder sb = new StringBuilder();
-                    sb.append("📋 **项目信息**\n\n");
+                    sb.append("📋 *项目信息*\n\n");
                     sb.append("项目名称：").append(data.getOrDefault("projectName", binding.getProjectName())).append("\n");
                     sb.append("项目描述：").append(data.getOrDefault("description", "暂无")).append("\n");
                     sb.append("技术栈：").append(data.getOrDefault("techStack", "暂无")).append("\n");
                     sb.append("状态：").append(data.getOrDefault("status", "未知")).append("\n");
                     sb.append("创建时间：").append(data.getOrDefault("createdAt", "暂无")).append("\n");
 
-                    String text = sb.toString();
-                    return botClientService.editMessageText(token, chatId, messageId, text, null)
-                            .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null))
-                            .then();
+                    return replyText(token, chatId, messageId, sb.toString());
                 })
                 .onErrorResume(e -> {
-                    log.warn("{}⚠️ Failed to fetch project info from manage service: {}", traceLogPrefix, e.getMessage());
-                    String text = String.format("📋 **项目信息（本地缓存）**\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 无法从管理服务获取详细信息", binding.getProjectName(), binding.getProjectId());
-                    return botClientService.editMessageText(token, chatId, messageId, text, null)
-                            .onErrorResume(ex -> botClientService.sendMessage(token, chatId, text, null))
-                            .then();
+                    log.warn("{}⚠️ Failed to fetch project info: {}", traceLogPrefix, e.getMessage());
+                    return replyText(token, chatId, messageId,
+                            String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()));
                 });
     }
 
-    private Mono<Void> replyNoBinding(String token, Long chatId, Long messageId, String traceLogPrefix) {
-        String text = "该群组未绑定项目，请联系管理员配置。";
+    private Mono<Void> fetchList(WebClient webClient, BotGroupProjectEntity binding, String uri,
+                                  String token, Long chatId, Long messageId, String title, String traceLogPrefix) {
+        return webClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(response -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> res = response.containsKey("data") ? (Map<String, Object>) response.get("data") : response;
+                    List<?> items = res.containsKey("data") ? (List<?>) res.get("data") : (res instanceof List ? (List<?>) res : List.of());
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(title).append("\n");
+                    sb.append("项目：").append(binding.getProjectName()).append("\n\n");
+
+                    if (items.isEmpty()) {
+                        sb.append("暂无数据");
+                    } else {
+                        int idx = 1;
+                        for (Object item : items) {
+                            if (!(item instanceof Map)) continue;
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> m = (Map<String, Object>) item;
+                            sb.append(idx++).append(". ");
+                            if (m.containsKey("domainName")) {
+                                sb.append(m.get("domainName"));
+                                if (m.containsKey("ip")) sb.append(" (").append(m.get("ip")).append(")");
+                            } else if (m.containsKey("name")) {
+                                sb.append(m.get("name"));
+                            } else if (m.containsKey("username")) {
+                                sb.append(m.get("username"));
+                                if (m.containsKey("projectRole")) sb.append(" [").append(m.get("projectRole")).append("]");
+                            } else {
+                                sb.append(m.toString());
+                            }
+                            sb.append("\n");
+                        }
+                        sb.append("\n共 ").append(idx - 1).append(" 条");
+                    }
+
+                    return replyText(token, chatId, messageId, sb.toString());
+                })
+                .onErrorResume(e -> {
+                    log.warn("{}⚠️ Failed to fetch {}: {}", traceLogPrefix, title, e.getMessage());
+                    return replyText(token, chatId, messageId, "⚠️ 查询失败：" + e.getMessage());
+                });
+    }
+
+    private Mono<Void> replyText(String token, Long chatId, Long messageId, String text) {
         return botClientService.editMessageText(token, chatId, messageId, text, null)
                 .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null))
                 .then();
     }
 
-    private Mono<Void> replyNotImplemented(String token, Long chatId, Long messageId, String feature, String traceLogPrefix) {
-        String text = String.format("⚠️ %s功能开发中，敬请期待...", feature);
-        return botClientService.editMessageText(token, chatId, messageId, text, null)
-                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null))
-                .then();
+    private Mono<Void> replyNoBinding(String token, Long chatId, Long messageId) {
+        return replyText(token, chatId, messageId, "该群组未绑定项目，请联系管理员配置。");
     }
 }
