@@ -59,8 +59,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
                         if (isMenuNavigation) {
                             log.info("{}⚠️ User {} is processing /start command but clicked menu navigation: {}. Allowing operation.", logPrefix, userId, callbackData);
-                            // 允许菜单导航操作，继续执行后续流程，但不取消删除任务
-                            return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                            // 允许菜单导航操作，继续执行后续流程，取消删除任务
+                            return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
                         } else {
                             // 非菜单导航操作，忽略并返回提示
                             log.info("{}⚠️ User {} is processing /start command. Ignoring callback action: {}", logPrefix, userId, callbackData);
@@ -72,8 +72,8 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     
                     // 正常流程：根据操作类型决定是否取消计时器
                     if (isMenuNavigation) {
-                        // 菜单导航，不取消删除任务
-                        return processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                        // 菜单导航，取消父消息删除计时器
+                        return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
                     } else {
                         // 其他操作，取消删除任务
                         return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
@@ -86,7 +86,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                         log.info("{}⚠️ User {} has no session, but clicked menu navigation: {}. Creating temporary session.", logPrefix, userId, callbackData);
                         return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
                                 .contextWrite(contextView)
-                                .then(processCallbackWithoutCancel(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId))
+                                .then(processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId))
                                 // 临时会话需要保持一段时间以便消息自动删除，不立即清除
                                 .then();
                     } else {

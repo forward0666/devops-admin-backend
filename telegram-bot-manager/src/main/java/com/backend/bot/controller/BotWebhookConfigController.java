@@ -187,7 +187,7 @@ public class BotWebhookConfigController {
                                         return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
                                     }
                                     return Mono.just(HttpResponseUtils.internalError("❌ 删除 Webhook 失败: " + res));
-                                })
+                                });
                     })
                     .onErrorResume(IllegalArgumentException.class, e -> Mono.just(HttpResponseUtils.badRequest(e.getMessage())))
                     .onErrorResume(e -> {
