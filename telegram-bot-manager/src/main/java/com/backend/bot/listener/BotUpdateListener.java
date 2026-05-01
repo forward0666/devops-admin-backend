@@ -15,6 +15,8 @@ import reactor.core.scheduler.Scheduler;
 
 import java.time.Duration;
 
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+
 import static com.backend.bot.util.BotChatUtils.extractChatId;
 
 @Component
@@ -25,16 +27,22 @@ public class BotUpdateListener {
     private final BotUpdateService botUpdateHandlerService;
     private final GroupMessageFilter groupMessageFilter;
     private final Scheduler blockingTaskScheduler;
+    private final ReactiveStringRedisTemplate redisTemplate;
+
+    private static final int MAX_UNAUTHORIZED_ATTEMPTS = 2;
+    private static final Duration BLACKLIST_TTL = Duration.ofHours(24);
 
     public BotUpdateListener(
             BotCoreService botCoreService,
             BotUpdateService botUpdateHandlerService,
             GroupMessageFilter groupMessageFilter,
-            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler) {
+            @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler,
+            ReactiveStringRedisTemplate redisTemplate) {
         this.botCoreService = botCoreService;
         this.botUpdateHandlerService = botUpdateHandlerService;
         this.groupMessageFilter = groupMessageFilter;
         this.blockingTaskScheduler = blockingTaskScheduler;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -87,8 +95,15 @@ public class BotUpdateListener {
                                 if (Boolean.TRUE.equals(isAllowed)) {
                                     return Mono.just(botConfigEntity);
                                 } else {
-                                    log.warn("⛔ Rejected update for bot {} from UNAUTHORIZED Chat ID: {}", botName, chatId);
-                                    return Mono.empty();
+                                    return checkAndBlacklist(botName, chatId)
+                                            .flatMap(blacklisted -> {
+                                                if (blacklisted) {
+                                                    log.warn("🚫 Rejected update for bot {} from BLACKLISTED Chat ID: {}", botName, chatId);
+                                                } else {
+                                                    log.warn("⛔ Rejected update for bot {} from UNAUTHORIZED Chat ID: {}", botName, chatId);
+                                                }
+                                                return Mono.empty();
+                                            });
                                 }
                             });
                 })
@@ -128,5 +143,34 @@ public class BotUpdateListener {
         processingPipeline
                 .subscribeOn(blockingTaskScheduler)
                 .subscribe();
+    }
+
+    /**
+     * 检查未授权用户并拉黑：第一次警告，第二次起直接拉黑
+     * @return true=已拉黑(静默丢弃), false=首次未授权(警告)
+     */
+    private Mono<Boolean> checkAndBlacklist(String botName, Long chatId) {
+        String counterKey = "bot:unauthorized:" + botName + ":" + chatId;
+        String blacklistKey = "bot:blacklist:" + botName + ":" + chatId;
+
+        // 先检查是否已拉黑
+        return redisTemplate.hasKey(blacklistKey)
+                .flatMap(isBlacklisted -> {
+                    if (Boolean.TRUE.equals(isBlacklisted)) {
+                        return Mono.just(true);
+                    }
+                    // 未拉黑，计数+1
+                    return redisTemplate.opsForValue().increment(counterKey)
+                            .flatMap(count -> {
+                                if (count >= MAX_UNAUTHORIZED_ATTEMPTS) {
+                                    // 达到阈值，拉黑
+                                    log.warn("🔒 Auto-blacklisting Chat ID: {} for bot: {} after {} unauthorized attempts", chatId, botName, count);
+                                    return redisTemplate.opsForValue().set(blacklistKey, "1", BLACKLIST_TTL)
+                                            .thenReturn(true);
+                                }
+                                // 首次，设置计数器过期时间
+                                return redisTemplate.expire(counterKey, BLACKLIST_TTL).thenReturn(false);
+                            });
+                });
     }
 }
