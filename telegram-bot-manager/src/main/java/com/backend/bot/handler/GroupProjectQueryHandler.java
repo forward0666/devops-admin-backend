@@ -136,9 +136,15 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .uri("/project/{id}", binding.getProjectId())
                 .retrieve()
                 .bodyToMono(Map.class)
+                .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> data = project.containsKey("data") ? (Map<String, Object>) project.get("data") : project;
+
+                    if (data == null) {
+                        return replyText(token, chatId, messageId,
+                                String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()));
+                    }
 
                     StringBuilder sb = new StringBuilder();
                     sb.append("📋 *项目信息*\n\n");
