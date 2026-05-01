@@ -14,7 +14,8 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
-import com.backend.bot.repository.BotAuthorizedChatRepository; // <--- 新增导入
+import com.backend.bot.repository.BotAuthorizedChatRepository;
+import com.backend.bot.config.TelegramProperties; // <--- 新增导入
 import java.time.Duration;
 
 @Service
@@ -30,6 +31,7 @@ public class BotCoreService {
 
     // 🌟 新增 CacheTemplateService 依赖
     private final CacheTemplateService cacheTemplateService;
+    private final TelegramProperties telegramProperties;
 
     private static final Duration CACHE_VALID_DURATION = Duration.ofHours(1);
     private static final Duration CACHE_INVALID_DURATION = Duration.ofMinutes(5);
@@ -72,7 +74,8 @@ public class BotCoreService {
         return botRepository.save(config)
                 .flatMap(savedConfig -> {
                     // 2. 注册 Webhook
-                    return botClient.setWebhook(savedConfig.getBotToken(), savedConfig.getBotName(), dto.getSecretToken())
+                    String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName();
+                    return botClient.setWebhook(savedConfig.getBotToken(), webhookUrl, dto.getSecretToken())
                             .thenReturn(savedConfig);
                 })
                 .flatMap(this::cacheBotEntity) // 3. 响应式缓存
