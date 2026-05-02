@@ -1,6 +1,7 @@
 package com.backend.bot;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -21,6 +22,7 @@ import reactor.core.scheduler.Scheduler; // 引入 Scheduler
  * @author Backend Team
  * @version 1.0.0
  */
+@EnableAsync
 @SpringBootApplication(
         scanBasePackages = {
                 "com.backend.bot", // 主工程包 - 扫描所有 Telegram Bot 相关组件

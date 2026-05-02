@@ -51,6 +51,7 @@ public class BotUpdateListener {
         this.objectMapper = objectMapper;
     }
 
+    @Async
     @EventListener
     public void handleBotUpdateEvent(BotUpdateEvent event) {
         String botName = event.botName();
