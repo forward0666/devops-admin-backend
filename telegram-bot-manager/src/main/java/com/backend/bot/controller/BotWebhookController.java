@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Optional;
 
@@ -84,9 +85,10 @@ public class BotWebhookController {
                                     })
                                     .then(Mono.empty());
                         }
-                        return LogUtils.processWebhookUpdateAndPublishEvent(
-                                contextView, eventPublisher, botName, botUpdate
-                        );
+                        return Mono.<Void>fromRunnable(() ->
+                            LogUtils.processWebhookUpdateAndPublishEvent(
+                                contextView, eventPublisher, botName, botUpdate)
+                        ).subscribeOn(Schedulers.boundedElastic()).then();
                     });
         }).doFinally(LogUtils::clearMDC);
     }
