@@ -34,6 +34,16 @@ public class DomainMapper {
     @PostConstruct
     public void init() {
         try {
+            // 确保域名唯一复合索引
+            mongoTemplate.indexOps(DEFAULT_COLLECTION).ensureIndex(
+                new org.springframework.data.mongodb.core.index.CompoundIndexDefinition(
+                    new org.bson.Document().append("projectId", 1).append("domain", 1)
+                ).unique()
+            );
+        } catch (Exception e) {
+            log.warn("域名唯一索引创建失败(可能已存在): {}", e.getMessage());
+        }
+        try {
             InputStream is = getClass().getClassLoader().getResourceAsStream("mongo/domain.json");
             if (is != null) {
                 templates = objectMapper.readValue(is, new TypeReference<>() {});
@@ -79,7 +89,13 @@ public class DomainMapper {
     }
 
     public void insertAll(List<DomainEntity> entities) {
-        mongoTemplate.insertAll(entities);
+        // 按 projectId+domain 去重
+        Map<String, DomainEntity> uniqueMap = new java.util.LinkedHashMap<>();
+        for (DomainEntity e : entities) {
+            String key = e.getProjectId() + ":" + e.getDomain();
+            uniqueMap.putIfAbsent(key, e);
+        }
+        mongoTemplate.insertAll(new java.util.ArrayList<>(uniqueMap.values()));
     }
 
     public DomainEntity findByProjectIdAndDomain(Long projectId, String domain) {
