@@ -1,5 +1,7 @@
 package com.backend.bot.service;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
@@ -32,6 +34,9 @@ public class BotClientService {
 
     // 静态常量，用于在 Reactor Context 中存储 Trace ID 的 Key
     public static final String TRACE_ID_CONTEXT_KEY = "traceId";
+
+    // 编辑消息文本缓存，避免重复编辑相同内容
+    private final ConcurrentHashMap<String, String> editTextCache = new ConcurrentHashMap<>();
 
     private final WebClient telegramWebClient;
     private final ObjectMapper objectMapper;
@@ -243,6 +248,16 @@ public class BotClientService {
      * * 🌟 关键修改：在 API 层处理 400 Bad Request 错误，防止日志污染。
      */
     public Mono<Void> editMessageText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto replyMarkup) {
+        // 缓存key
+        String cacheKey = chatId + ":" + messageId;
+        String lastText = editTextCache.get(cacheKey);
+        if (text != null && text.equals(lastText)) {
+            return Mono.<Void>deferContextual(ctx -> {
+                log.debug("{}💬 Skipping editMessageText - text unchanged for messageId: {}", getTraceIdPrefix(ctx), messageId);
+                return Mono.empty();
+            });
+        }
+        editTextCache.put(cacheKey, text);
         String path = "/bot" + token + "/editMessageText";
 
         Map<String, Object> bodyMap = new HashMap<>();
