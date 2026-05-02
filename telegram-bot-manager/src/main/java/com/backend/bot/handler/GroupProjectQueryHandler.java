@@ -261,7 +261,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 ));
                         for (String env : envOrder) {
                             if (!grouped.containsKey(env)) continue;
-                            sb.append("环境：").append(entry.getKey()).append("\n");
+                            sb.append("环境：").append(env).append("\n");
                             int idx = 1;
                             for (Map<String, Object> m : grouped.get(env)) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
