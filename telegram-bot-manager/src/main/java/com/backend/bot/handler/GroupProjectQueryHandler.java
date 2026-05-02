@@ -251,21 +251,38 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     sb.append(title).append("\n");
                     sb.append("项目：").append(binding.getProjectName()).append("\n\n");
 
-                    // 域名列表按环境分组
+                    // 域名列表按环境分组（prod > uat > test > dev）
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
+                        String[] envOrder = {"prod", "uat", "test", "dev"};
                         Map<String, List<Map<String, Object>>> grouped = items.stream()
                                 .collect(java.util.stream.Collectors.groupingBy(
                                         d -> String.valueOf(getVal(d, "env", "其他")),
                                         java.util.stream.Collectors.toList()
                                 ));
-                        for (Map.Entry<String, List<Map<String, Object>>> entry : grouped.entrySet()) {
+                        for (String env : envOrder) {
+                            if (!grouped.containsKey(env)) continue;
                             sb.append("环境：").append(entry.getKey()).append("\n");
                             int idx = 1;
-                            for (Map<String, Object> m : entry.getValue()) {
+                            for (Map<String, Object> m : grouped.get(env)) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
                                 sb.append(idx++).append(". ").append(domainName);
+                                sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
+                                sb.append("\n");
+                            }
+                            sb.append("\n");
+                        }
+                        // 输出未在排序中的其他环境
+                        for (Map.Entry<String, List<Map<String, Object>>> entry : grouped.entrySet()) {
+                            if (java.util.Arrays.asList(envOrder).contains(entry.getKey())) continue;
+                            sb.append("环境：").append(entry.getKey()).append("\n");
+                            int idx2 = 1;
+                            for (Map<String, Object> m : entry.getValue()) {
+                                String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
+                                String type = getVal(m, "type", "").toString();
+                                String remark = getVal(m, "remark", "").toString();
+                                sb.append(idx2++).append(". ").append(domainName);
                                 sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
