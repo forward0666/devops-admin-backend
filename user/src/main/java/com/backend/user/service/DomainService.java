@@ -27,6 +27,10 @@ public class DomainService {
     }
 
     public DomainEntity create(Long projectId, DomainEntity entity) {
+        DomainEntity existing = domainMapper.findByProjectIdAndDomain(projectId, entity.getDomain());
+        if (existing != null) {
+            throw new RuntimeException("域名已存在: " + entity.getDomain());
+        }
         entity.setId(null);
         entity.setProjectId(projectId);
         entity.setCreatedAt(LocalDateTime.now());
@@ -37,6 +41,12 @@ public class DomainService {
     }
 
     public DomainEntity update(String id, Long projectId, DomainEntity entity) {
+        if (entity.getDomain() != null) {
+            DomainEntity existing = domainMapper.findByProjectIdAndDomain(projectId, entity.getDomain());
+            if (existing != null && !existing.getId().equals(id)) {
+                throw new RuntimeException("域名已存在: " + entity.getDomain());
+            }
+        }
         Map<String, Object> fields = new LinkedHashMap<>();
         if (entity.getDomain() != null) fields.put("domain", entity.getDomain());
         if (entity.getType() != null) fields.put("type", entity.getType());
@@ -57,6 +67,12 @@ public class DomainService {
     }
 
     public void importDomains(Long projectId, List<DomainEntity> domains) {
+        List<String> domainNames = domains.stream().map(DomainEntity::getDomain).toList();
+        List<DomainEntity> existing = domainMapper.findByProjectIdAndDomains(projectId, domainNames);
+        if (!existing.isEmpty()) {
+            String duplicates = existing.stream().map(DomainEntity::getDomain).collect(java.util.stream.Collectors.joining(", "));
+            throw new RuntimeException("域名已存在: " + duplicates);
+        }
         LocalDateTime now = LocalDateTime.now();
         for (DomainEntity d : domains) {
             d.setId(null);

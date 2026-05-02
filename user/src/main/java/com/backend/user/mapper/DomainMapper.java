@@ -82,6 +82,16 @@ public class DomainMapper {
         mongoTemplate.insertAll(entities);
     }
 
+    public DomainEntity findByProjectIdAndDomain(Long projectId, String domain) {
+        Query query = Query.query(Criteria.where("projectId").is(projectId).and("domain").is(domain));
+        return mongoTemplate.findOne(query, DomainEntity.class, DEFAULT_COLLECTION);
+    }
+
+    public List<DomainEntity> findByProjectIdAndDomains(Long projectId, List<String> domainList) {
+        Query query = Query.query(Criteria.where("projectId").is(projectId).and("domain").in(domainList));
+        return mongoTemplate.find(query, DomainEntity.class, DEFAULT_COLLECTION);
+    }
+
     public String getCollection(String templateName) {
         if (templates != null && templates.containsKey(templateName)) {
             return (String) templates.get(templateName).get("collection");

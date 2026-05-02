@@ -55,6 +55,9 @@ public class DomainController {
             entity.setRemark(body.get("remark"));
             DomainEntity created = domainService.create(projectId, entity);
             return ApiResponseDto.success("Domain created", DomainVo.fromEntity(created));
+        } catch (RuntimeException e) {
+            log.warn("Failed to create domain: {}", e.getMessage());
+            return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to create domain", e);
             return ApiResponseDto.error("Failed to create domain");
@@ -72,6 +75,9 @@ public class DomainController {
             DomainEntity updated = domainService.update(id, projectId, entity);
             if (updated == null) return ApiResponseDto.error("Domain not found");
             return ApiResponseDto.success("Domain updated", DomainVo.fromEntity(updated));
+        } catch (RuntimeException e) {
+            log.warn("Failed to update domain: {}", e.getMessage());
+            return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to update domain", e);
             return ApiResponseDto.error("Failed to update domain");
@@ -106,6 +112,9 @@ public class DomainController {
             }).toList();
             domainService.importDomains(projectId, domains);
             return ApiResponseDto.success("Imported " + domains.size() + " domains", domains.size());
+        } catch (RuntimeException e) {
+            log.warn("Failed to import domains: {}", e.getMessage());
+            return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to import domains", e);
             return ApiResponseDto.error("Failed to import domains");
