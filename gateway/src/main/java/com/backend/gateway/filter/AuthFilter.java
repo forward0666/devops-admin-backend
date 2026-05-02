@@ -81,8 +81,9 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
             final String ip = WebExchangeUtils.getClientIp(exchange);
 
             if (isWhitelistedPath(path)) {
-                log.info("[traceId={}] ✅ Whitelisted path (BotAuth skip) | IP={} | Route={} | Method={} | Path={}",
-                        traceId, ip, routeId, method, path);
+                String encryptedData = exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data");
+                log.info("[traceId={}] ✅ Whitelisted path (BotAuth skip) | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
+                        traceId, ip, routeId, method, path, encryptedData);
                 return chain.filter(exchange);
             }
 
