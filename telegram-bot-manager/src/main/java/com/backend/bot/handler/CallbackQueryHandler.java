@@ -104,16 +104,14 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         String token = context.token();
         Long chatId = context.chatId();
         
-        // 1. 重置删除计时器（取消旧的，重新开始5秒倒计时）
+        // 1. 设置删除定时器（每条消息独立，不取消旧任务）
         Long messageId = context.messageId();
-        // 数据展示类 callback（项目信息/成员/域名/中间件）保留 30 秒，菜单导航保留 10 秒
         int delaySeconds = callbackData.contains("_ACTION") ? 30 : TelegramConstants.MENU_DELETE_DELAY_SECONDS;
-        Mono<Void> resetTimerMono = userSessionService.cancelPendingDeletion(userId)
-                .then(messageId != null ? interactiveMessageService.scheduleMessageDeletion(
+        Mono<Void> deleteTimerMono = messageId != null
+                ? interactiveMessageService.scheduleMessageDeletion(
                         token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
-                ).contextWrite(contextView) : Mono.empty())
-                .doOnSuccess(v -> log.debug("{}✅ User {} interaction detected. Reset deletion timer to {}s.", logPrefix, userId, delaySeconds))
-                .onErrorResume(e -> Mono.empty());
+                ).contextWrite(contextView).onErrorResume(e -> Mono.empty())
+                : Mono.empty();
         
         // 2. 回答回调查询 - 不显示加载提示，直接处理
         botClientService.answerCallbackQuery(token, callbackQueryId)
@@ -137,7 +135,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                 });
         
         // 按顺序执行：重置计时器 -> 执行处理器 -> 清session
-        return resetTimerMono.then(handlerMono)
+        return deleteTimerMono.then(handlerMono)
                 .then(userSessionService.clearUserSession(userId).contextWrite(contextView))
                 .onErrorResume(e -> Mono.empty());
     }
