@@ -3,6 +3,7 @@ package com.backend.bot.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -25,8 +26,7 @@ public class DebugWebhookController {
     private final AtomicLong stuckRequests = new AtomicLong(0);
 
     @PostMapping("/callback/{botName}")
-    @ResponseStatus(HttpStatus.OK)
-    public Mono<Map<String, Object>> handleWebhook(
+    public Mono<ResponseEntity<Map<String, Object>>> handleWebhook(
             @PathVariable String botName,
             @RequestBody Map<String, Object> body) {
 
@@ -45,12 +45,14 @@ public class DebugWebhookController {
                             requestId, elapsed, activeRequests.size());
                     activeRequests.remove(requestId);
                 })
-                .map(b -> Map.of(
-                        "status", "ok",
-                        "requestId", requestId,
-                        "botName", botName,
-                        "elapsedMs", System.currentTimeMillis() - startTime
-                ));
+                .map(b -> ResponseEntity.ok()
+                        .header("Connection", "close")
+                        .body(Map.of(
+                                "status", "ok",
+                                "requestId", requestId,
+                                "botName", botName,
+                                "elapsedMs", System.currentTimeMillis() - startTime
+                        )));
     }
 
     @GetMapping("/debug/status")
