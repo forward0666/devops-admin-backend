@@ -1,7 +1,6 @@
 package com.backend.bot.listener;
 
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.event.BotUpdateEvent;
 import com.backend.bot.filter.GroupMessageFilter;
@@ -12,7 +11,6 @@ import filter.TraceIdFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
