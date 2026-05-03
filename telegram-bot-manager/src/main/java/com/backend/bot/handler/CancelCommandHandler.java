@@ -38,7 +38,7 @@ public class CancelCommandHandler extends AbstractUpdateHandler {
     public boolean support(BotUpdateDto update) {
         return update.message() != null &&
                 update.message().text() != null &&
-                update.message().text().trim().startsWith("/cancel");
+                update.message().text().trim().matches("/cancel($|@.+$)");
     }
 
     @Override

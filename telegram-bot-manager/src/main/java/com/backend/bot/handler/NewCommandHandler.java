@@ -34,7 +34,7 @@ public class NewCommandHandler extends AbstractUpdateHandler {
     public boolean support(BotUpdateDto update) {
         return update.message() != null &&
                 update.message().text() != null &&
-                update.message().text().trim().startsWith("/new");
+                update.message().text().trim().matches("/new($|@.+$)");
     }
 
     @Override
