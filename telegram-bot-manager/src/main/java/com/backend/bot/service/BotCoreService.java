@@ -1,5 +1,6 @@
 package com.backend.bot.service;
 
+import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.entity.BotAuthorizedChatEntity;
 import com.backend.bot.entity.BotConfigEntity;
@@ -13,6 +14,8 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import com.backend.bot.repository.BotAuthorizedChatRepository;
+import reactor.core.scheduler.Scheduler;
+
 import java.time.Duration;
 
 @Service
@@ -33,6 +36,7 @@ public class BotCoreService {
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
     private static final String CACHE_WHITELIST_PREFIX = "bot:authorizedchat:set:";
     private static final String CACHE_KEY_SEPARATOR = ":"; // 统一键分隔符
+    private final Scheduler blockingTaskScheduler;
 
     public BotCoreService(
             BotRepository botRepository,

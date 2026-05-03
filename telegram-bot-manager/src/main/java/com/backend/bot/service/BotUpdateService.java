@@ -1,6 +1,7 @@
 package com.backend.bot.service;
 
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.handler.UpdateHandlerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
