@@ -155,10 +155,6 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
             Long messageId = resultNode.path("message_id").asLong(0);
             if (messageId != 0) {
-                // 菜单发送成功，立即清session让用户可以继续操作
-                log.info("{}✅ Menu sent, clearing session immediately", logPrefix);
-                userSessionService.clearUserSession(userId).contextWrite(reactor.util.context.Context.of(contextView)).subscribe();
-
                 interactiveMessageService.scheduleMessageDeletion(
                         token, userId, chatId, messageId,
                         DELETE_DELAY_SECONDS, context.logIdentifier(), contextView
