@@ -46,7 +46,6 @@ public class DebugWebhookController {
                     activeRequests.remove(requestId);
                 })
                 .map(b -> ResponseEntity.ok()
-                        .header("Connection", "close")
                         .body(Map.of(
                                 "status", "ok",
                                 "requestId", requestId,
