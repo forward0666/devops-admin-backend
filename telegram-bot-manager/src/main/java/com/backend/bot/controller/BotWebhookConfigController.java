@@ -32,6 +32,7 @@ public class BotWebhookConfigController {
             @Valid @RequestBody Mono<SetWebhookDto> dtoMono,
             ServerWebExchange exchange) {
 
+        // 🌟 关键修正：使用 Mono.deferContextual 替代 LogUtils.setMdcFromContext()
         return Mono.deferContextual(contextView -> {
                     // 步骤 1: 将 Trace ID 从 Reactor Context 同步到 MDC
                     LogUtils.syncTraceIdToMDC(contextView);
@@ -125,6 +126,7 @@ public class BotWebhookConfigController {
     @GetMapping("/getWebhookInfo")
     public Mono<ResponseEntity<Map<String, Object>>> getBotWebhookInfo(@RequestParam String botName) {
 
+        // 🌟 关键修正：使用 Mono.deferContextual 替代 LogUtils.setMdcFromContext()
         return Mono.deferContextual(contextView -> {
                     // 步骤 1: 将 Trace ID 从 Reactor Context 同步到 MDC
                     LogUtils.syncTraceIdToMDC(contextView);

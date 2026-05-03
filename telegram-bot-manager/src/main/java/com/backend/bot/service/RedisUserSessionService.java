@@ -1,5 +1,6 @@
 package com.backend.bot.service;
 
+import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -7,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
