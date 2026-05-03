@@ -3,21 +3,18 @@ package com.backend.bot.controller;
 import filter.ActivityTrackingFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
-
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.lang.management.RuntimeMXBean;
-import java.lang.management.ThreadMXBean;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
-import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
+import java.time.Duration;
 import java.util.*;
 
 @RestController
@@ -26,88 +23,107 @@ import java.util.*;
 @RequestMapping("/serviceStatus")
 public class ServiceStatusController {
 
-    private final StringRedisTemplate stringRedisTemplate;
+    private final ReactiveStringRedisTemplate reactiveRedisTemplate;
     private final ActivityTrackingFilter activityTrackingFilter;
 
     private static final String PENDING_DELETION_KEY = "bot:pendingDeletion";
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getStatus() {
-        Map<String, Object> status = new LinkedHashMap<>();
-
-        // 1. 活跃请求（未完成的 HTTP 请求）
-        status.put("activeRequests", getActiveRequests());
-
-        // 2. Redis 连接状态
-        status.put("redis", getRedisStatus());
-
-        // 2. 待删除消息队列
-        status.put("pendingDeletions", getPendingDeletions());
-
-        // 3. JVM 信息
-        status.put("jvm", getJvmInfo());
-
-        // 4. 线程信息
-        status.put("threads", getThreadInfo());
-
-        return ResponseEntity.ok(status);
+    public Mono<ResponseEntity<Map<String, Object>>> getStatus() {
+        return Mono.fromCallable(() -> {
+            Map<String, Object> status = new LinkedHashMap<>();
+            status.put("activeRequests", getActiveRequests());
+            status.put("jvm", getJvmInfo());
+            status.put("threads", getThreadInfo());
+            return status;
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+          .zipWith(getPendingDeletionsReactive(), (status, pd) -> {
+              status.put("pendingDeletions", pd);
+              return status;
+          })
+          .zipWith(getRedisStatusReactive(), (status, redis) -> {
+              status.put("redis", redis);
+              return status;
+          })
+          .map(ResponseEntity::ok)
+          .onErrorResume(e -> {
+              log.error("❌ ServiceStatus error", e);
+              Map<String, Object> error = new LinkedHashMap<>();
+              error.put("error", e.getMessage());
+              return Mono.just(ResponseEntity.ok(error));
+          });
     }
 
     @GetMapping("/pendingDeletions")
-    public ResponseEntity<List<Map<String, Object>>> getPendingDeletionList() {
-        Set<ZSetOperations.TypedTuple<String>> all =
-                stringRedisTemplate.opsForZSet().rangeWithScores(PENDING_DELETION_KEY, 0, -1);
-
-        List<Map<String, Object>> list = new ArrayList<>();
-        if (all != null) {
-            double now = System.currentTimeMillis() / 1000.0;
-            for (ZSetOperations.TypedTuple<String> tuple : all) {
-                if (tuple.getValue() == null) continue;
-                String[] parts = tuple.getValue().split(":", 4);
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("chatId", parts.length > 0 ? parts[0] : "?");
-                item.put("messageId", parts.length > 1 ? parts[1] : "?");
-                item.put("userId", parts.length > 2 ? parts[2] : "?");
-                item.put("score", tuple.getScore());
-                item.put("expireAt", new Date((long) (tuple.getScore() * 1000)));
-                item.put("remainingSeconds", Math.max(0, (int) (tuple.getScore() - now)));
-                item.put("expired", tuple.getScore() <= now);
-                list.add(item);
-            }
-        }
-
-        list.sort(Comparator.comparingDouble(m -> (double) m.get("score")));
-        return ResponseEntity.ok(list);
+    public Mono<ResponseEntity<List<Map<String, Object>>>> getPendingDeletionList() {
+        return reactiveRedisTemplate.opsForZSet()
+                .rangeWithScores(PENDING_DELETION_KEY, 0, -1)
+                .collectList()
+                .map(tuples -> {
+                    double now = System.currentTimeMillis() / 1000.0;
+                    List<Map<String, Object>> list = new ArrayList<>();
+                    for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+                        if (tuple.getValue() == null) continue;
+                        String[] parts = tuple.getValue().split(":", 4);
+                        Map<String, Object> item = new LinkedHashMap<>();
+                        item.put("chatId", parts.length > 0 ? parts[0] : "?");
+                        item.put("messageId", parts.length > 1 ? parts[1] : "?");
+                        item.put("userId", parts.length > 2 ? parts[2] : "?");
+                        item.put("score", tuple.getScore());
+                        item.put("expireAt", new Date((long) (tuple.getScore() * 1000)));
+                        item.put("remainingSeconds", Math.max(0, (int) (tuple.getScore() - now)));
+                        item.put("expired", tuple.getScore() <= now);
+                        list.add(item);
+                    }
+                    list.sort(Comparator.comparingDouble(m -> (double) m.get("score")));
+                    return ResponseEntity.ok(list);
+                })
+                .defaultIfEmpty(ResponseEntity.ok(Collections.emptyList()))
+                .timeout(Duration.ofSeconds(3))
+                .onErrorResume(e -> Mono.just(ResponseEntity.ok(Collections.emptyList())));
     }
 
-    private Map<String, Object> getRedisStatus() {
-        Map<String, Object> redis = new LinkedHashMap<>();
-        try {
-            long start = System.currentTimeMillis();
-            String testKey = "bot:health:ping";
-            stringRedisTemplate.opsForValue().set(testKey, "ok");
-            String result = stringRedisTemplate.opsForValue().get(testKey);
-            stringRedisTemplate.delete(testKey);
-            long elapsed = System.currentTimeMillis() - start;
-            redis.put("status", "UP");
-            redis.put("pingMs", elapsed);
-            redis.put("response", result);
-        } catch (Exception e) {
-            redis.put("status", "DOWN");
-            redis.put("error", e.getMessage());
-        }
-        return redis;
+    private Mono<Map<String, Object>> getRedisStatusReactive() {
+        final String testKey = "bot:health:ping";
+        long start = System.currentTimeMillis();
+        return reactiveRedisTemplate.opsForValue().set(testKey, "ok")
+                .then(reactiveRedisTemplate.opsForValue().get(testKey))
+                .flatMap(result -> reactiveRedisTemplate.delete(testKey).thenReturn(result))
+                .map(result -> {
+                    Map<String, Object> redis = new LinkedHashMap<>();
+                    redis.put("status", "UP");
+                    redis.put("pingMs", System.currentTimeMillis() - start);
+                    redis.put("response", result);
+                    return redis;
+                })
+                .defaultIfEmpty(Map.of("status", "UP", "pingMs", System.currentTimeMillis() - start))
+                .timeout(Duration.ofSeconds(3))
+                .onErrorResume(e -> Mono.just(Map.of("status", "DOWN", "error", e.getMessage())));
     }
 
-    private Map<String, Object> getPendingDeletions() {
-        Map<String, Object> info = new LinkedHashMap<>();
-        Long total = stringRedisTemplate.opsForZSet().size(PENDING_DELETION_KEY);
+    private Mono<Map<String, Object>> getPendingDeletionsReactive() {
         double now = System.currentTimeMillis() / 1000.0;
-        Long expired = stringRedisTemplate.opsForZSet().count(PENDING_DELETION_KEY, 0, now);
-        Long pending = total != null && expired != null ? total - expired : 0;
-        info.put("total", total);
-        info.put("expired", expired);
-        info.put("pending", pending);
+        return reactiveRedisTemplate.opsForZSet().size(PENDING_DELETION_KEY)
+                .zipWith(reactiveRedisTemplate.opsForZSet().count(PENDING_DELETION_KEY, 0, now))
+                .map(tuple -> {
+                    long total = tuple.getT1() != null ? tuple.getT1() : 0;
+                    long expired = tuple.getT2() != null ? tuple.getT2() : 0;
+                    Map<String, Object> info = new LinkedHashMap<>();
+                    info.put("total", total);
+                    info.put("expired", expired);
+                    info.put("pending", total - expired);
+                    return info;
+                })
+                .defaultIfEmpty(Map.of("total", 0, "expired", 0, "pending", 0))
+                .timeout(Duration.ofSeconds(3))
+                .onErrorResume(e -> Mono.just(Map.of("total", -1, "error", e.getMessage())));
+    }
+
+    private Map<String, Object> getActiveRequests() {
+        Map<String, Object> info = new LinkedHashMap<>();
+        Set<String> snapshot = activityTrackingFilter.getActiveRequestsSnapshot();
+        info.put("count", snapshot.size());
+        info.put("requests", snapshot);
         return info;
     }
 
@@ -115,7 +131,6 @@ public class ServiceStatusController {
         Map<String, Object> jvm = new LinkedHashMap<>();
         Runtime runtime = Runtime.getRuntime();
         MemoryMXBean memory = ManagementFactory.getMemoryMXBean();
-
         jvm.put("maxMemory", formatBytes(runtime.maxMemory()));
         jvm.put("totalMemory", formatBytes(runtime.totalMemory()));
         jvm.put("freeMemory", formatBytes(runtime.freeMemory()));
@@ -151,14 +166,5 @@ public class ServiceStatusController {
         if (d > 0) return String.format("%dd %dh %dm", d, h, m);
         if (h > 0) return String.format("%dh %dm", h, m);
         return String.format("%dm", m);
-    }
-
-
-    private Map<String, Object> getActiveRequests() {
-        Map<String, Object> info = new LinkedHashMap<>();
-        Set<String> snapshot = activityTrackingFilter.getActiveRequestsSnapshot();
-        info.put("count", snapshot.size());
-        info.put("requests", snapshot);
-        return info;
     }
 }
