@@ -1,5 +1,6 @@
 package com.backend.bot.controller;
 
+import filter.ActivityTrackingFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -26,6 +27,7 @@ import java.util.*;
 public class ServiceStatusController {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final ActivityTrackingFilter activityTrackingFilter;
 
     private static final String PENDING_DELETION_KEY = "bot:pendingDeletion";
 
@@ -33,13 +35,16 @@ public class ServiceStatusController {
     public ResponseEntity<Map<String, Object>> getStatus() {
         Map<String, Object> status = new LinkedHashMap<>();
 
-        // 1. Redis 连接状态
+        // 1. 活跃请求（卡住的 webhook 请求）
+        status.put("activeRequests", getActiveRequests());
+
+        // 2. Redis 连接状态
         status.put("redis", getRedisStatus());
 
-        // 2. 待删除消息队列
+        // 3. 待删除消息队列
         status.put("pendingDeletions", getPendingDeletions());
 
-        // 3. JVM 信息
+        // 4. JVM 信息
         status.put("jvm", getJvmInfo());
 
         // 4. 线程信息
@@ -146,5 +151,13 @@ public class ServiceStatusController {
         if (d > 0) return String.format("%dd %dh %dm", d, h, m);
         if (h > 0) return String.format("%dh %dm", h, m);
         return String.format("%dm", m);
+    }
+
+    private Map<String, Object> getActiveRequests() {
+        Map<String, Object> info = new LinkedHashMap<>();
+        Set<String> snapshot = activityTrackingFilter.getActiveRequestsSnapshot();
+        info.put("count", snapshot.size());
+        info.put("requests", snapshot);
+        return info;
     }
 }
