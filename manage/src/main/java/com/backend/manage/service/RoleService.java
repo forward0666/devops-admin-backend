@@ -35,23 +35,17 @@ public class RoleService {
     public List<RoleEntity> getAllRoles() {
         log.info("正在获取所有角色列表");
 
-        // 优先从Redis缓存获取角色列表
         if (cacheService.isRedisAvailable()) {
-            var cachedRoles = roleCacheService.getCachedRolesList();
-            if (cachedRoles != null) {
+            var cached = roleCacheService.getCachedRolesList();
+            if (cached != null) {
                 log.debug("从缓存中获取角色列表成功");
-                return cachedRoles;
+                return cached;
             }
         }
 
         try {
             var roles = roleMapper.findAll();
-
-            // 将查询结果缓存到Redis中
-            if (cacheService.isRedisAvailable()) {
-                roleCacheService.cacheRolesList(roles);
-            }
-
+            cacheRoleList(roles);
             log.info("成功获取 {} 个角色", roles.size());
             return roles;
         } catch (Exception e) {
@@ -71,29 +65,23 @@ public class RoleService {
             return null;
         }
 
-        // 优先从Redis缓存获取角色信息
         if (cacheService.isRedisAvailable()) {
-            var cachedRole = roleCacheService.getCachedRole(id);
-            if (cachedRole != null) {
+            var cached = roleCacheService.getCachedRole(id);
+            if (cached != null) {
                 log.debug("从缓存中获取角色成功: {}", id);
-                return cachedRole;
+                return cached;
             }
         }
 
         try {
             var role = roleMapper.findById(id);
             if (role != null) {
-                // 将查询结果缓存到Redis中
-                if (cacheService.isRedisAvailable()) {
-                    roleCacheService.cacheRole(role);
-                }
-
+                cacheSingleRole(role);
                 log.info("成功获取角色: {}", role.getName());
                 return role;
-            } else {
-                log.warn("找不到ID为 {} 的角色", id);
-                return null;
             }
+            log.warn("找不到ID为 {} 的角色", id);
+            return null;
         } catch (Exception e) {
             log.error("根据ID获取角色时发生错误: {}", id, e);
             throw new RuntimeException("获取角色信息失败", e);
@@ -109,23 +97,15 @@ public class RoleService {
         validateRoleForCreation(role);
 
         try {
-            if (roleMapper.existsByCode(role.getCode())) {
-                throw new IllegalArgumentException("角色代码 '" + role.getCode() + "' 已存在");
-            }
+            validateCodeUnique(role.getCode(), null);
 
             if (role.getUserCount() == null) {
                 role.setUserCount(0);
             }
 
-            role.setCreatedAt(LocalDateTime.now());
-            role.setUpdatedAt(LocalDateTime.now());
-
+            setTimestamps(role);
             roleMapper.insert(role);
-
-            // 清除相关缓存
-            if (cacheService.isRedisAvailable()) {
-                roleCacheService.clearAllRoleCache();
-            }
+            clearRoleCache();
 
             log.info("成功创建角色，ID: {}", role.getId());
             return role;
@@ -149,17 +129,11 @@ public class RoleService {
                 return null;
             }
 
-            if (roleMapper.existsByCodeExcludingId(role.getCode(), role.getId())) {
-                throw new IllegalArgumentException("角色代码 '" + role.getCode() + "' 已存在");
-            }
+            validateCodeUnique(role.getCode(), role.getId());
 
             role.setUpdatedAt(LocalDateTime.now());
             roleMapper.update(role);
-
-            // 清除相关缓存
-            if (cacheService.isRedisAvailable()) {
-                roleCacheService.clearAllRoleCache();
-            }
+            clearRoleCache();
 
             log.info("成功更新角色: {}", role.getName());
             return getRoleById(role.getId());
@@ -186,22 +160,15 @@ public class RoleService {
                 return false;
             }
 
-            RoleEntity role = roleMapper.findById(id);
-            if (role.getUserCount() != null && role.getUserCount() > 0) {
-                throw new IllegalStateException("无法删除包含 " + role.getUserCount() + " 个用户的角色。请先重新分配用户。");
-            }
-
+            validateNoUsersAssigned(id);
             boolean deleted = roleMapper.deleteById(id) > 0;
 
             if (deleted) {
-                if (cacheService.isRedisAvailable()) {
-                    roleCacheService.clearAllRoleCache();
-                }
+                clearRoleCache();
                 log.info("成功删除角色，ID: {}", id);
             } else {
                 log.warn("删除角色失败，ID: {}", id);
             }
-
             return deleted;
         } catch (Exception e) {
             log.error("删除角色时发生错误，ID: {}", id, e);
@@ -209,47 +176,87 @@ public class RoleService {
         }
     }
 
-    // Private helper methods
+    // --- Cache helpers ---
+
+    private void cacheRoleList(List<RoleEntity> roles) {
+        if (cacheService.isRedisAvailable()) {
+            roleCacheService.cacheRolesList(roles);
+        }
+    }
+
+    private void cacheSingleRole(RoleEntity role) {
+        if (cacheService.isRedisAvailable()) {
+            roleCacheService.cacheRole(role);
+        }
+    }
+
+    private void clearRoleCache() {
+        if (cacheService.isRedisAvailable()) {
+            roleCacheService.clearAllRoleCache();
+        }
+    }
+
+    // --- Validation helpers ---
+
+    private void validateCodeUnique(String code, Long excludeId) {
+        boolean exists = excludeId != null
+                ? roleMapper.existsByCodeExcludingId(code, excludeId)
+                : roleMapper.existsByCode(code);
+        if (exists) {
+            throw new IllegalArgumentException("角色代码 '" + code + "' 已存在");
+        }
+    }
+
+    private void validateNoUsersAssigned(Long roleId) {
+        RoleEntity role = roleMapper.findById(roleId);
+        if (role.getUserCount() != null && role.getUserCount() > 0) {
+            throw new IllegalStateException("无法删除包含 " + role.getUserCount() + " 个用户的角色。请先重新分配用户。");
+        }
+    }
+
+    private void setTimestamps(RoleEntity role) {
+        LocalDateTime now = LocalDateTime.now();
+        role.setCreatedAt(now);
+        role.setUpdatedAt(now);
+    }
+
+    // --- Field validation ---
 
     private void validateRoleForCreation(RoleEntity role) {
         if (role == null) {
             throw new IllegalArgumentException("角色不能为空");
         }
-
-        if (role.getName() == null || role.getName().trim().isEmpty()) {
-            throw new IllegalArgumentException("角色名称不能为空");
-        }
-
-        if (role.getName().length() > 100) {
-            throw new IllegalArgumentException("角色名称不能超过100个字符");
-        }
-
-        if (role.getCode() == null || role.getCode().trim().isEmpty()) {
-            throw new IllegalArgumentException("角色代码不能为空");
-        }
-
-        if (role.getCode().length() > 50) {
-            throw new IllegalArgumentException("角色代码不能超过50个字符");
-        }
-
-        if (role.getDescription() != null && role.getDescription().length() > 500) {
-            throw new IllegalArgumentException("角色描述不能超过500个字符");
-        }
-
-        if (role.getStatus() == null) {
-            role.setStatus("active");
-        }
+        validateRoleFields(role);
     }
 
     private void validateRoleForUpdate(RoleEntity role) {
         if (role == null) {
             throw new IllegalArgumentException("角色不能为空");
         }
-
         if (role.getId() == null) {
             throw new IllegalArgumentException("更新角色需要提供角色ID");
         }
+        validateRoleFields(role);
+    }
 
-        validateRoleForCreation(role);
+    private void validateRoleFields(RoleEntity role) {
+        if (role.getName() == null || role.getName().trim().isEmpty()) {
+            throw new IllegalArgumentException("角色名称不能为空");
+        }
+        if (role.getName().length() > 100) {
+            throw new IllegalArgumentException("角色名称不能超过100个字符");
+        }
+        if (role.getCode() == null || role.getCode().trim().isEmpty()) {
+            throw new IllegalArgumentException("角色代码不能为空");
+        }
+        if (role.getCode().length() > 50) {
+            throw new IllegalArgumentException("角色代码不能超过50个字符");
+        }
+        if (role.getDescription() != null && role.getDescription().length() > 500) {
+            throw new IllegalArgumentException("角色描述不能超过500个字符");
+        }
+        if (role.getStatus() == null) {
+            role.setStatus("active");
+        }
     }
 }

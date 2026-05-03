@@ -37,23 +37,17 @@ public class PositionService {
     public List<PositionEntity> getAllPositions() {
         log.info("正在获取所有职位列表");
 
-        // 优先从Redis缓存获取职位列表
         if (cacheService.isRedisAvailable()) {
-            List<PositionEntity> cachedPositions = positionCacheService.getCachedPositionsList();
-            if (cachedPositions != null) {
+            List<PositionEntity> cached = positionCacheService.getCachedPositionsList();
+            if (cached != null) {
                 log.debug("从缓存中获取职位列表成功");
-                return cachedPositions;
+                return cached;
             }
         }
 
         try {
             List<PositionEntity> positions = positionMapper.findAll();
-
-            // 将查询结果缓存到Redis中
-            if (cacheService.isRedisAvailable()) {
-                positionCacheService.cachePositionsList(positions);
-            }
-
+            cachePositionList(positions);
             log.info("成功获取 {} 个职位", positions.size());
             return positions;
         } catch (Exception e) {
@@ -73,29 +67,23 @@ public class PositionService {
             return null;
         }
 
-        // 优先从Redis缓存获取职位信息
         if (cacheService.isRedisAvailable()) {
-            PositionEntity cachedPosition = positionCacheService.getCachedPosition(id);
-            if (cachedPosition != null) {
+            PositionEntity cached = positionCacheService.getCachedPosition(id);
+            if (cached != null) {
                 log.debug("从缓存中获取职位成功: {}", id);
-                return cachedPosition;
+                return cached;
             }
         }
 
         try {
             PositionEntity position = positionMapper.findById(id);
             if (position != null) {
-                // 将查询结果缓存到Redis中
-                if (cacheService.isRedisAvailable()) {
-                    positionCacheService.cachePosition((PositionEntity) position);
-                }
-
+                cacheSinglePosition(position);
                 log.info("成功获取职位: {}", position.getName());
                 return position;
-            } else {
-                log.warn("找不到ID为 {} 的职位", id);
-                return null;
             }
+            log.warn("找不到ID为 {} 的职位", id);
+            return null;
         } catch (Exception e) {
             log.error("根据ID获取职位时发生错误: {}", id, e);
             throw new RuntimeException("获取职位信息失败", e);
@@ -111,30 +99,16 @@ public class PositionService {
         validatePositionForCreation(position);
 
         try {
-            // 验证部门是否存在
-            if (position.getDepartmentId() != null) {
-                if (departmentService.getDepartmentById(position.getDepartmentId()) == null) {
-                    throw new IllegalArgumentException("部门不存在");
-                }
-            }
-
-            if (positionMapper.existsByCode(position.getCode())) {
-                throw new IllegalArgumentException("职位代码 '" + position.getCode() + "' 已存在");
-            }
+            validateDepartmentExists(position.getDepartmentId());
+            validateCodeUnique(position.getCode(), null);
 
             if (position.getUserCount() == null) {
                 position.setUserCount(0);
             }
 
-            position.setCreatedAt(LocalDateTime.now());
-            position.setUpdatedAt(LocalDateTime.now());
-
+            setTimestamps(position);
             positionMapper.insert(position);
-
-            // 清除相关缓存
-            if (cacheService.isRedisAvailable()) {
-                positionCacheService.clearAllPositionCache();
-            }
+            clearPositionCache();
 
             log.info("成功创建职位，ID: {}", position.getId());
             return position;
@@ -158,24 +132,12 @@ public class PositionService {
                 return null;
             }
 
-            // 验证部门是否存在
-            if (position.getDepartmentId() != null) {
-                if (departmentService.getDepartmentById(position.getDepartmentId()) == null) {
-                    throw new IllegalArgumentException("部门不存在");
-                }
-            }
-
-            if (positionMapper.existsByCodeExcludingId(position.getCode(), position.getId())) {
-                throw new IllegalArgumentException("职位代码 '" + position.getCode() + "' 已存在");
-            }
+            validateDepartmentExists(position.getDepartmentId());
+            validateCodeUnique(position.getCode(), position.getId());
 
             position.setUpdatedAt(LocalDateTime.now());
             positionMapper.update(position);
-
-            // 清除相关缓存
-            if (cacheService.isRedisAvailable()) {
-                positionCacheService.clearAllPositionCache();
-            }
+            clearPositionCache();
 
             log.info("成功更新职位: {}", position.getName());
             return getPositionById(position.getId());
@@ -202,22 +164,15 @@ public class PositionService {
                 return false;
             }
 
-            PositionEntity position = positionMapper.findById(id);
-            if (position.getUserCount() != null && position.getUserCount() > 0) {
-                throw new IllegalStateException("无法删除包含 " + position.getUserCount() + " 个用户的职位。请先重新分配用户。");
-            }
-
+            validateNoUsersAssigned(id);
             boolean deleted = positionMapper.deleteById(id) > 0;
 
             if (deleted) {
-                if (cacheService.isRedisAvailable()) {
-                    positionCacheService.clearAllPositionCache();
-                }
+                clearPositionCache();
                 log.info("成功删除职位，ID: {}", id);
             } else {
                 log.warn("删除职位失败，ID: {}", id);
             }
-
             return deleted;
         } catch (Exception e) {
             log.error("删除职位时发生错误，ID: {}", id, e);
@@ -230,7 +185,6 @@ public class PositionService {
      */
     public List<PositionEntity> getPositionsByDepartmentId(Long departmentId) {
         log.info("获取部门ID {} 下的职位列表", departmentId);
-
         try {
             return positionMapper.findByDepartmentId(departmentId);
         } catch (Exception e) {
@@ -251,51 +205,96 @@ public class PositionService {
         }
     }
 
-    // Private helper methods
+    // --- Cache helpers ---
+
+    private void cachePositionList(List<PositionEntity> positions) {
+        if (cacheService.isRedisAvailable()) {
+            positionCacheService.cachePositionsList(positions);
+        }
+    }
+
+    private void cacheSinglePosition(PositionEntity position) {
+        if (cacheService.isRedisAvailable()) {
+            positionCacheService.cachePosition(position);
+        }
+    }
+
+    private void clearPositionCache() {
+        if (cacheService.isRedisAvailable()) {
+            positionCacheService.clearAllPositionCache();
+        }
+    }
+
+    // --- Validation helpers ---
+
+    private void validateDepartmentExists(Long departmentId) {
+        if (departmentId != null && departmentService.getDepartmentById(departmentId) == null) {
+            throw new IllegalArgumentException("部门不存在");
+        }
+    }
+
+    private void validateCodeUnique(String code, Long excludeId) {
+        boolean exists = excludeId != null
+                ? positionMapper.existsByCodeExcludingId(code, excludeId)
+                : positionMapper.existsByCode(code);
+        if (exists) {
+            throw new IllegalArgumentException("职位代码 '" + code + "' 已存在");
+        }
+    }
+
+    private void validateNoUsersAssigned(Long positionId) {
+        PositionEntity position = positionMapper.findById(positionId);
+        if (position.getUserCount() != null && position.getUserCount() > 0) {
+            throw new IllegalStateException("无法删除包含 " + position.getUserCount() + " 个用户的职位。请先重新分配用户。");
+        }
+    }
+
+    private void setTimestamps(PositionEntity position) {
+        LocalDateTime now = LocalDateTime.now();
+        position.setCreatedAt(now);
+        position.setUpdatedAt(now);
+    }
+
+    // --- Field validation ---
 
     private void validatePositionForCreation(PositionEntity position) {
         if (position == null) {
             throw new IllegalArgumentException("职位不能为空");
         }
-
-        if (position.getName() == null || position.getName().trim().isEmpty()) {
-            throw new IllegalArgumentException("职位名称不能为空");
-        }
-
-        if (position.getName().length() > 100) {
-            throw new IllegalArgumentException("职位名称不能超过100个字符");
-        }
-
-        if (position.getCode() == null || position.getCode().trim().isEmpty()) {
-            throw new IllegalArgumentException("职位代码不能为空");
-        }
-
-        if (position.getCode().length() > 50) {
-            throw new IllegalArgumentException("职位代码不能超过50个字符");
-        }
-
-        if (position.getDescription() != null && position.getDescription().length() > 500) {
-            throw new IllegalArgumentException("职位描述不能超过500个字符");
-        }
-
-        if (position.getLevel() == null || position.getLevel() < 1 || position.getLevel() > 5) {
-            throw new IllegalArgumentException("职位级别必须在1-5之间");
-        }
-
-        if (position.getStatus() == null) {
-            position.setStatus("active");
-        }
+        validatePositionFields(position);
     }
 
     private void validatePositionForUpdate(PositionEntity position) {
         if (position == null) {
             throw new IllegalArgumentException("职位不能为空");
         }
-
         if (position.getId() == null) {
             throw new IllegalArgumentException("更新职位需要提供职位ID");
         }
+        validatePositionFields(position);
+    }
 
-        validatePositionForCreation(position);
+    private void validatePositionFields(PositionEntity position) {
+        if (position.getName() == null || position.getName().trim().isEmpty()) {
+            throw new IllegalArgumentException("职位名称不能为空");
+        }
+        if (position.getName().length() > 100) {
+            throw new IllegalArgumentException("职位名称不能超过100个字符");
+        }
+        if (position.getCode() == null || position.getCode().trim().isEmpty()) {
+            throw new IllegalArgumentException("职位代码不能为空");
+        }
+        if (position.getCode().length() > 50) {
+            throw new IllegalArgumentException("职位代码不能超过50个字符");
+        }
+        if (position.getDescription() != null && position.getDescription().length() > 500) {
+            throw new IllegalArgumentException("职位描述不能超过500个字符");
+        }
+        if (position.getLevel() == null || position.getLevel() < 1 || position.getLevel() > 5) {
+            throw new IllegalArgumentException("职位级别必须在1-5之间");
+        }
+        if (position.getStatus() == null) {
+            position.setStatus("active");
+        }
     }
 }
