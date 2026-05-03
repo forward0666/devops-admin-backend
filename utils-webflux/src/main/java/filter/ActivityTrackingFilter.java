@@ -46,9 +46,16 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        // 在 Bean 初始化后，注册 JVM Shutdown Hook
         Runtime.getRuntime().addShutdownHook(new Thread(this::logActiveRequestsOnShutdown, "ActiveRequestShutdownLogger"));
         log.info("✅ JVM Shutdown Hook registered for ActiveRequest logging.");
+    }
+
+    public Set<String> getActiveRequestsSnapshot() {
+        return Collections.unmodifiableSet(new LinkedHashSet<>(activeRequests));
+    }
+
+    public int getActiveRequestCount() {
+        return activeRequests.size();
     }
 
     @Override
