@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import static com.backend.bot.util.BotChatUtils.extractChatId;
@@ -64,6 +65,11 @@ public class BotWebhookController {
             final boolean isPrivate = chatId != null && chatId.equals(user.id());
 
             return redisTemplate.hasKey(blacklistKey)
+                    .timeout(Duration.ofSeconds(3))
+                    .onErrorResume(e -> {
+                        log.error("❌ [WebhookController] Redis超时/异常，直接发布事件 | botName={}, error={}", botName, e.getMessage());
+                        return Mono.just(false);
+                    })
                     .flatMap(isBlacklisted -> {
                         if (Boolean.TRUE.equals(isBlacklisted)) {
                             if (isPrivate) {
@@ -71,6 +77,7 @@ public class BotWebhookController {
                                 return Mono.empty();
                             }
                             return botCoreService.findByBotName(botName)
+                                            .timeout(Duration.ofSeconds(3))
                                     .flatMap(bot -> {
                                         final Long msgId = extractMessageId(botUpdate);
                                         // 先发黑名单提示，再删用户消息
@@ -84,7 +91,7 @@ public class BotWebhookController {
                                         Mono<Void> deleteMsg = msgId != null
                                                 ? botClientService.deleteMessage(bot.getBotToken(), chatId, msgId)
                                                 : Mono.empty();
-                                        return sendWarning.then(deleteMsg);
+                                        return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
                                     })
                                     .then(Mono.empty());
                         }
@@ -93,7 +100,10 @@ public class BotWebhookController {
                                 contextView, eventPublisher, botName, botUpdate)
                         ).subscribeOn(Schedulers.boundedElastic()).then();
                     });
-        }).doFinally(LogUtils::clearMDC);
+        }).timeout(Duration.ofSeconds(5), Mono.empty())
+        .doOnError(e -> log.error("❌ [WebhookController] 全局超时/异常 | botName={}, error={}", botName, e.getMessage()))
+        .onErrorResume(e -> Mono.empty())
+        .doFinally(LogUtils::clearMDC);
     }
 
     private Long extractMessageId(BotUpdateDto update) {
