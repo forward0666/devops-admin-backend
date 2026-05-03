@@ -74,21 +74,21 @@ public class TelegramBotManagerApplication {
         log.info("✅ TelegramBotManagerApplication started successfully!");
 
         try {
-            // 🚨 关键修改：获取响应式调度器 Bean
-            // 该调度器用于处理可能阻塞的 IO 操作，确保响应式主流程不受影响
-            // Bean 名称必须与 ThreadPoolConfig 中定义的名称一致
             Scheduler scheduler = ctx.getBean("blockingTaskScheduler", Scheduler.class);
-            log.info("🧵 Blocking Scheduler initialized: {}", scheduler);
-
-            // ⚠️ 说明：移除线程池预热逻辑
-            // Reactor Scheduler 是弹性管理的，不需要像传统线程池那样预启动线程
-            // 它会根据需要动态创建和回收线程，更适合响应式编程范式
-            log.info("ℹ️ Scheduler is elastic and managed by Reactor. Manual thread pre-starting is not required.");
-
+            log.info("🧵 Blocking Scheduler: {}", scheduler);
         } catch (Exception e) {
-            // 记录警告信息，但不影响应用启动流程
-            // 即使调度器初始化失败，应用仍然可以运行，只是可能影响某些需要阻塞操作的功能
-            log.warn("⚠️ Could not find or initialize blockingTaskScheduler bean.", e);
+            log.warn("⚠️ Scheduler init failed: {}", e.getMessage());
+        }
+
+        // 预热 Redis 连接 + Jackson codec
+        try {
+            org.springframework.data.redis.core.StringRedisTemplate redis =
+                    ctx.getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
+            redis.opsForValue().set("bot:warmup", "ok");
+            redis.delete("bot:warmup");
+            log.info("🔥 Warmup complete.");
+        } catch (Exception e) {
+            log.warn("⚠️ Warmup failed: {}", e.getMessage());
         }
     }
 }
