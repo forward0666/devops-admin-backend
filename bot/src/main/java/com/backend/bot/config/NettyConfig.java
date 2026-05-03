@@ -20,6 +20,7 @@ public class NettyConfig {
             server.doOnConnection(conn ->
                       conn.addHandlerLast(new ReadTimeoutHandler(1, TimeUnit.SECONDS))
                   )
+                  .accessLog(true)
         );
         return factory;
     }
