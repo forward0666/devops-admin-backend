@@ -83,14 +83,13 @@ public class TelegramBotManagerApplication {
 
         // 预热 Redis
         try {
-            org.springframework.data.redis.core.StringRedisTemplate redis =
-                    ctx.getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
-            redis.opsForValue().set("bot:warmup", "ok");
-            redis.opsForZSet().add("bot:warmup", "test", System.currentTimeMillis() / 1000.0);
-            redis.delete("bot:warmup");
+            org.springframework.data.redis.core.ReactiveStringRedisTemplate redis =
+                    ctx.getBean(org.springframework.data.redis.core.ReactiveStringRedisTemplate.class);
+            redis.opsForValue().set("bot:warmup", "ok").block(Duration.ofSeconds(5));
+            redis.delete("bot:warmup").block(Duration.ofSeconds(5));
             log.info("🔥 Redis warmup OK");
         } catch (Exception e) {
-            log.warn("🔥 Redis warmup failed: {}", e.getMessage(), e);
+            log.warn("🔥 Redis warmup failed", e);
         }
 
         // 预热 Scheduler 线程
