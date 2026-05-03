@@ -116,7 +116,6 @@ public class TelegramBotManagerApplication {
         } catch (Exception e) {
             log.warn("🔥 WebClient warmup failed: {}", e.getMessage(), e);
         }
-    }
 
         // 预热整个 HTTP 管道（Jackson codec + filter chain + controller）
         try {
