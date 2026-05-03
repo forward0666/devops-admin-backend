@@ -27,6 +27,8 @@ public class BotCoreService {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final BotAuthorizedChatRepository authorizedChatRepository;
+    private final Scheduler blockingTaskScheduler; // 🌟 新增 Scheduler 字段
+
 
     private final CacheTemplateService cacheTemplateService;
     private final TelegramProperties telegramProperties;
@@ -36,7 +38,6 @@ public class BotCoreService {
     private static final String CACHE_ENTITY_PREFIX = "bot:entity:name:";
     private static final String CACHE_WHITELIST_PREFIX = "bot:authorizedchat:set:";
     private static final String CACHE_KEY_SEPARATOR = ":"; // 统一键分隔符
-    private final Scheduler blockingTaskScheduler;
 
     public BotCoreService(
             BotRepository botRepository,

@@ -43,7 +43,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     public boolean support(BotUpdateDto update) {
         return update.message() != null &&
                 update.message().text() != null &&
-                update.message().text().trim().matches("/start($|@.+$)");
+                update.message().text().trim().startsWith("/start");
     }
 
     @Override
