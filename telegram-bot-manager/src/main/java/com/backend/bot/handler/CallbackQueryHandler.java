@@ -136,8 +136,10 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     return handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView);
                 });
         
-        // 按顺序执行：重置计时器 -> 执行处理器
-        return resetTimerMono.then(handlerMono);
+        // 按顺序执行：重置计时器 -> 执行处理器 -> 清session
+        return resetTimerMono.then(handlerMono)
+                .then(userSessionService.clearUserSession(userId).contextWrite(contextView))
+                .onErrorResume(e -> Mono.empty());
     }
     
     private Mono<Void> processCallbackWithoutCancel(HandlerContext context, String logPrefix, ContextView contextView, 
