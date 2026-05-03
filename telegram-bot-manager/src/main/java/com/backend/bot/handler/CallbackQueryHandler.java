@@ -28,8 +28,6 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
     private final InteractiveMessageService interactiveMessageService;
     private final List<CallbackActionHandler> actionHandlers;
 
-
-
     @Override
     public boolean support(BotUpdateDto update) {
         return update.callbackQuery() != null;
@@ -47,64 +45,48 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
 
         log.info("{}⚙️ {} [Step1] 收到callback | data={}, userId={}, chatId={}", logPrefix, logIdentifier, callbackData, userId, chatId);
 
-        // 检查是否是菜单导航操作
         boolean isMenuNavigation = actionHandlers.stream()
                 .anyMatch(handler -> handler instanceof MenuNavigationHandler && handler.supports(callbackData));
-        
-        // 使用原子性检查和处理，避免重复处理
+
+        // ⚠️ 关键：flatMap 里返回 Mono<Void> 也会触发 switchIfEmpty（因为 Mono<Void> 不发射元素）
+        // 用 hasSession boolean 避免这个问题
         return userSessionService.getUserSession(userId)
-                .flatMap(session -> {
-                    // 有会话的情况
-                    String state = session.getState();
-                    
-                    // 如果用户正在处理/start命令，但点击的是菜单导航操作，允许执行
-                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
+                .map(session -> true)
+                .defaultIfEmpty(false)
+                .flatMap(hasSession -> {
+                    if (hasSession) {
+                        return userSessionService.getUserSession(userId)
+                                .flatMap(session -> {
+                                    String state = session.getState();
+                                    if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
+                                        if (isMenuNavigation) {
+                                            log.info("{}⚠️ User {} is processing /start but clicked navigation: {}. Allowing.", logPrefix, userId, callbackData);
+                                        } else {
+                                            log.info("{}⚠️ User {} is processing /start. Ignoring: {}", logPrefix, userId, callbackData);
+                                            return botClientService.answerCallbackQuery(token, callbackQueryId, "⏳ 正在处理您的请求，请稍候...");
+                                        }
+                                    }
+                                    return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                                });
+                    } else {
+                        // 没有会话
                         if (isMenuNavigation) {
-                            log.info("{}⚠️ User {} is processing /start command but clicked menu navigation: {}. Allowing operation.", logPrefix, userId, callbackData);
-                            // 允许菜单导航操作，继续执行后续流程，取消删除任务
-                            return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
+                            log.info("{}⚠️ User {} has no session, clicked navigation: {}. Creating temp session.", logPrefix, userId, callbackData);
+                            return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
+                                    .contextWrite(contextView)
+                                    .then(processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId));
                         } else {
-                            // 非菜单导航操作，忽略并返回提示
-                            log.info("{}⚠️ User {} is processing /start command. Ignoring callback action: {}", logPrefix, userId, callbackData);
-                            // 只回答回调查询，不取消待删除任务，也不执行任何其他操作
-                            return botClientService.answerCallbackQuery(token, callbackQueryId, "⏳ 正在处理您的请求，请稍候...")
-                                    .then(); // 返回提示并结束流程
+                            return botClientService.answerCallbackQuery(token, callbackQueryId, "⚠️ 没有活跃会话，请使用 /start 开始");
                         }
                     }
-                    
-                    // 正常流程：根据操作类型决定是否取消计时器
-                    if (isMenuNavigation) {
-                        // 菜单导航，取消父消息删除计时器
-                        return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
-                    } else {
-                        // 其他操作，取消删除任务
-                        return processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId);
-                    }
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    // 没有会话的情况
-                    if (isMenuNavigation) {
-                        // 创建临时会话并处理菜单导航
-                        log.info("{}⚠️ User {} has no session, but clicked menu navigation: {}. Creating temporary session.", logPrefix, userId, callbackData);
-                        return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
-                                .contextWrite(contextView)
-                                .then(processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId))
-                                // 临时会话需要保持一段时间以便消息自动删除，不立即清除
-                                .then();
-                    } else {
-                        // 非菜单导航操作，提示用户
-                        return botClientService.answerCallbackQuery(token, callbackQueryId, "⚠️ 没有活跃会话，请使用 /start 开始")
-                                .then();
-                    }
-                }));
+                });
     }
 
-    private Mono<Void> processCallbackNormally(HandlerContext context, String logPrefix, ContextView contextView, 
+    private Mono<Void> processCallbackNormally(HandlerContext context, String logPrefix, ContextView contextView,
                                                String logIdentifier, Long userId, String callbackData, String callbackQueryId) {
         String token = context.token();
         Long chatId = context.chatId();
-        
-        // 1. 设置删除定时器（每条消息独立，不取消旧任务）
+
         Long messageId = context.messageId();
         int delaySeconds = callbackData.contains("_ACTION") ? 30 : TelegramConstants.MENU_DELETE_DELAY_SECONDS;
         log.info("{}⏳ [Step2] 设置删除定时器 | messageId={}, delay={}s", logPrefix, messageId, delaySeconds);
@@ -113,29 +95,23 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                         token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
                 ).contextWrite(contextView).onErrorResume(e -> Mono.empty())
                 : Mono.empty();
-        
-        // 2. 回答回调查询 - 不显示加载提示，直接处理
+
+        // 回答回调查询 - fire and forget
         botClientService.answerCallbackQuery(token, callbackQueryId)
                 .contextWrite(contextView)
-                .subscribe(
-                        null,
-                        e -> log.error("{}❌ Failed to answer callback query for bot {}. Error: {}", logPrefix, logIdentifier, e.getMessage())
-                );
-        
-        // 3. 执行回调处理器
+                .subscribe(null, e -> log.error("{}❌ Failed to answer callback: {}", logPrefix, e.getMessage()));
+
+        // 执行回调处理器
         Mono<Void> handlerMono = actionHandlers.stream()
                 .sorted(Comparator.comparingInt(CallbackActionHandler::getOrder))
                 .filter(handler -> handler.supports(callbackData))
                 .findFirst()
                 .map(handler -> {
-                    log.info("{}🚀 {} Dispatching callback {} to handler: {}", logPrefix, logIdentifier, callbackData, handler.getClass().getSimpleName());
+                    log.info("{}🚀 {} Dispatching {} to {}", logPrefix, logIdentifier, callbackData, handler.getClass().getSimpleName());
                     return handler.handle(context.botEntity(), context.update()).contextWrite(contextView);
                 })
-                .orElseGet(() -> {
-                    return handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView);
-                });
-        
-        // 按顺序执行：删除定时器 -> 执行处理器 -> 清session
+                .orElseGet(() -> handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView));
+
         return deleteTimerMono
                 .doOnSuccess(v -> log.info("{}✅ [Step3] 删除定时器设置完成 | messageId={}", logPrefix, messageId))
                 .then(handlerMono)
@@ -147,44 +123,10 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     return Mono.empty();
                 });
     }
-    
-    private Mono<Void> processCallbackWithoutCancel(HandlerContext context, String logPrefix, ContextView contextView, 
-                                                 String logIdentifier, Long userId, String callbackData, String callbackQueryId) {
-        String token = context.token();
-        Long chatId = context.chatId();
-        
-        // 1. 不取消待删除任务，让各个消息独立销毁
-        log.debug("{}⏭️ User {} clicked menu navigation: {}. Not canceling deletion timers.", logPrefix, userId, callbackData);
-        
-        // 2. 回答回调查询 - 不显示加载提示，直接处理
-        botClientService.answerCallbackQuery(token, callbackQueryId)
-                .contextWrite(contextView)
-                .subscribe(
-                        null,
-                        e -> log.error("{}❌ Failed to answer callback query for bot {}. Error: {}", logPrefix, logIdentifier, e.getMessage())
-                );
-        
-        // 3. 执行回调处理器
-        Mono<Void> handlerMono = actionHandlers.stream()
-                .sorted(Comparator.comparingInt(CallbackActionHandler::getOrder))
-                .filter(handler -> handler.supports(callbackData))
-                .findFirst()
-                .map(handler -> {
-                    log.info("{}🚀 {} Dispatching callback {} to handler: {}", logPrefix, logIdentifier, callbackData, handler.getClass().getSimpleName());
-                    return handler.handle(context.botEntity(), context.update()).contextWrite(contextView);
-                })
-                .orElseGet(() -> {
-                    return handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView);
-                });
-        
-        // 只执行处理器，不取消计时器
-        return handlerMono;
-    }
-    
-    private Mono<Void> handleUnknownAction(String token, Long chatId, String callbackData, String logIdentifier, String logPrefix) {
-        String responseText = String.format("⚠️ 您点击了未配置的菜单项或最终操作: %s", callbackData);
-        log.warn("{}⚠️ {} No specific handler found for callback: {}. Sending default text response.", logPrefix, logIdentifier, callbackData);
 
+    private Mono<Void> handleUnknownAction(String token, Long chatId, String callbackData, String logIdentifier, String logPrefix) {
+        String responseText = String.format("⚠️ 您点击了未配置的菜单项: %s", callbackData);
+        log.warn("{}⚠️ {} No handler for callback: {}", logPrefix, logIdentifier, callbackData);
         return botClientService.sendMessage(token, chatId, responseText, null)
                 .onErrorResume(e -> Mono.empty())
                 .then();
