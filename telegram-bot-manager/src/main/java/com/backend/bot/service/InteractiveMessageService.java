@@ -8,16 +8,12 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.context.ContextView;
 
 import java.util.List;
 import java.util.Set;
 
-/**
- * 消息自动删除服务
- *
- * 使用 Redis ZSET 存储待删除消息，定时任务扫描执行删除。
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -53,6 +49,7 @@ public class InteractiveMessageService {
                     Long size = stringRedisTemplate.opsForZSet().size(ZSET_KEY);
                     log.info("{}📊 [Step3] Redis ZSET当前任务数={}", combinedLogPrefix, size);
                 })
+                .subscribeOn(Schedulers.boundedElastic())
                 .doOnSuccess(v -> log.info("{}✅ [scheduleMessageDeletion] 完成 | messageId={}, delay={}s", combinedLogPrefix, messageId, delaySeconds))
                 .onErrorResume(e -> {
                     log.error("{}❌ [Step2] Redis ZSET写入失败 | error={}", combinedLogPrefix, e.getMessage(), e);
@@ -61,9 +58,6 @@ public class InteractiveMessageService {
                 .then();
     }
 
-    /**
-     * 取消指定消息的删除任务
-     */
     public void cancelPendingDeletion(Long chatId, Long messageId) {
         String prefix = chatId + ":" + messageId + ":";
         log.info("🗑️ [cancelPendingDeletion] 开始取消 | chatId={}, messageId={}", chatId, messageId);
@@ -79,9 +73,6 @@ public class InteractiveMessageService {
         }
     }
 
-    /**
-     * 定时扫描 ZSET，删除过期消息。每 3 秒执行一次。
-     */
     @Scheduled(fixedRate = 3000)
     public void processPendingDeletions() {
         try {
@@ -132,7 +123,6 @@ public class InteractiveMessageService {
                     .doOnSuccess(v -> {
                         log.info("✅ [processDeletion] 删除成功 | chatId={}, messageId={}, userId={}", chatId, messageId, userId);
                         if (userId != 0L) {
-                            log.info("🔄 [processDeletion] 清理session | userId={}", userId);
                             userSessionService.clearUserSession(userId).subscribe();
                         }
                     })
