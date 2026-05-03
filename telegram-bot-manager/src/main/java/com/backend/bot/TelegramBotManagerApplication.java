@@ -117,4 +117,25 @@ public class TelegramBotManagerApplication {
             log.warn("🔥 WebClient warmup failed: {}", e.getMessage(), e);
         }
     }
+
+        // 预热整个 HTTP 管道（Jackson codec + filter chain + controller）
+        try {
+            String port = System.getenv().getOrDefault("SERVER_PORT", "8086");
+            org.springframework.web.reactive.function.client.WebClient localClient = org.springframework.web.reactive.function.client.WebClient.create();
+            localClient.post()
+                    .uri("http://localhost:" + port + "/callback/JH_OpenClaw01_Bot")
+                    .header("Content-Type", "application/json")
+                    .bodyValue("{\"update_id\":0}")
+                    .retrieve()
+                    .toBodilessEntity()
+                    .timeout(Duration.ofSeconds(10))
+                    .onErrorResume(e -> {
+                        log.info("🔥 HTTP pipeline warmup OK (error expected)");
+                        return reactor.core.publisher.Mono.empty();
+                    })
+                    .subscribe();
+            log.info("🔥 HTTP pipeline warmup submitted to localhost:{}", port);
+        } catch (Exception e) {
+            log.warn("🔥 HTTP pipeline warmup failed", e);
+        }
 }
