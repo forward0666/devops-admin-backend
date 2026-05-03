@@ -245,7 +245,6 @@ public class BotClientService {
     /**
      * 编辑已发送消息的文本内容和/或键盘。
      * 如果 replyMarkup 为 null，则移除键盘。
-     * * 🌟 关键修改：在 API 层处理 400 Bad Request 错误，防止日志污染。
      */
     public Mono<Void> editMessageText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto replyMarkup) {
         // 缓存key
@@ -283,7 +282,6 @@ public class BotClientService {
                             return Mono.empty();
                         })
                 )
-                // 🌟 关键修改：在 BotClientService 中捕获 WebClientResponseException
                 .onErrorResume(WebClientResponseException.class, e -> {
                     // 如果是 400 Bad Request，通常是因为消息内容未修改，或者消息不存在
                     if (e.getStatusCode().value() == 400) {
