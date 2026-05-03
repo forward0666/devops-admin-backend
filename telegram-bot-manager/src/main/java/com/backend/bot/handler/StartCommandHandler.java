@@ -56,10 +56,11 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         // 🌟 优化点：直接调用工具类获取标准化的身份日志
         String identityLog = BotUserUtils.formatIdentityLog(context);
 
-        log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
+        log.info("{}✅ [Step1] 开始处理/start | userId={}, chatId={}", logPrefix, userId, chatId);
 
         // 检查 Redis 中是否存在用户会话标记（UserSession:1 或 UserSession:0）
         return redisUserSessionService.hasAnySession(userId)
+                .doOnNext(hasSession -> log.info("{}🔍 [Step2] Session检查完成 | hasSession={}, userId={}", logPrefix, hasSession, userId))
                 .flatMap(hasSession -> {
                     if (hasSession) {
                         // 用户有会话标记，说明用户当前正在进行操作
@@ -104,8 +105,10 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
                     } else {
                         // 用户没有会话标记，创建新会话
-                        log.info("{}✅ User {} has no session markers. Creating new menu.", logPrefix, userId);
-                        return processStartCommand(context, logPrefix, contextView);
+                        log.info("{}✅ [Step3] 无session，开始创建菜单 | userId={}", logPrefix, userId);
+                        return processStartCommand(context, logPrefix, contextView)
+                                .doOnSuccess(v -> log.info("{}✅ [StartCommand] 流程完成 | userId={}, menu已发送", logPrefix, userId))
+                                .doOnError(e -> log.error("{}❌ [StartCommand] 流程失败 | userId={}, error={}", logPrefix, userId, e.getMessage()));
                     }
                 });
     }

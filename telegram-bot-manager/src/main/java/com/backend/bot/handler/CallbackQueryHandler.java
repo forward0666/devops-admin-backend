@@ -45,7 +45,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         String callbackData = context.update().callbackQuery().data();
         String callbackQueryId = context.update().callbackQuery().id();
 
-        log.info("{}⚙️ {} Received callback query: {}", logPrefix, logIdentifier, callbackData);
+        log.info("{}⚙️ {} [Step1] 收到callback | data={}, userId={}, chatId={}, messageId={}", logPrefix, logIdentifier, callbackData, userId, chatId, messageId);
 
         // 检查是否是菜单导航操作
         boolean isMenuNavigation = actionHandlers.stream()
@@ -107,6 +107,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         // 1. 设置删除定时器（每条消息独立，不取消旧任务）
         Long messageId = context.messageId();
         int delaySeconds = callbackData.contains("_ACTION") ? 30 : TelegramConstants.MENU_DELETE_DELAY_SECONDS;
+        log.info("{}⏳ [Step2] 设置删除定时器 | messageId={}, delay={}s", logPrefix, messageId, delaySeconds);
         Mono<Void> deleteTimerMono = messageId != null
                 ? interactiveMessageService.scheduleMessageDeletion(
                         token, userId, chatId, messageId, delaySeconds, logIdentifier, contextView
@@ -134,10 +135,17 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                     return handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView);
                 });
         
-        // 按顺序执行：重置计时器 -> 执行处理器 -> 清session
-        return deleteTimerMono.then(handlerMono)
+        // 按顺序执行：删除定时器 -> 执行处理器 -> 清session
+        return deleteTimerMono
+                .doOnSuccess(v -> log.info("{}✅ [Step3] 删除定时器设置完成 | messageId={}", logPrefix, messageId))
+                .then(handlerMono)
+                .doOnSuccess(v -> log.info("{}✅ [Step4] Handler执行完成 | callbackData={}", logPrefix, callbackData))
                 .then(userSessionService.clearUserSession(userId).contextWrite(contextView))
-                .onErrorResume(e -> Mono.empty());
+                .doOnSuccess(v -> log.info("{}✅ [Step5] Session已清理 | userId={}", logPrefix, userId))
+                .onErrorResume(e -> {
+                    log.error("{}❌ [CallbackFlow] 处理失败 | error={}", logPrefix, e.getMessage());
+                    return Mono.empty();
+                });
     }
     
     private Mono<Void> processCallbackWithoutCancel(HandlerContext context, String logPrefix, ContextView contextView, 

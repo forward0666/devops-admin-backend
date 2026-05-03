@@ -36,6 +36,9 @@ public class BotWebhookController {
             @PathVariable String botName,
             @RequestBody BotUpdateDto botUpdate
     ) {
+        String updateType = botUpdate.message() != null ? "TEXT:" + botUpdate.message().text() :
+                botUpdate.callbackQuery() != null ? "CALLBACK:" + botUpdate.callbackQuery().data() : "UNKNOWN";
+        log.info("📨 [WebhookController] 收到请求 | botName={}, updateType={}", botName, updateType);
         return Mono.deferContextual(contextView -> {
             // 提取用户和聊天信息（一次性赋值，确保 effectively final）
             final UserDto user;
