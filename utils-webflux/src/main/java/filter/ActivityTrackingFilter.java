@@ -71,6 +71,11 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
             filterChain = filterChain.timeout(REQUEST_TIMEOUT);
         }
         
+        // Webhook 也加一个兜底超时，防止请求永远不完成
+        if (isWebhook) {
+            filterChain = filterChain.timeout(Duration.ofSeconds(10));
+        }
+        
         return filterChain
                 .doFinally(signalType -> {
                     // 1. 移除记录
