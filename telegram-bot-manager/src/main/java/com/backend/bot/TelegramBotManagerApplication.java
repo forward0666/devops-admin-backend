@@ -9,7 +9,8 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ApplicationContext;
-import reactor.core.scheduler.Scheduler; // 引入 Scheduler
+import reactor.core.scheduler.Scheduler;
+import java.time.Duration; // 引入 Scheduler
 
 /**
  * Telegram Bot 管理系统主启动类
@@ -80,12 +81,35 @@ public class TelegramBotManagerApplication {
             log.warn("⚠️ Scheduler init failed: {}", e.getMessage());
         }
 
-        // 预热 Redis 连接 + Jackson codec
+        // 预热所有组件
         try {
+            log.info("🔥 Warming up components...");
+
+            // 1. 预热 Redis
             org.springframework.data.redis.core.StringRedisTemplate redis =
                     ctx.getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
             redis.opsForValue().set("bot:warmup", "ok");
+            redis.opsForZSet().add("bot:warmup", "test", System.currentTimeMillis() / 1000.0);
             redis.delete("bot:warmup");
+            log.info("🔥 Redis warmup OK");
+
+            // 2. 预热 WebClient (TG API)
+            reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+                try {
+                    org.springframework.web.reactive.function.client.WebClient webClient =
+                            ctx.getBean(org.springframework.web.reactive.function.client.WebClient.class);
+                    webClient.get().uri("https://api.telegram.org").retrieve().toBodilessEntity().block(Duration.ofSeconds(5));
+                    log.info("🔥 WebClient warmup OK");
+                } catch (Exception e) {
+                    log.warn("🔥 WebClient warmup failed (expected): {}", e.getMessage());
+                }
+            });
+
+            // 3. 预热 Scheduler 线程
+            reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+                log.info("🔥 BoundedElastic scheduler thread warmup OK");
+            });
+
             log.info("🔥 Warmup complete.");
         } catch (Exception e) {
             log.warn("⚠️ Warmup failed: {}", e.getMessage());
