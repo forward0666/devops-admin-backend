@@ -1,6 +1,5 @@
 package com.backend.bot.repository;
 
-import com.backend.bot.constants.BotMenuSqlConstants;
 import com.backend.bot.entity.BotMenuEntity;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
@@ -11,11 +10,11 @@ public interface BotMenuRepository extends ReactiveCrudRepository<BotMenuEntity,
 
     Flux<BotMenuEntity> findByBotName(String botName);
 
-    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_ORDER_BY_LEVEL_AND_SORT)
+    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName ORDER BY menu_level, sort_order")
     Flux<BotMenuEntity> findByBotNameOrderByLevelAndSort(String botName);
 
     Mono<BotMenuEntity> findByBotNameAndMenuKey(String botName, String menuKey);
 
-    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_AND_MENU_LEVEL)
+    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_level = :menuLevel ORDER BY sort_order")
     Flux<BotMenuEntity> findByBotNameAndMenuLevel(String botName, int menuLevel);
 }

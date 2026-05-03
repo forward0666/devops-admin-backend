@@ -1,6 +1,8 @@
 package com.backend.bot.controller;
 
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.dto.CallbackQueryDto;
+import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotClientService;
@@ -13,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.Optional;
 
 import static com.backend.bot.util.BotChatUtils.extractChatId;
 

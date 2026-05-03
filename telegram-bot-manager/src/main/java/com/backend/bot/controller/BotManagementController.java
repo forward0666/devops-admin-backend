@@ -30,6 +30,7 @@ public class BotManagementController {
     public Mono<ResponseEntity<Map<String, Object>>> addBot(
             @Valid @RequestBody Mono<BotRegisterDto> dtoMono) {
 
+        // 🌟 关键修正：使用 Mono.deferContextual 替代 LogUtils.setMdcFromContext()
         return Mono.deferContextual(contextView -> {
                     // 步骤 1: 将 Trace ID 从 Reactor Context 同步到 MDC
                     LogUtils.syncTraceIdToMDC(contextView);

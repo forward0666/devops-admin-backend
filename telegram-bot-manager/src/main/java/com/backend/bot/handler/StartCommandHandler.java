@@ -36,6 +36,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
     private static final int DELETE_DELAY_SECONDS = TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
 
+    // 🌟 警告消息常量
     private static final String WARNING_TEXT = "⚠️ 您有一个正在进行的操作，请完成当前操作或发送 /new 发起新请求。";
     private static final InlineKeyboardMarkupDto EMPTY_MENU = new InlineKeyboardMarkupDto(java.util.List.of());
 
@@ -52,6 +53,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         Long chatId = context.chatId();
         Long userId = context.userId();
 
+        // 🌟 优化点：直接调用工具类获取标准化的身份日志
         String identityLog = BotUserUtils.formatIdentityLog(context);
 
         log.info("{}✅ Handling /start command. Identity: {}", logPrefix, identityLog);
@@ -63,6 +65,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                         // 用户有会话标记，说明用户当前正在进行操作
                         log.info("{}⚠️ User {} has an active session. Notifying user to complete current operation first.", logPrefix, userId);
 
+                        // 🌟 核心修改：发送警告消息并调度自动删除
                         return botClientService.sendMenuMessageWithResponse(token, chatId, WARNING_TEXT, null)
                                 .flatMap(responseJson -> {
                                     // 尝试解析响应 JSON 并调度删除

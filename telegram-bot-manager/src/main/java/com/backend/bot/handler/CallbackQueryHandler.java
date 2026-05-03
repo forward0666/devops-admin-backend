@@ -3,6 +3,7 @@ package com.backend.bot.handler;
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.UserSessionService;

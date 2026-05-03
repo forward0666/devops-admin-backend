@@ -1,21 +1,21 @@
 package com.backend.bot.service;
 
-import com.backend.bot.config.TelegramProperties;
 import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.entity.BotAuthorizedChatEntity;
-import com.backend.bot.entity.BotConfigEntity;
-import com.backend.bot.repository.BotRepository;
+import com.backend.bot.entity.BotConfigEntity; // 统一使用 BotConfigEntity
+import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
 import com.backend.bot.repository.BotAuthorizedChatRepository;
-import reactor.core.scheduler.Scheduler;
-
+import com.backend.bot.config.TelegramProperties; // <--- 新增导入
 import java.time.Duration;
 
 @Service
@@ -29,7 +29,7 @@ public class BotCoreService {
     private final BotAuthorizedChatRepository authorizedChatRepository;
     private final Scheduler blockingTaskScheduler; // 🌟 新增 Scheduler 字段
 
-
+    // 🌟 新增 CacheTemplateService 依赖
     private final CacheTemplateService cacheTemplateService;
     private final TelegramProperties telegramProperties;
 
@@ -39,6 +39,7 @@ public class BotCoreService {
     private static final String CACHE_WHITELIST_PREFIX = "bot:authorizedchat:set:";
     private static final String CACHE_KEY_SEPARATOR = ":"; // 统一键分隔符
 
+    // 🌟 显式构造函数，注入所有依赖，包括自定义 Scheduler 和 CacheTemplateService
     public BotCoreService(
             BotRepository botRepository,
             BotClientService botClient,
