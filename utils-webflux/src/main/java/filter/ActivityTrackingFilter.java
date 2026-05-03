@@ -43,6 +43,8 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
 
     // 存储当前活跃请求的标识符
     private final Set<String> activeRequests = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    // 存储对应的 ServerWebExchange，用于强制清理卡住的请求
+    private final ConcurrentHashMap<String, ServerWebExchange> activeExchanges = new ConcurrentHashMap<>();
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -59,8 +61,21 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
     }
 
     public int clearActiveRequests() {
-        int count = activeRequests.size();
+        int count = 0;
+        for (Map.Entry<String, ServerWebExchange> entry : activeExchanges.entrySet()) {
+            try {
+                ServerWebExchange exchange = entry.getValue();
+                if (!exchange.getResponse().isCommitted()) {
+                    exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.OK);
+                    exchange.getResponse().setComplete().subscribe();
+                }
+            } catch (Exception e) {
+                log.debug("Failed to complete exchange: {}", e.getMessage());
+            }
+            count++;
+        }
         activeRequests.clear();
+        activeExchanges.clear();
         return count;
     }
 
@@ -69,10 +84,11 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
         String path = exchange.getRequest().getURI().getPath();
         boolean isWebhook = path.startsWith(WEBHOOK_PATH_PREFIX);
         String requestId = createRequestId(exchange);
-        String routeId = getRouteId(exchange); // 获取路由 ID
-        boolean isTelegramBotManager = TELEGRAM_BOT_MANAGER_ROUTE.equals(routeId); // 判断是否为 telegram-bot-manager 服务
+        String routeId = getRouteId(exchange);
+        boolean isTelegramBotManager = TELEGRAM_BOT_MANAGER_ROUTE.equals(routeId);
 
         activeRequests.add(requestId);
+        activeExchanges.put(requestId, exchange);
 
         log.info("[traceId={}]💬 Request started: {}", getTraceId(exchange), requestId);
 
@@ -93,6 +109,7 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
                 .doFinally(signalType -> {
                     // 1. 移除记录
                     activeRequests.remove(requestId);
+                    activeExchanges.remove(requestId);
 
                     // 2. 增强日志：记录请求的完成/取消/错误状态
                     String status = switch (signalType) {
