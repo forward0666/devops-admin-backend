@@ -58,6 +58,12 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
         return activeRequests.size();
     }
 
+    public int clearActiveRequests() {
+        int count = activeRequests.size();
+        activeRequests.clear();
+        return count;
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();

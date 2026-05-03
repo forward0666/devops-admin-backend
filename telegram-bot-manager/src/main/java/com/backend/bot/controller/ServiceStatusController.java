@@ -7,6 +7,7 @@ import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +29,17 @@ public class ServiceStatusController {
     private final ActivityTrackingFilter activityTrackingFilter;
 
     private static final String PENDING_DELETION_KEY = "bot:pendingDeletion";
+
+    @DeleteMapping("/activeRequests")
+    public Mono<ResponseEntity<Map<String, Object>>> clearActiveRequests() {
+        return Mono.fromCallable(() -> {
+            int cleared = activityTrackingFilter.clearActiveRequests();
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("cleared", cleared);
+            return result;
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+          .map(ResponseEntity::ok);
+    }
 
     @GetMapping
     public Mono<ResponseEntity<Map<String, Object>>> getStatus() {
