@@ -121,7 +121,9 @@ public class TelegramBotManagerApplication {
         // 预热整个 HTTP 管道（Jackson codec + filter chain + controller）
         try {
             String port = System.getenv().getOrDefault("SERVER_PORT", "8086");
-            org.springframework.web.reactive.function.client.WebClient localClient = org.springframework.web.reactive.function.client.WebClient.create();
+            log.info("🔥 HTTP pipeline warmup starting to localhost:{}...", port);
+            org.springframework.web.reactive.function.client.WebClient localClient =
+                    org.springframework.web.reactive.function.client.WebClient.create();
             localClient.post()
                     .uri("http://localhost:" + port + "/callback/JH_OpenClaw01_Bot")
                     .header("Content-Type", "application/json")
@@ -130,12 +132,13 @@ public class TelegramBotManagerApplication {
                     .toBodilessEntity()
                     .timeout(Duration.ofSeconds(10))
                     .onErrorResume(e -> {
-                        log.info("🔥 HTTP pipeline warmup OK (error expected)");
+                        log.info("🔥 HTTP pipeline warmup OK (error expected): {}", e.getMessage());
                         return reactor.core.publisher.Mono.empty();
                     })
-                    .subscribe();
-            log.info("🔥 HTTP pipeline warmup submitted to localhost:{}", port);
+                    .block(Duration.ofSeconds(15));
+            log.info("🔥 HTTP pipeline warmup complete");
         } catch (Exception e) {
             log.warn("🔥 HTTP pipeline warmup failed", e);
         }
+    }
 }
