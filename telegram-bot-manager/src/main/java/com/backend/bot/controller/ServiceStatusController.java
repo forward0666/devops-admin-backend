@@ -3,6 +3,7 @@ package com.backend.bot.controller;
 import filter.ActivityTrackingFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
@@ -57,7 +58,7 @@ public class ServiceStatusController {
     @GetMapping("/pendingDeletions")
     public Mono<ResponseEntity<List<Map<String, Object>>>> getPendingDeletionList() {
         return reactiveRedisTemplate.opsForZSet()
-                .rangeWithScores(PENDING_DELETION_KEY, 0, -1)
+                .rangeWithScores(PENDING_DELETION_KEY, Range.unbounded())
                 .collectList()
                 .map(tuples -> {
                     double now = System.currentTimeMillis() / 1000.0;
@@ -104,7 +105,7 @@ public class ServiceStatusController {
     private Mono<Map<String, Object>> getPendingDeletionsReactive() {
         double now = System.currentTimeMillis() / 1000.0;
         return reactiveRedisTemplate.opsForZSet().size(PENDING_DELETION_KEY)
-                .zipWith(reactiveRedisTemplate.opsForZSet().count(PENDING_DELETION_KEY, 0, now))
+                .zipWith(reactiveRedisTemplate.opsForZSet().count(PENDING_DELETION_KEY, Range.closed(0.0, now)))
                 .map(tuple -> {
                     long total = tuple.getT1() != null ? tuple.getT1() : 0;
                     long expired = tuple.getT2() != null ? tuple.getT2() : 0;
