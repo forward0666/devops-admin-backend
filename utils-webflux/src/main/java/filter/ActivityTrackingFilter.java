@@ -44,20 +44,6 @@ public class ActivityTrackingFilter implements WebFilter, InitializingBean {
     // 存储当前活跃请求的标识符
     private final Set<String> activeRequests = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    /**
-     * 获取当前活跃请求快照（供 Controller 读取）
-     */
-    public Set<String> getActiveRequestsSnapshot() {
-        return Collections.unmodifiableSet(new LinkedHashSet<>(activeRequests));
-    }
-
-    /**
-     * 获取当前活跃请求总数
-     */
-    public int getActiveRequestCount() {
-        return activeRequests.size();
-    }
-
     @Override
     public void afterPropertiesSet() throws Exception {
         // 在 Bean 初始化后，注册 JVM Shutdown Hook
