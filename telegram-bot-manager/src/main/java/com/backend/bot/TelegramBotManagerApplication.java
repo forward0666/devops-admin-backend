@@ -81,42 +81,41 @@ public class TelegramBotManagerApplication {
             log.warn("⚠️ Scheduler init failed: {}", e.getMessage());
         }
 
-        // 预热所有组件
+        // 预热 Redis
         try {
-            log.info("🔥 Warming up components...");
-
-            // 1. 预热 Redis
             org.springframework.data.redis.core.StringRedisTemplate redis =
                     ctx.getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
             redis.opsForValue().set("bot:warmup", "ok");
             redis.opsForZSet().add("bot:warmup", "test", System.currentTimeMillis() / 1000.0);
             redis.delete("bot:warmup");
             log.info("🔥 Redis warmup OK");
-
-            // 2. 预热 Scheduler 线程
-            reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
-                log.info("🔥 BoundedElastic scheduler thread warmup OK");
-            });
-
-            // 3. 预热 Telegram WebClient
-            try {
-                org.springframework.web.reactive.function.client.WebClient webClient =
-                        ctx.getBean("telegramWebClient", org.springframework.web.reactive.function.client.WebClient.class);
-                webClient.get().uri("/bot123/getMe")
-                        .retrieve().bodyToMono(String.class)
-                        .timeout(Duration.ofSeconds(5))
-                        .onErrorResume(e -> {
-                            log.info("🔥 WebClient warmup OK (auth error expected)");
-                            return reactor.core.publisher.Mono.empty();
-                        })
-                        .subscribe();
-            } catch (Exception e) {
-                log.warn("🔥 WebClient warmup failed: {}", e.getMessage());
-            }
-
-            log.info("🔥 Warmup complete.");
         } catch (Exception e) {
-            log.warn("⚠️ Warmup failed: {}", e.getMessage());
+            log.warn("🔥 Redis warmup failed: {}", e.getMessage(), e);
+        }
+
+        // 预热 Scheduler 线程
+        try {
+            reactor.core.scheduler.Schedulers.boundedElastic().schedule(() ->
+                log.info("🔥 BoundedElastic warmup OK"));
+        } catch (Exception e) {
+            log.warn("🔥 Scheduler warmup failed: {}", e.getMessage(), e);
+        }
+
+        // 预热 Telegram WebClient
+        try {
+            org.springframework.web.reactive.function.client.WebClient webClient =
+                    ctx.getBean("telegramWebClient", org.springframework.web.reactive.function.client.WebClient.class);
+            webClient.get().uri("/bot123/getMe")
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(5))
+                    .onErrorResume(e -> {
+                        log.info("🔥 WebClient warmup OK (auth error expected)");
+                        return reactor.core.publisher.Mono.empty();
+                    })
+                    .subscribe();
+            log.info("🔥 WebClient warmup submitted");
+        } catch (Exception e) {
+            log.warn("🔥 WebClient warmup failed: {}", e.getMessage(), e);
         }
     }
 }
