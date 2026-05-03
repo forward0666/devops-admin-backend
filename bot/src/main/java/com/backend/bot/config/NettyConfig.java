@@ -17,10 +17,7 @@ public class NettyConfig {
     public ReactiveWebServerFactory reactiveWebServerFactory() {
         NettyReactiveWebServerFactory factory = new NettyReactiveWebServerFactory();
         factory.addServerCustomizers(server ->
-            server.runOn(reactor.netty.http.HttpResources.get())
-                  // 连接空闲超时 60 秒，超时关闭连接
-                  .responseTimeout(Duration.ofSeconds(60))
-                  .doOnConnection(conn ->
+            server.doOnConnection(conn ->
                       conn.addHandlerLast(new ReadTimeoutHandler(1, TimeUnit.SECONDS))
                   )
         );
