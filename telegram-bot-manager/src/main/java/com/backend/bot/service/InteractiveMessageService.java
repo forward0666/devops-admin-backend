@@ -65,13 +65,16 @@ public class InteractiveMessageService {
      */
     public void cancelPendingDeletion(Long chatId, Long messageId) {
         String prefix = chatId + ":" + messageId + ":";
-        log.info("🗑️ [cancelPendingDeletion] 开始取消 | chatId={}, messageId={}, prefix={}", chatId, messageId, prefix);
-        Set<String> members = stringRedisTemplate.opsForZSet().rangeByValue(ZSET_KEY, prefix, prefix + "\uffff");
-        if (members != null && !members.isEmpty()) {
-            Long removed = stringRedisTemplate.opsForZSet().remove(ZSET_KEY, members.toArray());
-            log.info("✅ [cancelPendingDeletion] 已取消 {} 个任务 | messageId={}", removed, messageId);
-        } else {
-            log.info("📭 [cancelPendingDeletion] 未找到待删除任务 | messageId={}", messageId);
+        log.info("🗑️ [cancelPendingDeletion] 开始取消 | chatId={}, messageId={}", chatId, messageId);
+        Set<String> all = stringRedisTemplate.opsForZSet().range(ZSET_KEY, 0, -1);
+        if (all != null) {
+            List<String> toRemove = all.stream().filter(v -> v.startsWith(prefix)).toList();
+            if (!toRemove.isEmpty()) {
+                stringRedisTemplate.opsForZSet().remove(ZSET_KEY, toRemove.toArray());
+                log.info("✅ [cancelPendingDeletion] 已取消 {} 个任务 | messageId={}", toRemove.size(), messageId);
+            } else {
+                log.info("📭 [cancelPendingDeletion] 未找到待删除任务 | messageId={}", messageId);
+            }
         }
     }
 

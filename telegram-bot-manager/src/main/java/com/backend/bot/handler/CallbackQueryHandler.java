@@ -45,7 +45,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         String callbackData = context.update().callbackQuery().data();
         String callbackQueryId = context.update().callbackQuery().id();
 
-        log.info("{}⚙️ {} [Step1] 收到callback | data={}, userId={}, chatId={}, messageId={}", logPrefix, logIdentifier, callbackData, userId, chatId, messageId);
+        log.info("{}⚙️ {} [Step1] 收到callback | data={}, userId={}, chatId={}", logPrefix, logIdentifier, callbackData, userId, chatId);
 
         // 检查是否是菜单导航操作
         boolean isMenuNavigation = actionHandlers.stream()
