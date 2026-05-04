@@ -264,7 +264,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
                     StringBuilder sb = new StringBuilder();
                     sb.append(title).append("\n");
-                    sb.append("项目：").append(binding.getProjectName()).append("\n\n");
+                    sb.append("项目：").append(binding.getProjectName()).append("\n");
 
                     // 域名列表：按环境分组，仅多环境时显示环境标签
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
