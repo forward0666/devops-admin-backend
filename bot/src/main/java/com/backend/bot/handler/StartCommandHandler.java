@@ -58,6 +58,13 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         log.info("{}✅ [Step1] 开始处理/start | userId={}, chatId={}", logPrefix, userId, chatId);
 
+        // 群聊场景：把用户的 /start 消息也加入定时删除
+        Long userMessageId = context.messageId();
+        if (userMessageId != null && chatId != null && chatId < 0) {
+            interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, userMessageId, DELETE_DELAY_SECONDS, null, contextView)
+                    .subscribe();
+        }
+
         // 检查 Redis 中是否存在用户会话标记（UserSession:1 或 UserSession:0）
         return redisUserSessionService.hasAnySession(userId)
                 .doOnNext(hasSession -> log.info("{}🔍 [Step2] Session检查完成 | hasSession={}, userId={}", logPrefix, hasSession, userId))
