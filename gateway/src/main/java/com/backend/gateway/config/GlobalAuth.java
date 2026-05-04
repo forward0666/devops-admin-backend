@@ -26,9 +26,6 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
     @Value("${secure.global.authorized-methods:}")
     private String authorizedMethods;
 
-    @Value("${secure.global.whitelist-paths:}")
-    private String whitelistPaths;
-
     /**
      * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
      */
