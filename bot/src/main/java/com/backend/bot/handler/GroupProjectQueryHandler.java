@@ -266,7 +266,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     sb.append(title).append("\n");
                     sb.append("项目：").append(binding.getProjectName()).append("\n\n");
 
-                    // 域名列表按环境分组（prod > uat > test > dev）
+                    // 域名列表：按环境分组，仅多环境时显示环境标签
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
                         String[] envOrder = {"PROD", "UAT", "TEST", "DEV", "prod", "uat", "test", "dev"};
                         Map<String, List<Map<String, Object>>> grouped = items.stream()
@@ -274,9 +274,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                         d -> String.valueOf(getVal(d, "env", "其他")),
                                         java.util.stream.Collectors.toList()
                                 ));
+                        boolean multiEnv = grouped.size() > 1;
                         for (String env : envOrder) {
                             if (!grouped.containsKey(env)) continue;
-                            sb.append("环境：").append(env).append("\n");
+                            if (multiEnv) sb.append("环境：").append(env).append("\n");
                             int idx = 1;
                             for (Map<String, Object> m : grouped.get(env)) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
@@ -287,12 +288,11 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
-                            sb.append("\n");
+                            if (multiEnv) sb.append("\n");
                         }
-                        // 输出未在排序中的其他环境
                         for (Map.Entry<String, List<Map<String, Object>>> entry : grouped.entrySet()) {
                             if (java.util.Arrays.asList(envOrder).contains(entry.getKey())) continue;
-                            sb.append("环境：").append(entry.getKey()).append("\n");
+                            if (multiEnv) sb.append("环境：").append(entry.getKey()).append("\n");
                             int idx2 = 1;
                             for (Map<String, Object> m : entry.getValue()) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
@@ -303,7 +303,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
-                            sb.append("\n");
+                            if (multiEnv) sb.append("\n");
                         }
                         sb.append("共 ").append(items.size()).append(" 条");
                     } else if (items == null || items.isEmpty()) {
