@@ -111,7 +111,7 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                     }
 
                     if (authorizedRequest(method)) {
-                        log.warn("[traceId={}] ❌ Method NOT allowed | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
+                        log.warn("[traceId={}] ❌ Method BLOCKED (not in authorized-methods) | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
                                 traceId, ip, routeId, method, path, encryptedData);
                         if (cache != null) cache.put(cacheKey, false);
                         return false;
