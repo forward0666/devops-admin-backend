@@ -83,6 +83,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
 
             // 先从数据库查
+            log.info("{}🔍 [MenuNav] Searching DB: botName={}, menuKey={}", traceLogPrefix, context.botName(), menuKey);
             return botMenuService.findKeyboardByBotNameAndMenuKey(context.botName(), menuKey)
                     .flatMap(newMarkup -> {
                         if (newMarkup == null || newMarkup.isEmpty()) return Mono.empty();
