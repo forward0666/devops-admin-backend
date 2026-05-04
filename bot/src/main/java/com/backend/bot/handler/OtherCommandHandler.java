@@ -3,6 +3,7 @@ package com.backend.bot.handler;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.InteractiveMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Mono;
 public class OtherCommandHandler implements UpdateHandler {
 
     private final BotClientService botClientService;
+    private final InteractiveMessageService interactiveMessageService;
 
     @Override
     public boolean support(BotUpdateDto update) {
@@ -52,13 +54,30 @@ public class OtherCommandHandler implements UpdateHandler {
             log.info("ℹ️ Received unsupported command: {} for bot: {} in {} chat.", text, botName, type);
 
             String responseText = String.format("抱歉，命令 `%s` 暂未实现。请使用 `/start` 或通过菜单操作。", text);
+            Long userId = botUpdate.message().from() != null ? botUpdate.message().from().id() : null;
+            Long userMsgId = botUpdate.message().messageId();
+            boolean isGroup = chatId < 0;
 
-            return botClientService.sendMessage(token, chatId, responseText, null)
+            return botClientService.sendMenuMessageWithResponse(token, chatId, responseText, null)
+                    .flatMap(respJson -> {
+                        try {
+                            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
+                            Long respMsgId = root.path("result").path("message_id").asLong(0);
+                            if (respMsgId != 0) {
+                                // 回复消息 5s 后删除
+                                interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, respMsgId, 5, null, reactor.util.context.Context.empty()).subscribe();
+                            }
+                        } catch (Exception ignored) {}
+                        // 群聊中用户的命令消息也删除
+                        if (isGroup && userMsgId != null && userId != null) {
+                            interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, userMsgId, 5, null, reactor.util.context.Context.empty()).subscribe();
+                        }
+                        return Mono.<Void>empty();
+                    })
                     .onErrorResume(e -> {
                         log.error("❌ Failed to send command response for bot {}. Error: {}", botName, e.getMessage());
                         return Mono.empty();
-                    })
-                    .then();
+                    });
         }
 
         // 理论上由于 support 方法的过滤，这里是不会执行的。
