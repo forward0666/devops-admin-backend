@@ -76,7 +76,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
         String menuText = String.format(
                 MENU_PROMPT_TEXT_TEMPLATE,
                 String.valueOf(delaySeconds)
-        ) + "\n\u200B" + System.currentTimeMillis();
+        ) + "\n\u200B";
 
         // 使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
