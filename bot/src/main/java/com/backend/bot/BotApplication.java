@@ -52,6 +52,7 @@ public class BotApplication {
      * @param args 命令行参数，可传递配置项覆盖等
      */
     public static void main(String[] args) {
+        reactor.core.publisher.Hooks.onErrorDropped(e -> {});
 
         // 启动 Spring Boot 应用并获取应用上下文
         ApplicationContext ctx = SpringApplication.run(BotApplication.class, args);
