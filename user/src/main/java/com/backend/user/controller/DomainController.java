@@ -30,12 +30,16 @@ public class DomainController {
     private JwtUtil jwtUtil;
 
     @GetMapping("/list")
-    public ApiResponseDto<List<DomainVo>> list(@RequestParam Long projectId, HttpServletRequest request) {
+    public ApiResponseDto<List<DomainVo>> list(@RequestParam Long projectId, @RequestParam(required = false) String env, HttpServletRequest request) {
         try {
             List<DomainEntity> domains = domainService.findByProjectId(projectId);
             String projectRole = resolveProjectRole(request, projectId);
 
             domains = applyDomainFilter(domains, projectRole);
+
+            if (env != null && !env.isBlank()) {
+                domains = domains.stream().filter(d -> env.equalsIgnoreCase(d.getEnv())).toList();
+            }
 
             return ApiResponseDto.success("Success", domains.stream().map(DomainVo::fromEntity).toList());
         } catch (Exception e) {

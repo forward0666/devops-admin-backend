@@ -40,7 +40,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private static final String PROJECT_INFO_ACTION = "PROJECT_INFO_ACTION";
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
-    private static final String PROJECT_DOMAIN_ACTION = "PROJECT_DOMAIN_ACTION";
+    private static final String PROJECT_DOMAIN_PROD_ACTION = "PROJECT_DOMAIN_PROD_ACTION";
+    private static final String PROJECT_DOMAIN_UAT_ACTION = "PROJECT_DOMAIN_UAT_ACTION";
+    private static final String PROJECT_DOMAIN_TEST_ACTION = "PROJECT_DOMAIN_TEST_ACTION";
+    private static final String PROJECT_DOMAIN_DEV_ACTION = "PROJECT_DOMAIN_DEV_ACTION";
     private static final String PROJECT_MIDDLEWARE_ACTION = "PROJECT_MIDDLEWARE_ACTION";
     private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
 
@@ -48,7 +51,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     public boolean supports(String callbackData) {
         return callbackData.equals("callback_data_" + PROJECT_INFO_ACTION)
                 || callbackData.equals("callback_data_" + PROJECT_MEMBER_ACTION)
-                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_PROD_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_UAT_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_TEST_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_DEV_ACTION)
                 || callbackData.equals("callback_data_" + PROJECT_MIDDLEWARE_ACTION);
     }
 
@@ -118,7 +124,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                     return switch (action) {
                                         case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
                                         case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", null, traceLogPrefix);
-                                        case PROJECT_DOMAIN_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🌐 域名列表", role, traceLogPrefix);
+                                        case PROJECT_DOMAIN_PROD_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=PROD", token, chatId, messageId, "🌐 生产域名列表", role, traceLogPrefix);
+                                        case PROJECT_DOMAIN_UAT_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=UAT", token, chatId, messageId, "🌐 UAT域名列表", role, traceLogPrefix);
+                                        case PROJECT_DOMAIN_TEST_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=TEST", token, chatId, messageId, "🌐 TEST域名列表", role, traceLogPrefix);
+                                        case PROJECT_DOMAIN_DEV_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=DEV", token, chatId, messageId, "🌐 DEV域名列表", role, traceLogPrefix);
                                         case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, binding, "/middleware/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🔧 中间件列表", role, traceLogPrefix);
                                         default -> Mono.empty();
                                     };
