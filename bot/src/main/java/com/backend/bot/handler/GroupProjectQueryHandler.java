@@ -285,7 +285,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String remark = getVal(m, "remark", "").toString();
                                 sb.append(String.format("%02d. ", idx++));
                                 sb.append(domainName);
-                                sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
+                                sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
                             if (multiEnv) sb.append("\n");
@@ -300,7 +300,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String remark = getVal(m, "remark", "").toString();
                                 sb.append(String.format("%02d. ", idx2++));
                                 sb.append(domainName);
-                                sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
+                                sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
                             if (multiEnv) sb.append("\n");
