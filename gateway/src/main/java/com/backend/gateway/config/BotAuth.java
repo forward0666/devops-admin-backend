@@ -23,6 +23,9 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
     @Value("${secure.bot.whitelist-paths:}")
     private String whitelistPaths;
 
+    @Value("${secure.bot.authorized-methods:}")
+    private String authorizedMethods;
+
     /**
      * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
      */
@@ -37,6 +40,14 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
 
     @Override
     protected boolean authorizedRequest(String method) {
+        if (authorizedMethods == null || authorizedMethods.isBlank()) {
+            return false;
+        }
+        for (String m : authorizedMethods.split(",")) {
+            if (m.trim().equalsIgnoreCase(method)) {
+                return true;
+            }
+        }
         return false;
     }
 
