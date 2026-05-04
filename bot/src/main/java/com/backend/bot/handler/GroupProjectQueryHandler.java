@@ -262,7 +262,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
                     // 域名列表按环境分组（prod > uat > test > dev）
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
-                        String[] envOrder = {"prod", "uat", "test", "dev"};
+                        String[] envOrder = {"PROD", "UAT", "TEST", "DEV", "prod", "uat", "test", "dev"};
                         Map<String, List<Map<String, Object>>> grouped = items.stream()
                                 .collect(java.util.stream.Collectors.groupingBy(
                                         d -> String.valueOf(getVal(d, "env", "其他")),
