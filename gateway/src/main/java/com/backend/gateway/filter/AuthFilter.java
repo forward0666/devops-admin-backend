@@ -100,12 +100,19 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                         return cached;
                     }
 
-                    // 💥 真正的阻塞操作在这里执行
+                    String encryptedData = exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data");
                     boolean authorized = AuthValidationUtils.isAuthorized(exchange, getSecret());
 
-                    if (!authorized || authorizedRequest(method)) {
-                        log.warn("[traceId={}] ❌ Unauthorized or method not allowed | IP={} | Route={} | Method={} | Path={}",
-                                traceId, ip, routeId, method, path);
+                    if (!authorized) {
+                        log.warn("[traceId={}] ❌ Auth FAILED | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
+                                traceId, ip, routeId, method, path, encryptedData);
+                        if (cache != null) cache.put(cacheKey, false);
+                        return false;
+                    }
+
+                    if (authorizedRequest(method)) {
+                        log.warn("[traceId={}] ❌ Method NOT allowed | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
+                                traceId, ip, routeId, method, path, encryptedData);
                         if (cache != null) cache.put(cacheKey, false);
                         return false;
                     }
