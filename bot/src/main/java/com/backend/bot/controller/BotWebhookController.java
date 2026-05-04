@@ -1,4 +1,5 @@
 package com.backend.bot.controller;
+import com.backend.bot.service.InteractiveMessageService;
 
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.CallbackQueryDto;
@@ -32,6 +33,7 @@ public class BotWebhookController {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final BotCoreService botCoreService;
     private final BotClientService botClientService;
+    private final InteractiveMessageService interactiveMessageService;
 
     @PostMapping("/callback/{botName}")
     public Mono<ResponseEntity<Map<String, String>>> onUpdateReceived(
@@ -102,9 +104,9 @@ public class BotWebhookController {
                                                         com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
                                                         Long warnMsgId = root.path("result").path("message_id").asLong(0);
                                                         if (warnMsgId != 0) {
-                                                            return botClientService.deleteMessage(bot.getBotToken(), chatId, warnMsgId)
-                                                                    .delayElement(Duration.ofSeconds(5))
-                                                                    .onErrorResume(e -> Mono.empty());
+                                                            return interactiveMessageService.scheduleMessageDeletion(
+                                                                    bot.getBotToken(), 0L, chatId, warnMsgId, 5, null, reactor.util.context.Context.empty()
+                                                            );
                                                         }
                                                     } catch (Exception ignored) {}
                                                     return Mono.empty();
