@@ -54,6 +54,8 @@ public class BotMenuService {
      */
     public Mono<InlineKeyboardMarkupDto> findKeyboardByBotNameAndMenuKey(String botName, String menuKey) {
         String cacheKey = "bot:menu:" + botName + ":key:" + menuKey;
+        log.info("🔍 [MenuService] findKeyboard: botName={}, menuKey={}", botName, menuKey);
+
         return redisTemplate.opsForValue().get(cacheKey)
                 .flatMap(cached -> {
                     try {
@@ -65,29 +67,30 @@ public class BotMenuService {
                         return Mono.empty();
                     }
                 })
+                .switchIfEmpty(Mono.defer(() -> queryDbAndCache(botName, menuKey, cacheKey)))
                 .switchIfEmpty(Mono.defer(() -> {
-                        log.info("🔍 [MenuService] DB query: botName={}, menuKey={}", botName, menuKey);
-                        return botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
-                                .doOnNext(entity -> {
-                                    String btns = entity.getButtons() != null
-                                            ? entity.getButtons().substring(0, Math.min(80, entity.getButtons().length()))
-                                            : "null";
-                                    log.info("🔍 [MenuService] Found entity: id={}, title={}, buttons={}", entity.getId(), entity.getTitle(), btns);
-                                })
-                                .map(this::entityToKeyboard)
-                                .doOnNext(markup -> {
-                                    try {
-                                        String json = objectMapper.writeValueAsString(markup);
-                                        redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
-                                    } catch (Exception e) {
-                                        log.warn("Failed to cache menu key={}", cacheKey, e);
-                                    }
-                                })
-                                .switchIfEmpty(Mono.defer(() -> {
-                                    log.debug("No menu found in DB for bot={} menuKey={}, will use fallback", botName, menuKey);
-                                    return Mono.empty();
-                                }))
+                    log.info("🔍 [MenuService] No menu found for bot={} menuKey={}", botName, menuKey);
+                    return Mono.empty();
                 }));
+    }
+
+    private Mono<InlineKeyboardMarkupDto> queryDbAndCache(String botName, String menuKey, String cacheKey) {
+        return botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
+                .doOnNext(entity -> {
+                    String btns = entity.getButtons() != null
+                            ? entity.getButtons().substring(0, Math.min(80, entity.getButtons().length()))
+                            : "null";
+                    log.info("🔍 [MenuService] Found entity: id={}, title={}, buttons={}", entity.getId(), entity.getTitle(), btns);
+                })
+                .map(this::entityToKeyboard)
+                .doOnNext(markup -> {
+                    try {
+                        String json = objectMapper.writeValueAsString(markup);
+                        redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
+                    } catch (Exception e) {
+                        log.warn("Failed to cache menu key={}", cacheKey, e);
+                    }
+                });
     }
 
     /**
