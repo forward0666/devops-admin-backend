@@ -2,7 +2,7 @@ package com.backend.bot.filter;
 
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.service.GroupMessageCleanupService;
+import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.BotChatUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,7 @@ import reactor.core.publisher.Mono;
 @Slf4j
 public class GroupMessageFilter {
 
-    private final GroupMessageCleanupService cleanupService;
+    private final InteractiveMessageService interactiveMessageService;
 
     public Mono<Void> filter(BotUpdateDto update, String botToken) {
         if (update.message() == null || update.message().chat() == null || update.message().text() == null) {
@@ -40,9 +40,10 @@ public class GroupMessageFilter {
 
         Long messageId = update.message().messageId();
         Long chatId = update.message().chat().id();
+        Long userId = update.message().from() != null ? update.message().from().id() : null;
 
         if (messageId != null && chatId != null) {
-            return cleanupService.markMessageForCleanup(chatId, messageId, botToken);
+            return interactiveMessageService.scheduleMessageDeletion(chatId, messageId, botToken, userId, 5);
         }
 
         return Mono.empty();
