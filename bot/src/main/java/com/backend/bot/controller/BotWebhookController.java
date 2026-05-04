@@ -95,9 +95,20 @@ public class BotWebhookController {
                                                         "🚫 %s (%s) 已在黑名单中，如需解封请联系管理员。",
                                                         user.firstName() != null ? user.firstName() : "",
                                                         user.username() != null ? "@" + user.username() : "N/A");
-                                                Mono<Void> sendWarning = botClientService.sendMessage(
-                                                        bot.getBotToken(), chatId, warnMsg
-                                                );
+                                                Mono<Void> sendWarning = botClientService.sendMenuMessageWithResponse(
+                                                        bot.getBotToken(), chatId, warnMsg, null
+                                                ).flatMap(respJson -> {
+                                                    try {
+                                                        com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
+                                                        Long warnMsgId = root.path("result").path("message_id").asLong(0);
+                                                        if (warnMsgId != 0) {
+                                                            return botClientService.deleteMessage(bot.getBotToken(), chatId, warnMsgId)
+                                                                    .delayElement(Duration.ofSeconds(5))
+                                                                    .onErrorResume(e -> Mono.empty());
+                                                        }
+                                                    } catch (Exception ignored) {}
+                                                    return Mono.empty();
+                                                }).onErrorResume(e -> Mono.empty());
                                                 Mono<Void> deleteMsg = msgId != null
                                                         ? botClientService.deleteMessage(bot.getBotToken(), chatId, msgId)
                                                         : Mono.empty();
