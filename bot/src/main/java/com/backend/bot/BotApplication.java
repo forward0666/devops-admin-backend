@@ -14,13 +14,13 @@ import java.time.Duration; // 引入 Scheduler
 
 /**
  * Telegram Bot 管理系统主启动类
- *
+ * 
  * 该应用是一个基于 Spring Boot WebFlux 的响应式 Telegram Bot 管理平台，
  * 提供多 Bot 管理、Webhook 处理、白名单机制、交互式菜单等功能。
- *
+ * 
  * 技术栈：Spring Boot 3.x + Java 21 + WebFlux + R2DBC + Redis + MySQL
  * 架构模式：响应式编程 (Reactive Programming)
- *
+ * 
  * @author Backend Team
  * @version 1.0.0
  */
@@ -44,31 +44,31 @@ public class BotApplication {
 
     /**
      * 应用程序主入口方法
-     *
+     * 
      * 启动 Spring Boot 应用，并在应用启动完成后执行初始化操作。
      * 使用 SpringApplication.run() 方法启动应用上下文，
      * 然后调用 initAfterStartup 方法执行启动后初始化逻辑。
-     *
+     * 
      * @param args 命令行参数，可传递配置项覆盖等
      */
     public static void main(String[] args) {
 
         // 启动 Spring Boot 应用并获取应用上下文
         ApplicationContext ctx = SpringApplication.run(BotApplication.class, args);
-
+        
         // 执行启动后的初始化逻辑
         initAfterStartup(ctx);
     }
 
     /**
      * 应用启动后初始化方法
-     *
+     * 
      * 在 Spring 应用上下文加载完成后执行，负责初始化关键的系统组件。
      * 主要功能：
      * 1. 获取响应式调度器 Bean 用于处理阻塞任务
      * 2. 记录初始化状态信息
      * 3. 提供异常处理机制确保启动流程的健壮性
-     *
+     * 
      * @param ctx Spring 应用上下文，用于获取 Bean 实例
      */
     private static void initAfterStartup(ApplicationContext ctx) {
@@ -95,7 +95,7 @@ public class BotApplication {
         // 预热 Scheduler 线程
         try {
             reactor.core.scheduler.Schedulers.boundedElastic().schedule(() ->
-                    log.info("🔥 BoundedElastic warmup OK"));
+                log.info("🔥 BoundedElastic warmup OK"));
         } catch (Exception e) {
             log.warn("🔥 Scheduler warmup failed: {}", e.getMessage(), e);
         }

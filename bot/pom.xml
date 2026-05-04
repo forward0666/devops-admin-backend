@@ -13,7 +13,7 @@
     <artifactId>bot</artifactId>
     <version>1.0.0</version>
     <name>Bot</name>
-    <description>Bot</description>
+    <description>Bot Manager</description>
 
     <dependencies>
 
@@ -75,5 +75,5 @@
         </plugins>
     </build>
 
-
+    
 </project>
