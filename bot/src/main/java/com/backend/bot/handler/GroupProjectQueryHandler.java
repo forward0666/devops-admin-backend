@@ -324,7 +324,6 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 if (m.containsKey("env")) sb.append(" (").append(getVal(m, "env", "")).append(")");
                             } else if (m.containsKey("username")) {
                                 sb.append(getVal(m, "username", ""));
-                                if (m.containsKey("fullName")) sb.append(" (").append(getVal(m, "fullName", "")).append(")");
                                 // projectRole 不显示
                             } else {
                                 sb.append(m.toString());
