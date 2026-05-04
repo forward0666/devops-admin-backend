@@ -282,7 +282,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
-                                sb.append(idx++).append(". ").append(domainName);
+                                sb.append(String.format("%02d. ", idx++));
+                                sb.append(domainName);
                                 sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
@@ -297,7 +298,8 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
-                                sb.append(idx2++).append(". ").append(domainName);
+                                sb.append(String.format("%02d. ", idx2++));
+                                sb.append(domainName);
                                 sb.append(" ").append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
@@ -309,7 +311,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     } else {
                         int idx = 1;
                         for (Map<String, Object> m : items) {
-                            sb.append(idx++).append(". ");
+                            sb.append(String.format("%02d. ", idx++));
                             if (m.containsKey("domainName") || m.containsKey("domain")) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 sb.append(domainName);
