@@ -96,7 +96,12 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                     Boolean cached = cache != null ? cache.get(cacheKey, Boolean.class) : null;
 
                     if (cached != null) {
-                        log.info("[traceId={}] 🔹 Cache hit | result={}| key={} ", traceId, cached, cacheKey);
+                        if (!cached) {
+                            log.warn("[traceId={}] 🔹 Cache hit BLOCKED | IP={} | Route={} | Method={} | Path={}",
+                                    traceId, ip, routeId, method, path);
+                        } else {
+                            log.info("[traceId={}] 🔹 Cache hit ALLOWED | key={}", traceId, cacheKey);
+                        }
                         return cached;
                     }
 
