@@ -18,6 +18,7 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 import java.time.Duration;
 import java.util.List;
@@ -121,7 +122,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 .flatMap(role -> {
                                     log.info("{}🔍 Resolved role: {} for tgUsername={}", traceLogPrefix, role, tgUsername);
                                     if ("None".equals(role)) {
-                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看。");
+                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看。", true);
                                     }
                                     return switch (action) {
                                         case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
@@ -191,14 +192,14 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .flatMap(project -> {
                     Object code = project.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
-                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + project.getOrDefault("message", "未知错误"));
+                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + project.getOrDefault("message", "未知错误"), true);
                     }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> data = project.containsKey("data") ? (Map<String, Object>) project.get("data") : project;
 
                     if (data == null) {
                         return replyText(token, chatId, messageId,
-                                String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()));
+                                String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()), true);
                     }
 
                     StringBuilder sb = new StringBuilder();
@@ -210,12 +211,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     sb.append("进度：").append(getVal(data, "progress", 0)).append("%\n");
                     sb.append("创建时间：").append(getVal(data, "createdAt", "暂无")).append("\n");
 
-                    return replyText(token, chatId, messageId, sb.toString());
+                    return replyText(token, chatId, messageId, sb.toString(), true);
                 })
                 .onErrorResume(e -> {
                     log.warn("{}⚠️ Failed to fetch project info: {}", traceLogPrefix, e.getMessage());
                     return replyText(token, chatId, messageId,
-                            String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()));
+                            String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()), true);
                 });
     }
 
@@ -241,7 +242,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     // 检查响应 code
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
-                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + response.getOrDefault("message", "未知错误"));
+                        return replyText(token, chatId, messageId, "⚠️ 查询失败：" + response.getOrDefault("message", "未知错误"), true);
                     }
                     // 响应结构: {code:200, data: [...]} 或 {code:200, data: {data: [...]}}
                     Object dataObj = response.get("data");
@@ -333,11 +334,11 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         sb.append("\n共 ").append(idx - 1).append(" 条");
                     }
 
-                    return replyText(token, chatId, messageId, sb.toString());
+                    return replyText(token, chatId, messageId, sb.toString(), true);
                 })
                 .onErrorResume(e -> {
                     log.warn("{}⚠️ Failed to fetch {}: {}", traceLogPrefix, title, e.getMessage());
-                    return replyText(token, chatId, messageId, "⚠️ 查询失败：" + e.getMessage());
+                    return replyText(token, chatId, messageId, "⚠️ 查询失败：" + e.getMessage(), true);
                 });
     }
 
@@ -362,16 +363,17 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return items;
     }
 
-    private Mono<Void> replyText(String token, Long chatId, Long messageId, String text) {
-        return botClientService.editMessageText(token, chatId, messageId, text, null)
-                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null)
-                        .doOnNext(msg -> interactiveMessageService.scheduleMessageDeletion(chatId, msg.messageId(), null, 10)))
-                .doOnNext(v -> interactiveMessageService.scheduleMessageDeletion(chatId, messageId, null, 10))
-                .then();
+    private Mono<Void> replyText(String token, Long chatId, Long messageId, String text, boolean autoDelete) {
+        Mono<Void> send = botClientService.editMessageText(token, chatId, messageId, text, null)
+                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null));
+        if (autoDelete) {
+            send = send.doOnSuccess(v -> interactiveMessageService.scheduleMessageDeletion(token, null, chatId, messageId, 10, "[bot]", Context.empty()).subscribe());
+        }
+        return send.then();
     }
 
     private Mono<Void> replyNoBinding(String token, Long chatId, Long messageId) {
-        return replyText(token, chatId, messageId, "该群组未绑定项目，请联系管理员配置。");
+        return replyText(token, chatId, messageId, "该群组未绑定项目，请联系管理员配置。", true);
     }
 
     private Object getVal(Map<String, Object> data, String key, Object defaultVal) {
