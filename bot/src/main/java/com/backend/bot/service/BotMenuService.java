@@ -82,7 +82,7 @@ public class BotMenuService {
                                     log.debug("No menu found in DB for bot={} menuKey={}, will use fallback", botName, menuKey);
                                     return Mono.empty();
                                 }))
-                ));
+                }));
     }
 
     /**
