@@ -284,7 +284,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
                                 ;
-                                sb.append(domainName);
+                                sb.append(domainName).append(" ");
                                 sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
@@ -299,7 +299,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
                                 ;
-                                sb.append(domainName);
+                                sb.append(domainName).append(" ");
                                 sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
@@ -314,7 +314,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             ;
                             if (m.containsKey("domainName") || m.containsKey("domain")) {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
-                                sb.append(domainName);
+                                sb.append(domainName).append(" ");
                                 String env = getVal(m, "env", "").toString();
                                 String type = getVal(m, "type", "").toString();
                                 if (!env.isEmpty() || !type.isEmpty()) {
