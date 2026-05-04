@@ -6,6 +6,7 @@ import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.BotGroupProjectEntity;
 import com.backend.bot.repository.BotGroupProjectRepository;
 import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.core.ParameterizedTypeReference;
@@ -30,6 +31,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private final BotGroupProjectRepository botGroupProjectRepository;
     private final BotClientService botClientService;
+    private final InteractiveMessageService interactiveMessageService;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -362,7 +364,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
     private Mono<Void> replyText(String token, Long chatId, Long messageId, String text) {
         return botClientService.editMessageText(token, chatId, messageId, text, null)
-                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null))
+                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null)
+                        .doOnNext(msg -> interactiveMessageService.scheduleMessageDeletion(chatId, msg.messageId(), null, 10)))
+                .doOnNext(v -> interactiveMessageService.scheduleMessageDeletion(chatId, messageId, null, 10))
                 .then();
     }
 
