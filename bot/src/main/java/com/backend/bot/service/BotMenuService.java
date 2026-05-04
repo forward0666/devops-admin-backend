@@ -65,8 +65,10 @@ public class BotMenuService {
                         return Mono.empty();
                     }
                 })
-                .switchIfEmpty(Mono.defer(() ->
-                        botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
+                .switchIfEmpty(Mono.defer(() -> {
+                        log.info("🔍 [MenuService] DB query: botName={}, menuKey={}", botName, menuKey);
+                        return botMenuRepository.findByBotNameAndMenuKey(botName, menuKey)
+                                .doOnNext(entity -> log.info("🔍 [MenuService] Found entity: id={}, title={}, buttons={}", entity.getId(), entity.getTitle(), entity.getButtons() != null ? entity.getButtons().substring(0, Math.min(80, entity.getButtons().length())) : "null"))
                                 .map(this::entityToKeyboard)
                                 .doOnNext(markup -> {
                                     try {

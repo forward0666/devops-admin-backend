@@ -14,7 +14,7 @@ public interface BotMenuRepository extends ReactiveCrudRepository<BotMenuEntity,
     @Query("SELECT * FROM bot_menu WHERE bot_name = :botName ORDER BY menu_level, sort_order")
     Flux<BotMenuEntity> findByBotNameOrderByLevelAndSort(String botName);
 
-    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_key = :menuKey LIMIT 1")
+    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_key = :menuKey")
     Mono<BotMenuEntity> findByBotNameAndMenuKey(String botName, String menuKey);
 
     @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_level = :menuLevel ORDER BY sort_order")
