@@ -72,11 +72,11 @@ public class MenuNavigationHandler implements CallbackActionHandler {
         // 2. 确定计时器时间 (int)
         int delaySeconds = getDeletionDelay(callbackData);
 
-        // 3. 动态生成菜单文本
+        // 3. 动态生成菜单文本（加时间戳避免TG editMessageText 400）
         String menuText = String.format(
                 MENU_PROMPT_TEXT_TEMPLATE,
                 String.valueOf(delaySeconds)
-        );
+        ) + "\n\u200B" + System.currentTimeMillis();
 
         // 使用 Mono.deferContextual 捕获 ContextView
         return Mono.deferContextual(contextView -> {
