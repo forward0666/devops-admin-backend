@@ -20,6 +20,9 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
     @Value("${secure.header.bot.secret:default-secret}")
     private String secret;
 
+    @Value("${secure.bot.whitelist-paths:}")
+    private String whitelistPaths;
+
     /**
      * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
      */
@@ -39,6 +42,15 @@ public class BotAuth extends AuthFilter<BaseAuthConfig> {
 
     @Override
     protected boolean isWhitelistedPath(String path) {
-        return path != null && path.startsWith("/callback/");
+        if (path == null || whitelistPaths == null || whitelistPaths.isBlank()) {
+            return false;
+        }
+        for (String wp : whitelistPaths.split(",")) {
+            String trimmed = wp.trim();
+            if (!trimmed.isEmpty() && path.startsWith(trimmed)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
