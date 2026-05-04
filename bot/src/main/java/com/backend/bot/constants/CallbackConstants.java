@@ -12,7 +12,6 @@ public class CallbackConstants {
     public static final String MAIN_MENU_CALLBACK = "MAIN_MENU";
 
     // --- 最终业务操作常量：域名加白 ---
-    public static final String DOMAIN_WHITELIST_ACTION = "callback_data_DOMAIN_WHITELIST_ACTION";
     public static final String FRONTEND_WEB_ACTION = "callback_data_FRONTEND_WEB_DOMAIN_ACTION";
     public static final String FRONTEND_ADMIN_ACTION = "callback_data_FRONTEND_ADMIN_DOMAIN_ACTION";
 

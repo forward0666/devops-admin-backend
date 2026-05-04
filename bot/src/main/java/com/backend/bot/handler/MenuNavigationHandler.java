@@ -33,7 +33,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     // 修复: 将秒数占位符从 %d 更改为 %s，以避免 java.util.IllegalFormatConversionException
     // 优化: 缩短菜单提示文本，移除“当前菜单:”前缀、菜单名称及其周围的方括号【】，只保留计时器信息
     // 注意: 菜单名称 (%s) 现已移除，只保留计时器 (%s)
-    private static final String MENU_PROMPT_TEXT_TEMPLATE = "🐌 请在%s秒内选择操作";
+    private static final String MENU_PROMPT_TEXT_TEMPLATE = "⏱️ 窗口剩余 %s 秒，请及时选择操作或发送 /start 重新打开菜单。";
 
     @Override
     public boolean supports(String callbackData) {
