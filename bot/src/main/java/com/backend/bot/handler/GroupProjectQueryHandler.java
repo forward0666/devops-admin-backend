@@ -234,6 +234,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
         return cacheOrFetch(cacheKey, USER_CACHE_TTL,
                 webClient.get().uri(uri).retrieve())
+                .doOnSubscribe(s -> log.info("{}🔍 Fetching URI: {}", traceLogPrefix, uri))
                 .flatMap(response -> {
                     // 检查响应 code
                     Object code = response.get("code");
