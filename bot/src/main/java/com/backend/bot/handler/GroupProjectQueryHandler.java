@@ -225,7 +225,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         if (uri.contains("/projectMember")) {
             cacheKey = "bot:projectMembers:" + binding.getProjectId();
         } else if (uri.contains("/domain/")) {
-            cacheKey = "bot:domains:" + binding.getProjectId() + ":" + role;
+            // 从 URI 提取 env 参数作为缓存 key 的一部分
+            String envPart = uri.contains("env=") ? uri.substring(uri.indexOf("env=") + 4).split("&")[0] : "all";
+            cacheKey = "bot:domains:" + binding.getProjectId() + ":" + role + ":" + envPart;
         } else {
             cacheKey = "bot:middlewares:" + binding.getProjectId() + ":" + role;
         }
