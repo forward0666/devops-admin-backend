@@ -48,7 +48,7 @@ public class LoginAuth extends AuthFilter<BaseAuthConfig> {
     @Override
     protected boolean isWhitelistedPath(String path) {
         if (path == null || whitelistPaths == null || whitelistPaths.isBlank()) {
-            return true;
+            return false;
         }
         for (String wp : whitelistPaths.split(",")) {
             String trimmed = wp.trim();
@@ -56,6 +56,6 @@ public class LoginAuth extends AuthFilter<BaseAuthConfig> {
                 return true;
             }
         }
-        return true;
+        return false;
     }
 }
