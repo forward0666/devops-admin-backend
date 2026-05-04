@@ -39,9 +39,9 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
 
     protected abstract String getSecret();
 
-    /** 检查是否为无需授权的请求方法 */
-    protected boolean authorizedRequest(String method) {
-        return false;
+    /** 检查是否为允许的请求方法（空=允许所有方法） */
+    protected boolean isAllowedMethod(String method) {
+        return true;
     }
 
     /** 白名单路径，子类可覆盖 */
@@ -105,18 +105,20 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                         return cached;
                     }
 
+                    // 1. 先检查方法是否允许
+                    if (!isAllowedMethod(method)) {
+                        log.warn("[traceId={}] ❌ Method NOT allowed | IP={} | Route={} | Method={} | Path={}",
+                                traceId, ip, routeId, method, path);
+                        if (cache != null) cache.put(cacheKey, false);
+                        return false;
+                    }
+
+                    // 2. 再检查 header auth
                     String encryptedData = exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data");
                     boolean authorized = AuthValidationUtils.isAuthorized(exchange, getSecret());
 
                     if (!authorized) {
                         log.warn("[traceId={}] ❌ Auth FAILED | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
-                                traceId, ip, routeId, method, path, encryptedData);
-                        if (cache != null) cache.put(cacheKey, false);
-                        return false;
-                    }
-
-                    if (authorizedRequest(method)) {
-                        log.warn("[traceId={}] ❌ Method BLOCKED (not in authorized-methods) | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
                                 traceId, ip, routeId, method, path, encryptedData);
                         if (cache != null) cache.put(cacheKey, false);
                         return false;

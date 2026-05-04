@@ -39,9 +39,9 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
     }
 
     @Override
-    protected boolean authorizedRequest(String method) {
+    protected boolean isAllowedMethod(String method) {
         if (authorizedMethods == null || authorizedMethods.isBlank()) {
-            return false;
+            return true;
         }
         for (String m : authorizedMethods.split(",")) {
             if (m.trim().equalsIgnoreCase(method)) {
@@ -54,7 +54,7 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
     @Override
     protected boolean isWhitelistedPath(String path) {
         if (path == null || whitelistPaths == null || whitelistPaths.isBlank()) {
-            return false;
+            return true;
         }
         for (String wp : whitelistPaths.split(",")) {
             String trimmed = wp.trim();
@@ -62,6 +62,6 @@ public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
                 return true;
             }
         }
-        return false;
+        return true;
     }
 }

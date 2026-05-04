@@ -11,19 +11,19 @@ import reactor.core.scheduler.Scheduler;
 
 @Slf4j
 @RefreshScope
-@Component("LoginAuth")
-public class LoginAuth extends AuthFilter<BaseAuthConfig> {
+@Component("SecurityAuth")
+public class SecurityAuth extends AuthFilter<BaseAuthConfig> {
 
-    @Value("${secure.header.login.secret:default-secret}")
+    @Value("${secure.header.security.secret:default-secret}")
     private String secret;
 
-    @Value("${secure.login.whitelist-paths:}")
+    @Value("${secure.security.whitelist-paths:}")
     private String whitelistPaths;
 
-    @Value("${secure.login.authorized-methods:}")
+    @Value("${secure.security.authorized-methods:}")
     private String authorizedMethods;
 
-    public LoginAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
+    public SecurityAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
         super(BaseAuthConfig.class, scheduler, cacheManager);
     }
 
@@ -48,7 +48,7 @@ public class LoginAuth extends AuthFilter<BaseAuthConfig> {
     @Override
     protected boolean isWhitelistedPath(String path) {
         if (path == null || whitelistPaths == null || whitelistPaths.isBlank()) {
-            return true;
+            return false;
         }
         for (String wp : whitelistPaths.split(",")) {
             String trimmed = wp.trim();
@@ -56,6 +56,6 @@ public class LoginAuth extends AuthFilter<BaseAuthConfig> {
                 return true;
             }
         }
-        return true;
+        return false;
     }
 }
