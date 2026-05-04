@@ -16,7 +16,7 @@ public class NettyConfig {
         NettyReactiveWebServerFactory factory = new NettyReactiveWebServerFactory();
         factory.addServerCustomizers(server ->
             server.doOnConnection(conn ->
-                conn.addHandlerLast(new ReadTimeoutHandler(2, TimeUnit.SECONDS))
+                conn.addHandlerLast(new ReadTimeoutHandler(1, TimeUnit.SECONDS))
             )
         );
         return factory;
