@@ -4,7 +4,6 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.event.BotUpdateEvent;
-import com.backend.bot.filter.GroupMessageFilter;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotUpdateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +28,6 @@ public class BotUpdateListener {
 
     private final BotCoreService botCoreService;
     private final BotUpdateService botUpdateHandlerService;
-    private final GroupMessageFilter groupMessageFilter;
     private final Scheduler blockingTaskScheduler;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -40,13 +38,13 @@ public class BotUpdateListener {
     public BotUpdateListener(
             BotCoreService botCoreService,
             BotUpdateService botUpdateHandlerService,
-            GroupMessageFilter groupMessageFilter,
+
             @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler,
             ReactiveStringRedisTemplate redisTemplate,
             ObjectMapper objectMapper) {
         this.botCoreService = botCoreService;
         this.botUpdateHandlerService = botUpdateHandlerService;
-        this.groupMessageFilter = groupMessageFilter;
+
         this.blockingTaskScheduler = blockingTaskScheduler;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
@@ -73,8 +71,7 @@ public class BotUpdateListener {
                             });
                 })
                 .flatMap(botConfigEntity -> {
-                    return groupMessageFilter.filter(botUpdate, botConfigEntity.getBotToken())
-                            .then(Mono.just(botConfigEntity));
+                    return Mono.just(botConfigEntity);
                 })
                 .filter(botConfigEntity -> {
                     if (botConfigEntity.getStatus() == null || botConfigEntity.getStatus() != 1) {
