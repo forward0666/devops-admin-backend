@@ -175,13 +175,13 @@ public class MiddlewareController {
 
     /**
      * 按角色过滤中间件
-     * Administrator/DevOps/Leader: 全部可见
-     * Member: 隐藏 prod 环境
+     * Administrator/DevOps: 全部可见
+     * Leader/Member: 隐藏 prod 环境
      * None: 无权限，返回空
      */
     private List<MiddlewareEntity> applyMiddlewareFilter(List<MiddlewareEntity> list, String role) {
         if ("None".equals(role)) return List.of();
-        if (!"Member".equals(role)) return list;
+        if ("Administrator".equals(role) || "DevOps".equals(role)) return list;
         return list.stream().filter(m -> !"prod".equals(m.getEnv())).toList();
     }
 }
