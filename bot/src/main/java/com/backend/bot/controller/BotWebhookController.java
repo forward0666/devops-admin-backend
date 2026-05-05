@@ -79,8 +79,22 @@ public class BotWebhookController {
                     }
 
                     if (chatId != null && chatId.equals(user.id())) {
-                        log.info("🔒 Private chat not allowed: botName={}, userId={}", botName, user.id());
-                        return Mono.empty();
+                        final String privateAttemptsKey = "bot:privateAttempts:" + botName + ":" + user.id();
+                        return redisTemplate.opsForValue().increment(privateAttemptsKey)
+                                .flatMap(count -> {
+                                    log.info("🔒 Private chat attempt {}/2: botName={}, userId={}", count, botName, user.id());
+                                    if (count >= 2) {
+                                        // 自动拉黑30天
+                                        redisTemplate.opsForValue().set("bot:blacklist:" + botName + ":" + user.id(), "1", java.time.Duration.ofDays(30)).subscribe();
+                                        log.warn("🚫 Auto-blacklisted private chat user: botName={}, userId={}", botName, user.id());
+                                    }
+                                    redisTemplate.expire(privateAttemptsKey, java.time.Duration.ofMinutes(5)).subscribe();
+                                    return Mono.empty();
+                                })
+                                .onErrorResume(e -> {
+                                    log.error("❌ Redis error tracking private attempts", e);
+                                    return Mono.empty();
+                                });
                     }
 
                     final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
