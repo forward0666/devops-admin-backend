@@ -88,6 +88,7 @@ public class BotUpdateListener {
 
                     return botCoreService.isChatIdAuthorized(botConfigEntity.getId(), botConfigEntity.getBotName(), chatId)
                             .flatMap(isAllowed -> {
+                                log.info("🔐 [AuthCheck] bot={}, userId={}, chatId={}, allowed={}", botName, userId, chatId, isAllowed);
                                 if (Boolean.TRUE.equals(isAllowed)) {
                                     return Mono.just(botConfigEntity);
                                 } else {
