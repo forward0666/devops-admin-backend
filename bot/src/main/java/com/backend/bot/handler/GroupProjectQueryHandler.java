@@ -283,9 +283,11 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
+                                String cdn = getVal(m, "cdn", "").toString();
                                 ;
                                 sb.append(domainName).append(" ");
-                                sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
+                                if (!cdn.isEmpty()) sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark).append("/").append(cdn);
+                                else sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
                             if (multiEnv) sb.append("\n");
@@ -298,9 +300,11 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 String domainName = getVal(m, "domainName", getVal(m, "domain", "")).toString();
                                 String type = getVal(m, "type", "").toString();
                                 String remark = getVal(m, "remark", "").toString();
+                                String cdn = getVal(m, "cdn", "").toString();
                                 ;
                                 sb.append(domainName).append(" ");
-                                sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
+                                if (!cdn.isEmpty()) sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark).append("/").append(cdn);
+                                else sb.append(type).append("/").append(remark.isEmpty() ? "无" : remark);
                                 sb.append("\n");
                             }
                             if (multiEnv) sb.append("\n");
