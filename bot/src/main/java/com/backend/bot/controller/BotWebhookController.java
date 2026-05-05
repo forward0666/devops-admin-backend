@@ -85,7 +85,12 @@ public class BotWebhookController {
                                     log.info("🔒 Private chat attempt {}/2: botName={}, userId={}", count, botName, user.id());
                                     if (count >= 2) {
                                         // 自动拉黑30天
-                                        redisTemplate.opsForValue().set("bot:blacklist:" + botName + ":" + user.id(), "1", java.time.Duration.ofDays(3650)).subscribe();
+                                        String blacklistValue = String.format("userId=%d, username=%s, tgUsername=%s, chatId=%d",
+                                                user.id(),
+                                                user.firstName() != null ? user.firstName() : "",
+                                                user.username() != null ? "@" + user.username() : "N/A",
+                                                chatId);
+                                        redisTemplate.opsForValue().set("bot:blacklist:" + botName + ":" + user.id(), blacklistValue, java.time.Duration.ofDays(3650)).subscribe();
                                         log.warn("🚫 Auto-blacklisted private chat user: botName={}, userId={}", botName, user.id());
                                     }
                                     redisTemplate.expire(privateAttemptsKey, java.time.Duration.ofMinutes(5)).subscribe();
