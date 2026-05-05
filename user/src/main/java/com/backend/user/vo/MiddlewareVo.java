@@ -13,6 +13,7 @@ public record MiddlewareVo(
     String internalAddr,
     String svcAddr,
     String remark,
+    String type,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -20,7 +21,7 @@ public record MiddlewareVo(
         return new MiddlewareVo(
             entity.getId(), entity.getProjectId(), entity.getName(),
             entity.getEnv(), entity.getProtocol(), entity.getExternalAddr(),
-            entity.getInternalAddr(), entity.getSvcAddr(), entity.getRemark(),
+            entity.getInternalAddr(), entity.getSvcAddr(), entity.getRemark(), entity.getType(),
             entity.getCreatedAt(), entity.getUpdatedAt()
         );
     }

@@ -45,6 +45,7 @@ public class MiddlewareService {
         if (entity.getSvcAddr() != null) fields.put("svcAddr", entity.getSvcAddr());
         if (entity.getEnv() != null) fields.put("env", entity.getEnv());
         if (entity.getRemark() != null) fields.put("remark", entity.getRemark());
+        if (entity.getType() != null) fields.put("type", entity.getType());
         if (fields.isEmpty()) return middlewareMapper.findByIdAndProjectId(id, projectId);
         middlewareMapper.update(id, projectId, fields);
         evictMiddlewareCache(projectId);
@@ -69,6 +70,17 @@ public class MiddlewareService {
         }
         middlewareMapper.insertAll(items);
         evictMiddlewareCache(projectId);
+    }
+
+    public int bulkUpdate(Long projectId, List<String> ids, Map<String, Object> fields) {
+        if (ids == null || ids.isEmpty() || fields == null || fields.isEmpty()) return 0;
+        int count = 0;
+        for (String id : ids) {
+            middlewareMapper.update(id, projectId, fields);
+            count++;
+        }
+        evictMiddlewareCache(projectId);
+        return count;
     }
 
     private void evictMiddlewareCache(Long projectId) {

@@ -56,6 +56,7 @@ public class MiddlewareController {
             entity.setInternalAddr(body.get("internalAddr"));
             entity.setSvcAddr(body.get("svcAddr"));
             entity.setRemark(body.get("remark"));
+            entity.setType(body.get("type"));
             MiddlewareEntity created = middlewareService.create(projectId, entity);
             return ApiResponseDto.success("Middleware created", MiddlewareVo.fromEntity(created));
         } catch (Exception e) {
@@ -75,6 +76,7 @@ public class MiddlewareController {
             entity.setInternalAddr(body.get("internalAddr"));
             entity.setSvcAddr(body.get("svcAddr"));
             entity.setRemark(body.get("remark"));
+            entity.setType(body.get("type"));
             MiddlewareEntity updated = middlewareService.update(id, projectId, entity);
             if (updated == null) return ApiResponseDto.error("Middleware not found");
             return ApiResponseDto.success("Middleware updated", MiddlewareVo.fromEntity(updated));
@@ -111,6 +113,7 @@ public class MiddlewareController {
                 e.setInternalAddr(m.getOrDefault("internalAddr", ""));
                 e.setSvcAddr(m.getOrDefault("svcAddr", ""));
                 e.setRemark(m.getOrDefault("remark", ""));
+                e.setType(m.getOrDefault("type", ""));
                 return e;
             }).toList();
             middlewareService.importMiddlewares(projectId, entities);
@@ -118,6 +121,30 @@ public class MiddlewareController {
         } catch (Exception e) {
             log.error("Failed to import middlewares", e);
             return ApiResponseDto.error("Failed to import middlewares");
+        }
+    }
+
+    /**
+     * 批量编辑中间件
+     */
+    @PostMapping("/bulkUpdate")
+    public ApiResponseDto<Integer> bulkUpdate(@RequestBody Map<String, Object> body) {
+        try {
+            Long projectId = Long.parseLong(body.get("projectId").toString());
+            @SuppressWarnings("unchecked")
+            List<String> ids = ((List<String>) body.get("ids"));
+            Map<String, Object> fields = new LinkedHashMap<>();
+            if (body.containsKey("type") && body.get("type") != null && !body.get("type").toString().isBlank())
+                fields.put("type", body.get("type").toString());
+            if (body.containsKey("protocol") && body.get("protocol") != null && !body.get("protocol").toString().isBlank())
+                fields.put("protocol", body.get("protocol").toString());
+            if (body.containsKey("remark") && body.get("remark") != null && !body.get("remark").toString().isBlank())
+                fields.put("remark", body.get("remark").toString());
+            int count = middlewareService.bulkUpdate(projectId, ids, fields);
+            return ApiResponseDto.success("Updated " + count + " middlewares", count);
+        } catch (Exception e) {
+            log.error("Failed to bulk update middlewares", e);
+            return ApiResponseDto.error("Failed to bulk update middlewares");
         }
     }
 

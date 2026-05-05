@@ -21,6 +21,7 @@ public class MiddlewareEntity {
     private String internalAddr;
     private String svcAddr;
     private String remark;
+    private String type;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
