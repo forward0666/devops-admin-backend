@@ -78,7 +78,7 @@ public class BotWebhookController {
                         return Mono.empty();
                     }
 
-                    if (isPrivate) {
+                    if (chatId != null && chatId.equals(user.id())) {
                         log.info("🔒 Private chat not allowed: botName={}, userId={}", botName, user.id());
                         return Mono.empty();
                     }
