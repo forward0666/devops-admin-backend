@@ -60,7 +60,7 @@ public class DomainController {
             entity.setCdn(body.get("cdn"));
             DomainEntity created = domainService.create(projectId, entity);
             return ApiResponseDto.success("Domain created", DomainVo.fromEntity(created));
-            log.warn("Failed to create domain: {}", e.getMessage());
+        } catch (RuntimeException e) {
             return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
             log.error("Failed to create domain", e);
