@@ -187,8 +187,18 @@ public class BotClientService {
         return telegramWebClient.post()
                 .uri(path)
                 .body(BodyInserters.fromValue(bodyMap))
-                .retrieve()
-                .bodyToMono(String.class)
+                .exchangeToMono(response -> {
+                    if (response.statusCode().isError()) {
+                        return response.bodyToMono(String.class)
+                                .defaultIfEmpty("no body")
+                                .flatMap(body -> {
+                                    log.error("❌ TG API error {} for chatId={}: {}", response.statusCode(), chatId, body);
+                                    return Mono.error(new RuntimeException("TG API " + response.statusCode() + ": " + body));
+                                });
+                    }
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("{}");
+                })
                 .retryWhen(telegramRetryPolicy)
                 .flatMap(response -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
