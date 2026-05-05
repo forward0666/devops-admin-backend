@@ -71,6 +71,7 @@ public class UserController {
             if (updates.containsKey("avatarUrl")) existing.setAvatarUrl((String) updates.get("avatarUrl"));
 
             userMapper.update(existing);
+            cacheService.clearByPrefix("bot:projectMembers:");
             return ApiResponseDto.success("Profile updated successfully", UserVo.fromEntity(existing));
         } catch (Exception e) {
             log.error("Failed to update profile", e);

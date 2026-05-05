@@ -102,6 +102,7 @@ public class UserController {
                     userRequest.getPosition(), userRequest.getEmployeeId(), userRequest.getRole(),
                     userRequest.getDepartmentId(), userRequest.getActive(), userRequest.getUpdatedBy());
             if (updatedUser != null) {
+                cacheService.clearByPrefix("bot:projectMembers:");
                 return ApiResponseDto.success("User updated successfully", UserVo.fromEntity(updatedUser));
             } else {
                 return ApiResponseDto.error("User not found");
