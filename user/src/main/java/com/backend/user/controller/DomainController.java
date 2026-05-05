@@ -1,4 +1,5 @@
 package com.backend.user.controller;
+import java.util.Set;
 
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.DomainEntity;
@@ -173,14 +174,15 @@ public class DomainController {
     /**
      * 按角色过滤域名
      * Administrator/DevOps/Leader: 全部可见
-     * Member: prod 环境只显示 web 类型
+     * Member: prod 环境只显示 landingpage/antiblock/bucket/web 类型
      * None: 无权限，返回空
      */
     private List<DomainEntity> applyDomainFilter(List<DomainEntity> domains, String role) {
         if ("None".equals(role)) return List.of();
         if (!"Member".equals(role)) return domains;
+        Set<String> memberProdTypes = Set.of("landingpage", "antiblock", "bucket", "web");
         return domains.stream()
-                .filter(d -> !"prod".equals(d.getEnv()) || "web".equals(d.getType()))
+                .filter(d -> !"prod".equals(d.getEnv()) || memberProdTypes.contains(d.getType()))
                 .toList();
     }
 }
