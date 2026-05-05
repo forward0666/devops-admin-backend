@@ -16,7 +16,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 @SpringBootApplication(
         scanBasePackages = {
-                "com.backend.login"
+                "com.backend.login",
+                "config"
         })
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.backend.login.client")
