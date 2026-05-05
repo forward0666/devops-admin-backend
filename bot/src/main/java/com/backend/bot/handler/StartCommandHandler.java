@@ -10,13 +10,19 @@ import com.backend.bot.service.RedisUserSessionService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.BotMenuService;
 import com.backend.bot.template.MenuType;
-import com.backend.bot.util.BotUserUtils; // 引入新工具类
+import com.backend.bot.repository.BotGroupProjectRepository;
+import com.backend.bot.entity.BotGroupProjectEntity;
+import com.backend.bot.util.BotUserUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.Map;
 import reactor.core.publisher.Mono;
 import reactor.util.context.ContextView;
 
@@ -32,6 +38,11 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final RedisUserSessionService redisUserSessionService;
     private final ObjectMapper objectMapper;
     private final BotMenuService botMenuService;
+    private final BotGroupProjectRepository botGroupProjectRepository;
+    private final WebClient.Builder webClientBuilder;
+
+    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
+    private String userServiceUrl;
 
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
     private static final int DELETE_DELAY_SECONDS = TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
@@ -113,9 +124,13 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                     } else {
                         // 用户没有会话标记，创建新会话
                         log.info("{}✅ [Step3] 无session，开始创建菜单 | userId={}", logPrefix, userId);
-                        return processStartCommand(context, logPrefix, contextView)
+                        return checkGroupMembership(context, logPrefix)
+                                .flatMap(allowed -> {
+                                    if (!allowed) return Mono.empty();
+                                    return processStartCommand(context, logPrefix, contextView)
                                 .doOnSuccess(v -> log.info("{}✅ [StartCommand] 流程完成 | userId={}, menu已发送", logPrefix, userId))
                                 .doOnError(e -> log.error("{}❌ [StartCommand] 流程失败 | userId={}, error={}", logPrefix, userId, e.getMessage()));
+                                });
                     }
                 });
     }
@@ -149,6 +164,61 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                     })
                     .then();
         });
+    }
+
+    /**
+     * 群聊中检查用户是否是项目成员（私聊跳过检查）
+     */
+    private Mono<Boolean> checkGroupMembership(HandlerContext context, String logPrefix) {
+        Long chatId = context.chatId();
+        if (chatId >= 0) return Mono.just(true);
+
+        String tgUsername = context.username();
+        String mention = tgUsername != null ? "@" + tgUsername : "";
+        String rejectMsg = "⚠️ 您不是该项目成员，无权限查看，" + (mention.isEmpty() ? "且未设置用户名。" : mention + "。");
+
+        if (tgUsername == null || tgUsername.isBlank()) {
+            log.warn("{}⚠️ User {} has no tg username, rejecting /start in group", logPrefix, context.userId());
+            botClientService.sendMessage(context.token(), chatId, rejectMsg)
+                    .subscribe(null, e -> log.warn("{}⚠️ Failed to send warning", logPrefix));
+            return Mono.just(false);
+        }
+
+        return botGroupProjectRepository.findByBotNameAndChatId(context.botName(), chatId)
+                .flatMap(binding -> {
+                    WebClient webClient = webClientBuilder.baseUrl(userServiceUrl).build();
+                    return webClient.get()
+                            .uri("/projectMember?projectId={projectId}", binding.getProjectId())
+                            .header("X-Tg-Username", tgUsername)
+                            .retrieve()
+                            .bodyToMono(Map.class)
+                            .map(response -> {
+                                Object code = response.get("code");
+                                if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
+                                    return false;
+                                }
+                                Object dataObj = response.get("data");
+                                java.util.List<Map<String, Object>> members;
+                                if (dataObj instanceof java.util.List) {
+                                    members = (java.util.List<Map<String, Object>>) dataObj;
+                                } else if (dataObj instanceof Map) {
+                                    Object inner = ((Map<String, Object>) dataObj).get("data");
+                                    members = (inner instanceof java.util.List) ? (java.util.List<Map<String, Object>>) inner : java.util.List.of();
+                                } else {
+                                    members = java.util.List.of();
+                                }
+                                boolean isMember = members.stream()
+                                        .anyMatch(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("tgUsername", ""))));
+                                if (!isMember) {
+                                    log.info("{}⚠️ User {} (@{}) is not project member, rejecting /start", logPrefix, context.userId(), tgUsername);
+                                    botClientService.sendMessage(context.token(), chatId, rejectMsg)
+                                            .subscribe(null, e -> log.warn("{}⚠️ Failed to send warning", logPrefix));
+                                }
+                                return isMember;
+                            })
+                            .onErrorReturn(false);
+                })
+                .defaultIfEmpty(true);
     }
 
     /**
