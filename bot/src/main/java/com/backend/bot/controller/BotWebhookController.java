@@ -78,9 +78,13 @@ public class BotWebhookController {
                         return Mono.empty();
                     }
 
+                    if (isPrivate) {
+                        log.info("🔒 Private chat not allowed: botName={}, userId={}", botName, user.id());
+                        return Mono.empty();
+                    }
+
                     final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
-                    final boolean isPrivate = chatId != null && chatId.equals(user.id());
-                    log.info("🔍 [WebhookController] processAsync | botName={}, userId={}, chatId={}, isPrivate={}", botName, user.id(), chatId, isPrivate);
+                    log.info("🔍 [WebhookController] processAsync | botName={}, userId={}, chatId={}", botName, user.id(), chatId);
 
                     return redisTemplate.hasKey(blacklistKey)
                             .timeout(Duration.ofSeconds(3))
@@ -90,10 +94,7 @@ public class BotWebhookController {
                             })
                             .flatMap(isBlacklisted -> {
                                 if (Boolean.TRUE.equals(isBlacklisted)) {
-                                    if (isPrivate) {
-                                        log.info("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
-                                        return Mono.empty();
-                                    }
+                                    log.info("🔒 BLACKLISTED group chat: botName={}, userId={}", botName, user.id());
                                     return botCoreService.findByBotName(botName)
                                                     .timeout(Duration.ofSeconds(3))
                                             .flatMap(bot -> {
