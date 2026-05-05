@@ -179,8 +179,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         if (tgUsername == null || tgUsername.isBlank()) {
             log.warn("{}⚠️ User {} has no tg username, rejecting /start in group", logPrefix, context.userId());
-            botClientService.sendMessage(context.token(), chatId, rejectMsg)
-                    .subscribe(null, e -> log.warn("{}⚠️ Failed to send warning", logPrefix));
+            scheduleDeleteReply(context.token(), chatId, rejectMsg);
             return Mono.just(false);
         }
 
@@ -211,8 +210,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                                         .anyMatch(m -> tgUsername.equalsIgnoreCase(String.valueOf(m.getOrDefault("tgUsername", ""))));
                                 if (!isMember) {
                                     log.info("{}⚠️ User {} (@{}) is not project member, rejecting /start", logPrefix, context.userId(), tgUsername);
-                                    botClientService.sendMessage(context.token(), chatId, rejectMsg)
-                                            .subscribe(null, e -> log.warn("{}⚠️ Failed to send warning", logPrefix));
+                                    scheduleDeleteReply(context.token(), chatId, rejectMsg);
                                 }
                                 return isMember;
                             })
@@ -247,5 +245,19 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         } catch (Exception e) {
             log.error("{}❌ JSON parse error: {}", logPrefix, responseJson, e);
         }
+    }
+
+    private void scheduleDeleteReply(String token, Long chatId, String text) {
+        botClientService.sendMenuMessageWithResponse(token, chatId, text, null)
+                .flatMap(respJson -> {
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
+                        Long msgId = root.path("result").path("message_id").asLong(0);
+                        if (msgId != 0) {
+                            return interactiveMessageService.scheduleMessageDeletion(token, 0L, chatId, msgId, 5, null, reactor.util.context.Context.empty());
+                        }
+                    } catch (Exception ignored) {}
+                    return reactor.core.publisher.Mono.empty();
+                }).subscribe();
     }
 }
