@@ -59,7 +59,7 @@ public class DomainController {
             entity.setRemark(body.get("remark"));
             entity.setCdn(body.get("cdn"));
             DomainEntity created = domainService.create(projectId, entity);
-        } catch (RuntimeException e) {
+            return ApiResponseDto.success("Domain created", DomainVo.fromEntity(created));
             log.warn("Failed to create domain: {}", e.getMessage());
             return ApiResponseDto.error(e.getMessage());
         } catch (Exception e) {
