@@ -91,7 +91,7 @@ public class BotWebhookController {
                             .flatMap(isBlacklisted -> {
                                 if (Boolean.TRUE.equals(isBlacklisted)) {
                                     if (isPrivate) {
-                                        log.debug("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
+                                        log.info("🔒 BLACKLISTED private chat: botName={}, userId={}", botName, user.id());
                                         return Mono.empty();
                                     }
                                     return botCoreService.findByBotName(botName)
@@ -123,6 +123,7 @@ public class BotWebhookController {
                                             })
                                             .then(Mono.empty());
                                 }
+                                log.info("🔓 [WebhookController] Not blacklisted | botName={}, userId={}, isBlacklisted={}", botName, user.id(), isBlacklisted);
                                 return Mono.<Void>fromRunnable(() ->
                                     LogUtils.processWebhookUpdateAndPublishEvent(
                                         reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate)
