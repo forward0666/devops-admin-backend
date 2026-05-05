@@ -42,7 +42,9 @@ public class BotWebhookController {
     ) {
         String updateType = botUpdate.message() != null ? "TEXT:" + botUpdate.message().text() :
                 botUpdate.callbackQuery() != null ? "CALLBACK:" + botUpdate.callbackQuery().data() : "UNKNOWN";
-        log.info("📨 [WebhookController] 收到请求 | botName={}, updateType={}", botName, updateType);
+        Long userId = botUpdate.message() != null ? botUpdate.message().from().id() :
+                botUpdate.callbackQuery() != null ? botUpdate.callbackQuery().from().id() : null;
+        log.info("📨 [WebhookController] 收到请求 | botName={}, userId={}, updateType={}", botName, userId, updateType);
 
         // 立即返回 200，异步处理业务逻辑
         return Mono.just(ResponseEntity.ok(Map.of("status", "ok")))
