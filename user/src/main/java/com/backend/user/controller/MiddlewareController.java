@@ -132,7 +132,7 @@ public class MiddlewareController {
         try {
             Long projectId = Long.parseLong(body.get("projectId").toString());
             @SuppressWarnings("unchecked")
-            List<String> ids = ((List<String>) body.get("ids"));
+            List<String> ids = ((List<?>) body.get("ids")).stream().map(Object::toString).toList();
             Map<String, Object> fields = new LinkedHashMap<>();
             if (body.containsKey("type") && body.get("type") != null && !body.get("type").toString().isBlank())
                 fields.put("type", body.get("type").toString());
