@@ -178,7 +178,6 @@ public class BotClientService {
         Map<String, Object> bodyMap = new HashMap<>();
         bodyMap.put("chat_id", chatId);
         bodyMap.put("text", text);
-        bodyMap.put("parse_mode", "Markdown"); // 确保格式化生效
 
         if (replyMarkup != null) {
             bodyMap.put("reply_markup", replyMarkup);
@@ -274,7 +273,6 @@ public class BotClientService {
         bodyMap.put("chat_id", chatId);
         bodyMap.put("message_id", messageId);
         bodyMap.put("text", text);
-        bodyMap.put("parse_mode", "Markdown");
 
         if (replyMarkup != null) {
             bodyMap.put("reply_markup", replyMarkup);
