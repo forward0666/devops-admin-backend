@@ -101,6 +101,23 @@ public class DomainController {
         }
     }
 
+    @PostMapping("/bulkUpdate")
+    public ApiResponseDto<Integer> bulkUpdate(@RequestBody Map<String, Object> body) {
+        try {
+            Long projectId = Long.parseLong(body.get("projectId").toString());
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) body.get("ids");
+            String type = body.get("type") instanceof String s && !s.isBlank() ? s : null;
+            String remark = body.get("remark") instanceof String s && !s.isBlank() ? s : null;
+            String cdn = body.get("cdn") instanceof String s && !s.isBlank() ? s : null;
+            int updated = domainService.bulkUpdate(projectId, ids, type, remark, cdn);
+            return ApiResponseDto.success("Updated " + updated + " domains", updated);
+        } catch (Exception e) {
+            log.error("Failed to bulk update domains", e);
+            return ApiResponseDto.error("Failed to bulk update domains");
+        }
+    }
+
     @PostMapping("/import")
     public ApiResponseDto<Integer> importDomains(@RequestBody Map<String, Object> body) {
         try {

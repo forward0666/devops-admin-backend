@@ -66,6 +66,22 @@ public class DomainService {
         return true;
     }
 
+    public int bulkUpdate(Long projectId, List<String> ids, String type, String remark, String cdn) {
+        if (ids == null || ids.isEmpty()) return 0;
+        Map<String, Object> fields = new LinkedHashMap<>();
+        if (type != null) fields.put("type", type);
+        if (remark != null) fields.put("remark", remark);
+        if (cdn != null) fields.put("cdn", cdn);
+        if (fields.isEmpty()) return 0;
+        int count = 0;
+        for (String id : ids) {
+            domainMapper.update(id, projectId, fields);
+            count++;
+        }
+        evictDomainCache(projectId);
+        return count;
+    }
+
     public void importDomains(Long projectId, List<DomainEntity> domains) {
         List<String> domainNames = domains.stream().map(DomainEntity::getDomain).toList();
         List<DomainEntity> existing = domainMapper.findByProjectIdAndDomains(projectId, domainNames);
