@@ -38,7 +38,7 @@ public class InteractiveMessageService {
         final String combinedLogPrefix = logPrefix + botLogIdentifier;
 
         double score = System.currentTimeMillis() / 1000.0 + delaySeconds;
-        String value = chatId + ":" + messageId + ":" + userId + ":" + token;
+        String value = chatId + ":" + messageId + ":" + (userId != null ? userId : 0) + ":" + token;
 
         log.info("{}⏳ [Step1] 准备写入Redis ZSET | chatId={}, messageId={}, userId={}, delay={}s, value长度={}, score={}",
                 combinedLogPrefix, chatId, messageId, userId, delaySeconds, value.length(), score);
