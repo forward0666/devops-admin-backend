@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import com.backend.manage.dto.UserRequestDto;
+import com.backend.manage.service.CacheService;
 
 import java.util.List;
 import java.util.Map;
@@ -22,11 +23,16 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private CacheService cacheService;
+
     @GetMapping
     public ApiResponseDto<List<UserVo>> getAllUsers() {
         try {
             List<UserEntity> users = userService.getAllUsers();
-            List<UserVo> result = users.stream().map(UserVo::fromEntity).toList();
+            List<UserVo> result = users.stream()
+                    .map(u -> UserVo.fromEntity(u, isLocked(u.getUsername())))
+                    .toList();
             return ApiResponseDto.success("Users retrieved successfully", result);
         } catch (Exception e) {
             log.error("Failed to retrieve users", e);
@@ -240,14 +246,24 @@ public class UserController {
         }
     }
 
-    @GetMapping("/search")
-    public ApiResponseDto<List<UserVo>> searchUsers(@RequestParam String query) {
+    @PostMapping("/unlock/{id}")
+    public ApiResponseDto<Void> unlockUser(@PathVariable Long id) {
         try {
-            List<UserEntity> users = userService.searchUsers(query);
-            List<UserVo> result = users.stream().map(UserVo::fromEntity).toList();
-            return ApiResponseDto.success("Users retrieved successfully", result);
+            UserEntity user = userService.getUserById(id);
+            if (user == null) return ApiResponseDto.error("User not found");
+            cacheService.delete("login:lock:" + user.getUsername());
+            cacheService.delete("login:fail:" + user.getUsername());
+            log.info("🔓 Unlocked user: {}", user.getUsername());
+            return ApiResponseDto.success("User unlocked", null);
         } catch (Exception e) {
-            return ApiResponseDto.error("Failed to search users");
+            log.error("Failed to unlock user: " + id, e);
+            return ApiResponseDto.error("Failed to unlock user");
         }
+    }
+
+    private boolean isLocked(String username) {
+        if (username == null) return false;
+        Object locked = cacheService.get("login:lock:" + username);
+        return locked != null && Boolean.TRUE.equals(locked);
     }
 }

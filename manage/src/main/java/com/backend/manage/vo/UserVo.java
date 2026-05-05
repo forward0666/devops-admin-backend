@@ -16,6 +16,7 @@ public record UserVo(
         String employeeId,
         String role,
         boolean active,
+        boolean locked,
         boolean emailVerified,
         boolean phoneVerified,
         LocalDateTime lastLoginAt,
@@ -23,6 +24,10 @@ public record UserVo(
         LocalDateTime updatedAt
 ) {
     public static UserVo fromEntity(UserEntity entity) {
+        return fromEntity(entity, false);
+    }
+
+    public static UserVo fromEntity(UserEntity entity, boolean locked) {
         return new UserVo(
                 entity.getId(),
                 entity.getUsername(),
@@ -36,6 +41,7 @@ public record UserVo(
                 entity.getEmployeeId(),
                 entity.getRole(),
                 entity.isActive(),
+                locked,
                 entity.isEmailVerified(),
                 entity.isPhoneVerified(),
                 entity.getLastLoginAt(),
