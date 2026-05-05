@@ -66,7 +66,6 @@ public class UserController {
             if (updates.containsKey("fullName")) existing.setFullName((String) updates.get("fullName"));
             if (updates.containsKey("email")) existing.setEmail((String) updates.get("email"));
             if (updates.containsKey("phone")) existing.setPhone((String) updates.get("phone"));
-            if (updates.containsKey("tgUsername")) existing.setTgUsername((String) updates.get("tgUsername"));
             if (updates.containsKey("position")) existing.setPosition((String) updates.get("position"));
             if (updates.containsKey("avatarUrl")) existing.setAvatarUrl((String) updates.get("avatarUrl"));
 
