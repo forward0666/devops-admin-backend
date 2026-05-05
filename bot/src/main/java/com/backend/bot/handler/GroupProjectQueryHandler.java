@@ -122,7 +122,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 .flatMap(role -> {
                                     log.info("{}🔍 Resolved role: {} for tgUsername={}", traceLogPrefix, role, tgUsername);
                                     if ("None".equals(role)) {
-                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看。", true);
+                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看，@" + tgUsername + "。", true);
                                     }
                                     return switch (action) {
                                         case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
