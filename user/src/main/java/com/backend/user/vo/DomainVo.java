@@ -10,13 +10,14 @@ public record DomainVo(
     String env,
     String type,
     String remark,
+    String cdn,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
     public static DomainVo fromEntity(DomainEntity entity) {
         return new DomainVo(
             entity.getId(), entity.getProjectId(), entity.getDomain(),
-            entity.getEnv(), entity.getType(), entity.getRemark(),
+            entity.getEnv(), entity.getType(), entity.getRemark(), entity.getCdn(),
             entity.getCreatedAt(), entity.getUpdatedAt()
         );
     }

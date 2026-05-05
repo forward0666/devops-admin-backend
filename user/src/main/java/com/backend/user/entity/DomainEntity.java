@@ -18,6 +18,7 @@ public class DomainEntity {
     private String env;
     private String type;
     private String remark;
+    private String cdn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

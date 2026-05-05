@@ -57,8 +57,8 @@ public class DomainController {
             entity.setEnv(body.get("env"));
             entity.setType(body.get("type"));
             entity.setRemark(body.get("remark"));
+            entity.setCdn(body.get("cdn"));
             DomainEntity created = domainService.create(projectId, entity);
-            return ApiResponseDto.success("Domain created", DomainVo.fromEntity(created));
         } catch (RuntimeException e) {
             log.warn("Failed to create domain: {}", e.getMessage());
             return ApiResponseDto.error(e.getMessage());
@@ -76,6 +76,7 @@ public class DomainController {
             entity.setDomain(body.get("domain"));
             entity.setType(body.get("type"));
             entity.setRemark(body.get("remark"));
+            entity.setCdn(body.get("cdn"));
             DomainEntity updated = domainService.update(id, projectId, entity);
             if (updated == null) return ApiResponseDto.error("Domain not found");
             return ApiResponseDto.success("Domain updated", DomainVo.fromEntity(updated));
@@ -112,6 +113,7 @@ public class DomainController {
                 d.setEnv(m.get("env"));
                 d.setType(m.getOrDefault("type", "web"));
                 d.setRemark(m.getOrDefault("remark", ""));
+                d.setCdn(m.getOrDefault("cdn", ""));
                 return d;
             }).toList();
             domainService.importDomains(projectId, domains);
