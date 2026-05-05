@@ -44,7 +44,9 @@ public class BotWebhookController {
                 botUpdate.callbackQuery() != null ? "CALLBACK:" + botUpdate.callbackQuery().data() : "UNKNOWN";
         Long userId = botUpdate.message() != null ? botUpdate.message().from().id() :
                 botUpdate.callbackQuery() != null ? botUpdate.callbackQuery().from().id() : null;
-        log.info("📨 [WebhookController] 收到请求 | botName={}, userId={}, updateType={}", botName, userId, updateType);
+        log.info("📨 [WebhookController] 收到请求 | botName={}, userId={}, chatId={}, updateType={}", botName, userId,
+                botUpdate.message() != null ? botUpdate.message().chat().id() :
+                botUpdate.callbackQuery() != null ? botUpdate.callbackQuery().message().chat().id() : null, updateType);
 
         // 立即返回 200，异步处理业务逻辑
         return Mono.just(ResponseEntity.ok(Map.of("status", "ok")))
@@ -78,6 +80,7 @@ public class BotWebhookController {
 
                     final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
                     final boolean isPrivate = chatId != null && chatId.equals(user.id());
+                    log.info("🔍 [WebhookController] processAsync | botName={}, userId={}, chatId={}, isPrivate={}", botName, user.id(), chatId, isPrivate);
 
                     return redisTemplate.hasKey(blacklistKey)
                             .timeout(Duration.ofSeconds(3))
