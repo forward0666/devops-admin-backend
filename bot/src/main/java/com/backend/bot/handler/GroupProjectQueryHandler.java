@@ -269,11 +269,21 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     // 域名列表：按环境分组，仅多环境时显示环境标签
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
                         String[] envOrder = {"PROD", "UAT", "TEST", "DEV", "prod", "uat", "test", "dev"};
+                        String[] typeOrder = {"landingpage", "antiblock", "bucket", "web", "admin", "callback", "api"};
                         Map<String, List<Map<String, Object>>> grouped = items.stream()
                                 .collect(java.util.stream.Collectors.groupingBy(
                                         d -> String.valueOf(getVal(d, "env", "其他")),
                                         java.util.stream.Collectors.toList()
                                 ));
+                        // 每个 env 内按 typeOrder 排序
+                        java.util.List<String> typeOrderList = java.util.Arrays.asList(typeOrder);
+                        for (List<Map<String, Object>> list : grouped.values()) {
+                            list.sort((a, b) -> {
+                                int ia = typeOrderList.indexOf(getVal(a, "type", "").toString().toLowerCase());
+                                int ib = typeOrderList.indexOf(getVal(b, "type", "").toString().toLowerCase());
+                                return Integer.compare(ia, ib);
+                            });
+                        }
                         boolean multiEnv = grouped.size() > 1;
                         for (String env : envOrder) {
                             if (!grouped.containsKey(env)) continue;
