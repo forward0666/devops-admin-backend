@@ -139,7 +139,9 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                         log.warn("{}⚠️ No menu found for bot={} in DB or fallback", logPrefix, context.botName());
                         return userSessionService.clearUserSession(userId).then();
                     }
-                    return botClientService.sendMenuMessageWithResponse(token, chatId, WELCOME_TEXT, mainMenuMarkup, context.chatTitle())
+                    String mention = context.username() != null ? "@" + context.username() : (context.firstName() != null ? context.firstName() : "");
+                    String welcomeText = "欢迎使用运维助手 " + mention + ".\n✨✨✨ 选择服务: 👇👇👇👇👇👇";
+                    return botClientService.sendMenuMessageWithResponse(token, chatId, welcomeText, mainMenuMarkup, context.chatTitle())
                     .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
                     .doOnError(e -> {
                         log.error("{}❌ Failed to send initial menu message.", logPrefix, e);

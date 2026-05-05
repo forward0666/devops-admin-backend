@@ -13,7 +13,8 @@ public record HandlerContext(
         Long chatId,
         Long messageId,
         String chatTitle,
-        String firstName
+        String firstName,
+        String username
 ) {
     public HandlerContext(BotConfigEntity botEntity, BotUpdateDto update) {
         this(
@@ -49,7 +50,12 @@ public record HandlerContext(
                 // 统一提取 firstName
                 update.message() != null
                         ? update.message().from().firstName()
-                        : (update.callbackQuery() != null ? update.callbackQuery().from().firstName() : null)
+                        : (update.callbackQuery() != null ? update.callbackQuery().from().firstName() : null),
+
+                // username
+                update.message() != null
+                        ? update.message().from().username()
+                        : (update.callbackQuery() != null ? update.callbackQuery().from().username() : null)
         );
 
         // 确保关键信息不为空
