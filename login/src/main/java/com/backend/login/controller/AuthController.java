@@ -65,7 +65,9 @@ public class AuthController {
                     clientIP, request.getHeader("User-Agent"),
                     null, null, false, e.getMessage(), "LOGIN");
             } catch (Exception ignored) {}
-            return ApiResponseDto.error("Login failed: " + e.getMessage());
+            String msg = e.getMessage();
+            int code = (msg != null && (msg.contains("locked") || msg.contains("password") || msg.contains("verification"))) ? 401 : 500;
+            return ApiResponseDto.error(code, "Login failed: " + msg);
         }
     }
 
