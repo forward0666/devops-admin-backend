@@ -407,4 +407,23 @@ public class BotClientService {
                 .doOnNext(res -> log.debug("sendMessageToThread response: {}", res))
                 .then();
     }
+
+    public Mono<Void> editForumTopic(String token, Long chatId, Long threadId, String topicName) {
+        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/editForumTopic";
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chat_id", chatId);
+        body.put("message_thread_id", threadId);
+        body.put("name", topicName);
+        return telegramWebClient.post()
+                .uri(url)
+                .bodyValue(body)
+                .exchangeToMono(response -> {
+                    if (response.statusCode().is2xxSuccessful()) {
+                        return response.bodyToMono(String.class).then();
+                    }
+                    return response.bodyToMono(String.class)
+                            .doOnNext(errorBody -> log.warn("editForumTopic failed: {}", errorBody))
+                            .then();
+                });
+    }
 }

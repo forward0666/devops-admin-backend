@@ -139,9 +139,19 @@ public class BotGroupController {
     public Mono<ResponseEntity<Map<String, Object>>> updateTopic(@PathVariable Long id, @RequestBody BotGroupTopicEntity entity) {
         return botGroupTopicRepository.findById(id)
                 .flatMap(existing -> {
+                    String oldName = existing.getTopicName();
                     if (entity.getTopicName() != null) existing.setTopicName(entity.getTopicName());
                     if (entity.getThreadId() != null) existing.setThreadId(entity.getThreadId());
                     return botGroupTopicRepository.save(existing);
+                })
+                .flatMap(saved -> {
+                    if (entity.getTopicName() != null && saved.getThreadId() != null) {
+                        return botCoreService.findByBotName(saved.getBotName())
+                                .flatMap(botConfig -> botClientService.editForumTopic(botConfig.getBotToken(), saved.getChatId(), saved.getThreadId(), entity.getTopicName()))
+                                .onErrorResume(e -> { log.warn("TG editForumTopic failed: {}", e.getMessage()); return Mono.empty(); })
+                                .thenReturn(saved);
+                    }
+                    return Mono.just(saved);
                 })
                 .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)))
                 .defaultIfEmpty(HttpResponseUtils.notFound("Topic not found: " + id));
