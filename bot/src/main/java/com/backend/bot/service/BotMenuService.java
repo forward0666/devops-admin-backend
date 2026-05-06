@@ -110,25 +110,20 @@ public class BotMenuService {
                         return Mono.empty();
                     }
                 })
-                .switchIfEmpty(Mono.defer(() ->
-                        botMenuRepository.findByBotNameAndMenuLevelOrdered(botName, menuLevel)
-                                .next()
-                                .switchIfEmpty(Mono.defer(() -> {
-                                    // Fallback: query shared menu by botType
-                                    String fallbackType = botType != null ? botType.getDbValue() : "general";
-                                    log.info("No menu for bot={}, falling back to botType={}", botName, fallbackType);
-                                    return botMenuRepository.findByBotTypeAndMenuLevel(fallbackType, menuLevel);
-                                }))
-                                .map(this::entityToKeyboard)
-                                .doOnNext(markup -> {
-                                    try {
-                                        String json = objectMapper.writeValueAsString(markup);
-                                        redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
-                                    } catch (Exception e) {
-                                        log.warn("Failed to cache menu key={}", cacheKey, e);
-                                    }
-                                })
-                ));
+                .switchIfEmpty(Mono.defer(() -> {
+                    String type = botType != null ? botType.getDbValue() : "general";
+                    log.info("Querying menu by botType={} level={}", type, menuLevel);
+                    return botMenuRepository.findByBotTypeAndMenuLevel(type, menuLevel)
+                            .map(this::entityToKeyboard)
+                            .doOnNext(markup -> {
+                                try {
+                                    String json = objectMapper.writeValueAsString(markup);
+                                    redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
+                                } catch (Exception e) {
+                                    log.warn("Failed to cache menu key={}", cacheKey, e);
+                                }
+                            });
+                }));
     }
 
     /**
