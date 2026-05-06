@@ -43,26 +43,26 @@ public class BotGroupController {
                             .flatMap(group -> botGroupTopicRepository.findByBotNameAndChatId(group.getBotName(), group.getChatId())
                                     .collectList()
                                     .map(topics -> {
-                                            Map<String, Object> m = new java.util.HashMap<>();
-                                            m.put("id", group.getId());
-                                            m.put("botName", group.getBotName() != null ? group.getBotName() : "");
-                                            m.put("botConfigId", group.getBotConfigId() != null ? group.getBotConfigId() : 0);
-                                            m.put("chatId", group.getChatId());
-                                            m.put("chatTitle", group.getChatTitle() != null ? group.getChatTitle() : "");
-                                            m.put("chatType", group.getChatType() != null ? group.getChatType() : "");
-                                            m.put("projectId", group.getProjectId() != null ? group.getProjectId() : 0);
-                                            m.put("projectName", group.getProjectName() != null ? group.getProjectName() : "");
-                                            m.put("status", group.getStatus() != null ? group.getStatus() : 0);
-                                            m.put("topicCount", topics.size());
-                                            m.put("topics", topics.stream().map(t -> {
-                                                Map<String, Object> tm = new java.util.HashMap<>();
-                                                tm.put("id", t.getId());
-                                                tm.put("threadId", t.getThreadId() != null ? t.getThreadId() : 0);
-                                                tm.put("topicName", t.getTopicName() != null ? t.getTopicName() : "");
-                                                return tm;
-                                            }).toList());
-                                            return m;
-                                    })
+                                        Map<String, Object> m = new java.util.HashMap<>();
+                                        m.put("id", group.getId());
+                                        m.put("botName", group.getBotName() != null ? group.getBotName() : "");
+                                        m.put("botConfigId", group.getBotConfigId() != null ? group.getBotConfigId() : 0);
+                                        m.put("chatId", group.getChatId());
+                                        m.put("chatTitle", group.getChatTitle() != null ? group.getChatTitle() : "");
+                                        m.put("chatType", group.getChatType() != null ? group.getChatType() : "");
+                                        m.put("projectId", group.getProjectId() != null ? group.getProjectId() : 0);
+                                        m.put("projectName", group.getProjectName() != null ? group.getProjectName() : "");
+                                        m.put("status", group.getStatus() != null ? group.getStatus() : 0);
+                                        m.put("topicCount", topics.size());
+                                        m.put("topics", topics.stream().map(t -> {
+                                            Map<String, Object> tm = new java.util.HashMap<>();
+                                            tm.put("id", t.getId());
+                                            tm.put("threadId", t.getThreadId() != null ? t.getThreadId() : 0);
+                                            tm.put("topicName", t.getTopicName() != null ? t.getTopicName() : "");
+                                            return tm;
+                                        }).toList());
+                                        return m;
+                                    }))
                             .collectList()
                             .map(enriched -> HttpResponseUtils.ok(Map.of("groups", enriched, "total", enriched.size())));
                 });
