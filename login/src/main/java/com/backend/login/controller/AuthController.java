@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -25,16 +26,16 @@ public class AuthController {
     private com.backend.login.service.OperationLogService operationLogService;
 
     @PostMapping("/authLogIn")
-    public ApiResponseDto<LoginVo> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
+    public ResponseEntity<ApiResponseDto<LoginVo>> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
         try {
             if (loginRequest.username() == null || loginRequest.username().isEmpty()) {
-                return ApiResponseDto.error("Username is required");
+                return ResponseEntity.badRequest().body(ApiResponseDto.error("Username is required"));
             }
             if (loginRequest.password() == null || loginRequest.password().isEmpty()) {
-                return ApiResponseDto.error("Password is required");
+                return ResponseEntity.badRequest().body(ApiResponseDto.error("Password is required"));
             }
             if (loginRequest.verificationCode() == null || loginRequest.verificationCode().isEmpty()) {
-                return ApiResponseDto.error("Verification code is required");
+                return ResponseEntity.badRequest().body(ApiResponseDto.error("Verification code is required"));
             }
 
             var clientIP = securityService.getRealClientIP(
@@ -51,7 +52,7 @@ public class AuthController {
                 clientIP, request.getHeader("User-Agent"),
                 null, null, true, null, "LOGIN");
 
-            return ApiResponseDto.success("Login successful", loginResponse);
+            return ResponseEntity.ok(ApiResponseDto.success("Login successful", loginResponse));
         } catch (Exception e) {
             try {
                 var clientIP = securityService.getRealClientIP(
@@ -67,7 +68,7 @@ public class AuthController {
             } catch (Exception ignored) {}
             String msg = e.getMessage();
             int code = (msg != null && (msg.contains("locked") || msg.contains("password") || msg.contains("verification"))) ? 401 : 500;
-            return ApiResponseDto.error(code, "Login failed: " + msg);
+            return ResponseEntity.status(code).body(ApiResponseDto.error(code, "Login failed: " + msg));
         }
     }
 
