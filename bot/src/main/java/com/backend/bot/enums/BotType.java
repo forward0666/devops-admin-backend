@@ -115,7 +115,6 @@ public enum BotType {
      * 
      * @return 数据库存储字符串值
      */
-    @JsonValue
     public String getDbValue() {
         return dbValue;
     }
