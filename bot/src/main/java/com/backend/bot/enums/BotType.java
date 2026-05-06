@@ -120,7 +120,6 @@ public enum BotType {
         return dbValue;
     }
 
-    @JsonCreator
     public static BotType fromDbValue(String value) {
         for (BotType type : values()) {
             if (type.dbValue.equals(value)) {
