@@ -29,7 +29,7 @@ public class BotMenuService {
     private static final Duration MENU_CACHE_TTL = Duration.ofSeconds(300);
 
     public Flux<BotMenuEntity> findByBotName(String botName) {
-        return botMenuRepository.findByBotNameOrdered(botName).collectList();
+        return botMenuRepository.findByBotNameOrdered(botName);
     }
 
     public Mono<BotMenuEntity> findById(Long id) {
