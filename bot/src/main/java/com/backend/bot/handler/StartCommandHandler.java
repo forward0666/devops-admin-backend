@@ -53,9 +53,14 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
     @Override
     public boolean support(BotUpdateDto update) {
-        return update.message() != null &&
-                update.message().text() != null &&
-                update.message().text().trim().startsWith("/start");
+        if (update.message() == null || update.message().text() == null) return false;
+        String text = update.message().text().trim();
+        if (!text.startsWith("/start")) return false;
+        Long chatId = update.message().chat().id();
+        // 私聊允许纯 /start
+        if (chatId != null && chatId.equals(update.message().from().id())) return true;
+        // 群聊：必须带 @botName
+        return text.contains("@");
     }
 
     @Override
@@ -68,6 +73,16 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         String identityLog = BotUserUtils.formatIdentityLog(context);
 
         log.info("{}✅ [Step1] 开始处理/start | userId={}, chatId={}", logPrefix, userId, chatId);
+
+        // 群聊：/start@botName 必须匹配当前 bot
+        String text = context.update().message().text().trim();
+        if (text.contains("@")) {
+            String mention = text.split("@")[1].split("\\s")[0].toLowerCase();
+            if (!mention.equals(context.botName().toLowerCase())) {
+                log.info("{}⚠️ /start@{} does not match current bot {}, ignoring", logPrefix, mention, context.botName());
+                return Mono.empty();
+            }
+        }
 
         // 群聊场景：把用户的 /start 消息也加入定时删除
         Long userMessageId = context.messageId();
