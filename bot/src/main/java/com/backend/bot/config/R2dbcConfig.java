@@ -36,7 +36,7 @@ public class R2dbcConfig {
     public R2dbcCustomConversions r2dbcCustomConversions(
             Converter<String, BotType> readingConverter,
             Converter<BotType, String> writingConverter) {
-        List<Converter<?, ?>> converters = new ArrayList<>();
+        List<Object> converters = new ArrayList<>();
         converters.add(readingConverter);
         converters.add(writingConverter);
         return R2dbcCustomConversions.of(MySqlDialect.INSTANCE, converters);
