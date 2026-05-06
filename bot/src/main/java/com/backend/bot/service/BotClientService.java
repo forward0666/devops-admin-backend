@@ -371,17 +371,25 @@ public class BotClientService {
         return telegramWebClient.post()
                 .uri(url)
                 .bodyValue(body)
-                .retrieve()
-                .bodyToMono(String.class)
-                .map(response -> {
-                    try {
-                        ObjectMapper om = new ObjectMapper();
-                        com.fasterxml.jackson.databind.JsonNode root = om.readTree(response);
-                        return root.path("result").path("message_thread_id").asLong(0);
-                    } catch (Exception e) {
-                        log.error("Failed to parse createForumTopic response", e);
-                        return 0L;
+                .exchangeToMono(response -> {
+                    if (response.statusCode().is2xxSuccessful()) {
+                        return response.bodyToMono(String.class)
+                                .map(resp -> {
+                                    try {
+                                        ObjectMapper om = new ObjectMapper();
+                                        com.fasterxml.jackson.databind.JsonNode root = om.readTree(resp);
+                                        return root.path("result").path("message_thread_id").asLong(0);
+                                    } catch (Exception e) {
+                                        log.error("Failed to parse createForumTopic response", e);
+                                        return 0L;
+                                    }
+                                });
                     }
+                    return response.bodyToMono(String.class)
+                            .flatMap(errorBody -> {
+                                log.error("createForumTopic failed: status={}, body={}", response.statusCode(), errorBody);
+                                return Mono.error(new RuntimeException("createForumTopic failed: " + errorBody));
+                            });
                 });
     }
 
