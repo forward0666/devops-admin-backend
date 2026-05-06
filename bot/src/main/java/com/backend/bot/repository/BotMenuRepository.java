@@ -1,22 +1,23 @@
 package com.backend.bot.repository;
 
+import com.backend.bot.constants.BotMenuSqlConstants;
 import com.backend.bot.entity.BotMenuEntity;
 import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public interface BotMenuRepository extends ReactiveCrudRepository<BotMenuEntity, Long> {
+public interface BotMenuRepository extends R2dbcRepository<BotMenuEntity, Long> {
 
-    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName")
+    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME)
     Flux<BotMenuEntity> findByBotName(String botName);
 
-    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName ORDER BY menu_level, sort_order")
-    Flux<BotMenuEntity> findByBotNameOrderByLevelAndSort(String botName);
+    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_ORDERED)
+    Flux<BotMenuEntity> findByBotNameOrdered(String botName);
 
-    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_key = :menuKey")
+    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_AND_MENU_KEY)
     Mono<BotMenuEntity> findByBotNameAndMenuKey(String botName, String menuKey);
 
-    @Query("SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_level = :menuLevel ORDER BY sort_order")
-    Flux<BotMenuEntity> findByBotNameAndMenuLevel(String botName, int menuLevel);
+    @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_AND_MENU_LEVEL_ORDERED)
+    Flux<BotMenuEntity> findByBotNameAndMenuLevelOrdered(String botName, Integer menuLevel);
 }

@@ -1,12 +1,16 @@
 package com.backend.bot.constants;
 
-public final class BotMenuSqlConstants {
+public class BotMenuSqlConstants {
 
-    private BotMenuSqlConstants() {}
+    public static final String FIND_BY_BOT_NAME =
+            "SELECT * FROM bot_menu WHERE bot_name = :botName";
 
-    public static final String FIND_BY_BOT_NAME_ORDER_BY_LEVEL_AND_SORT =
+    public static final String FIND_BY_BOT_NAME_ORDERED =
             "SELECT * FROM bot_menu WHERE bot_name = :botName ORDER BY menu_level, sort_order";
 
-    public static final String FIND_BY_BOT_NAME_AND_MENU_LEVEL =
+    public static final String FIND_BY_BOT_NAME_AND_MENU_KEY =
+            "SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_key = :menuKey";
+
+    public static final String FIND_BY_BOT_NAME_AND_MENU_LEVEL_ORDERED =
             "SELECT * FROM bot_menu WHERE bot_name = :botName AND menu_level = :menuLevel ORDER BY sort_order";
 }
