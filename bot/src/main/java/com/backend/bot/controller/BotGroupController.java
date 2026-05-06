@@ -124,10 +124,12 @@ public class BotGroupController {
                                 entity.setThreadId(threadId);
                                 String welcomeMsg = "📋 " + entity.getTopicName();
                                 return botGroupTopicRepository.save(entity)
-                                        .flatMap(saved -> botClientService.sendMessageToThread(botConfig.getBotToken(), entity.getChatId(), threadId, welcomeMsg)
-                                                .onErrorResume(e -> { log.warn("Welcome message failed: {}", e.getMessage()); return Mono.empty(); })
-                                                .then(Mono.just(saved)))
-                                        .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
+                                        .map(saved -> {
+                                            botClientService.sendMessageToThread(botConfig.getBotToken(), entity.getChatId(), threadId, welcomeMsg)
+                                                    .onErrorResume(e -> { log.warn("Welcome message failed: {}", e.getMessage()); return Mono.empty(); })
+                                                    .subscribe();
+                                            return HttpResponseUtils.ok(Map.of("topic", saved));
+                                        });
                             }))
                     .switchIfEmpty(Mono.defer(() -> botGroupTopicRepository.save(entity).map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)))));
         }
