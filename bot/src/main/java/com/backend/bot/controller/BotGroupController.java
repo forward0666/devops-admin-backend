@@ -44,16 +44,16 @@ public class BotGroupController {
                                     .collectList()
                                     .map(topics -> Map.of(
                                             "id", group.getId(),
-                                            "botName", group.getBotName(),
+                                            "botName", group.getBotName() != null ? group.getBotName() : "",
                                             "chatId", group.getChatId(),
-                                            "chatTitle", group.getChatTitle(),
-                                            "chatType", group.getChatType(),
-                                            "status", group.getStatus(),
+                                            "chatTitle", group.getChatTitle() != null ? group.getChatTitle() : "",
+                                            "chatType", group.getChatType() != null ? group.getChatType() : "",
+                                            "status", group.getStatus() != null ? group.getStatus() : 0,
                                             "topicCount", topics.size(),
                                             "topics", topics.stream().map(t -> Map.of(
                                                     "id", t.getId(),
-                                                    "threadId", t.getThreadId(),
-                                                    "topicName", t.getTopicName()
+                                                    "threadId", t.getThreadId() != null ? t.getThreadId() : 0,
+                                                    "topicName", t.getTopicName() != null ? t.getTopicName() : ""
                                             )).toList()
                                     )))
                             .collectList()
