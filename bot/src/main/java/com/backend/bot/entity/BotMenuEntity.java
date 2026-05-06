@@ -15,6 +15,8 @@ public class BotMenuEntity {
 
     private String botName;
 
+    private String botType;
+
     /** 1=主菜单, 2=子菜单 */
     private Integer menuLevel;
 

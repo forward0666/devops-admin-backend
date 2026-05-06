@@ -20,4 +20,7 @@ public interface BotMenuRepository extends R2dbcRepository<BotMenuEntity, Long> 
 
     @Query(BotMenuSqlConstants.FIND_BY_BOT_NAME_AND_MENU_LEVEL_ORDERED)
     Flux<BotMenuEntity> findByBotNameAndMenuLevelOrdered(String botName, Integer menuLevel);
+
+    @Query(BotMenuSqlConstants.FIND_BY_BOT_TYPE_AND_MENU_LEVEL)
+    Mono<BotMenuEntity> findByBotTypeAndMenuLevel(String botType, Integer menuLevel);
 }

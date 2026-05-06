@@ -114,10 +114,10 @@ public class BotMenuService {
                         botMenuRepository.findByBotNameAndMenuLevelOrdered(botName, menuLevel)
                                 .next()
                                 .switchIfEmpty(Mono.defer(() -> {
-                                    // Fallback: use botType dbValue as shared menu name
-                                    String fallbackName = botType != null ? botType.getDbValue() : "general";
-                                    log.info("No menu for bot={}, falling back to shared menu: {}", botName, fallbackName);
-                                    return botMenuRepository.findByBotNameAndMenuLevelOrdered(fallbackName, menuLevel).next();
+                                    // Fallback: query shared menu by botType
+                                    String fallbackType = botType != null ? botType.getDbValue() : "general";
+                                    log.info("No menu for bot={}, falling back to botType={}", botName, fallbackType);
+                                    return botMenuRepository.findByBotTypeAndMenuLevel(fallbackType, menuLevel);
                                 }))
                                 .map(this::entityToKeyboard)
                                 .doOnNext(markup -> {
