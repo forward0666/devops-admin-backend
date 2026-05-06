@@ -362,4 +362,26 @@ public class BotClientService {
                 .bodyToMono(String.class)
                 .doOnNext(res -> log.info("deleteWebhook response: {}", res));
     }
+
+    public Mono<Long> createForumTopic(String token, Long chatId, String topicName) {
+        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/createForumTopic";
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chat_id", chatId);
+        body.put("name", topicName);
+        return telegramWebClient.post()
+                .uri(url)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(response -> {
+                    try {
+                        ObjectMapper om = new ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode root = om.readTree(response);
+                        return root.path("result").path("message_thread_id").asLong(0);
+                    } catch (Exception e) {
+                        log.error("Failed to parse createForumTopic response", e);
+                        return 0L;
+                    }
+                });
+    }
 }

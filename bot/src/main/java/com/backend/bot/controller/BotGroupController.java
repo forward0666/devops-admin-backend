@@ -4,6 +4,8 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.entity.BotGroupTopicEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.repository.BotGroupTopicRepository;
+import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.BotCoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
@@ -24,6 +26,7 @@ public class BotGroupController {
 
     private final BotGroupRepository botGroupRepository;
     private final BotGroupTopicRepository botGroupTopicRepository;
+    private final BotClientService botClientService;
 
     // ========== Group CRUD ==========
 
@@ -95,6 +98,16 @@ public class BotGroupController {
     @PostMapping("/topic")
     public Mono<ResponseEntity<Map<String, Object>>> addTopic(@RequestBody BotGroupTopicEntity entity) {
         entity.setCreatedAt(LocalDateTime.now());
+        if (entity.getThreadId() == null && entity.getTopicName() != null) {
+            return botCoreService.findByBotName(entity.getBotName())
+                    .flatMap(botConfig -> botClientService.createForumTopic(botConfig.getBotToken(), entity.getChatId(), entity.getTopicName()))
+                    .flatMap(threadId -> {
+                        entity.setThreadId(threadId);
+                        return botGroupTopicRepository.save(entity)
+                                .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
+                    })
+                    .defaultIfEmpty(HttpResponseUtils.ok(Map.of("topic", entity)));
+        }
         return botGroupTopicRepository.save(entity)
                 .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
     }
