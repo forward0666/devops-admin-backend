@@ -108,7 +108,7 @@ public class BotQueryController {
                 .flatMap(bot -> {
                     if (body.containsKey("botType")) {
                         try {
-                            bot.setBotType(BotType.valueOf((String) body.get("botType")));
+                            bot.setBotType(BotType.fromDbValue((String) body.get("botType")));
                         } catch (IllegalArgumentException e) {
                             return Mono.just(HttpResponseUtils.badRequest("Invalid bot type: " + body.get("botType")));
                         }
