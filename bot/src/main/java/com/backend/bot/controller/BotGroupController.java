@@ -27,6 +27,7 @@ public class BotGroupController {
     private final BotGroupRepository botGroupRepository;
     private final BotGroupTopicRepository botGroupTopicRepository;
     private final BotClientService botClientService;
+    private final BotCoreService botCoreService;
 
     // ========== Group CRUD ==========
 
