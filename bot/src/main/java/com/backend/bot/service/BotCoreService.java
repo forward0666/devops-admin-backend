@@ -2,7 +2,8 @@ package com.backend.bot.service;
 
 import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.entity.BotAuthorizedChatEntity;
-import com.backend.bot.entity.BotConfigEntity; // 统一使用 BotConfigEntity
+import com.backend.bot.entity.BotConfigEntity;
+import com.backend.bot.enums.BotType; // 统一使用 BotConfigEntity
 import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -191,6 +192,9 @@ public class BotCoreService {
      * 保存 Bot 配置
      */
     public Mono<BotConfigEntity> saveBot(BotConfigEntity bot) {
+        if (bot.getBotType() == null) {
+            bot.setBotType(BotType.GENERAL);
+        }
         return botRepository.save(bot);
     }
 
