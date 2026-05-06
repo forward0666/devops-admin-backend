@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import com.backend.bot.enums.BotType;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +97,7 @@ public class BotMenuService {
     /**
      * 根据 botName + menuLevel 查找主菜单（level=1）的第一个菜单并转换
      */
-    public Mono<InlineKeyboardMarkupDto> findMainMenuByBotName(String botName, int menuLevel) {
+    public Mono<InlineKeyboardMarkupDto> findMainMenuByBotType(String botName, BotType botType, int menuLevel) {
         String cacheKey = "bot:menu:" + botName + ":main:" + menuLevel;
         return redisTemplate.opsForValue().get(cacheKey)
                 .flatMap(cached -> {
@@ -112,6 +113,12 @@ public class BotMenuService {
                 .switchIfEmpty(Mono.defer(() ->
                         botMenuRepository.findByBotNameAndMenuLevelOrdered(botName, menuLevel)
                                 .next()
+                                .switchIfEmpty(Mono.defer(() -> {
+                                    // Fallback: use botType dbValue as shared menu name
+                                    String fallbackName = botType != null ? botType.getDbValue() : "general";
+                                    log.info("No menu for bot={}, falling back to shared menu: {}", botName, fallbackName);
+                                    return botMenuRepository.findByBotNameAndMenuLevelOrdered(fallbackName, menuLevel).next();
+                                }))
                                 .map(this::entityToKeyboard)
                                 .doOnNext(markup -> {
                                     try {
@@ -121,10 +128,6 @@ public class BotMenuService {
                                         log.warn("Failed to cache menu key={}", cacheKey, e);
                                     }
                                 })
-                                .switchIfEmpty(Mono.defer(() -> {
-                                    log.debug("No main menu found in DB for bot={} level={}, will use fallback", botName, menuLevel);
-                                    return Mono.empty();
-                                }))
                 ));
     }
 

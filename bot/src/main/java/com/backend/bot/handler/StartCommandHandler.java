@@ -160,7 +160,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         // 先设置 session，再查菜单（避免 Mono.zip 空 empty 导致卡死）
         return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
-                .then(botMenuService.findMainMenuByBotName(context.botName(), 1)
+                .then(botMenuService.findMainMenuByBotType(context.botName(), context.botEntity().getBotType(), 1))
                         .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
                         .defaultIfEmpty(EMPTY_MENU)
                 )
