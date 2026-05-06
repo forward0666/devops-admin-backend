@@ -116,6 +116,10 @@ public class BotGroupController {
         if (entity.getThreadId() == null && entity.getTopicName() != null) {
             return botCoreService.findByBotName(entity.getBotName())
                     .flatMap(botConfig -> botClientService.createForumTopic(botConfig.getBotToken(), entity.getChatId(), entity.getTopicName())
+                            .onErrorResume(e -> {
+                                log.warn("createForumTopic failed for chatId={}: {}", entity.getChatId(), e.getMessage());
+                                return Mono.error(new RuntimeException("Failed to create topic: group may not have Topics feature enabled. Error: " + e.getMessage()));
+                            })
                             .flatMap(threadId -> {
                                 entity.setThreadId(threadId);
                                 String welcomeMsg = "📋 " + entity.getTopicName();
