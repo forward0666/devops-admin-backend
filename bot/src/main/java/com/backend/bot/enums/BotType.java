@@ -1,5 +1,6 @@
 package com.backend.bot.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
@@ -117,5 +118,15 @@ public enum BotType {
     @JsonValue
     public String getDbValue() {
         return dbValue;
+    }
+
+    @JsonCreator
+    public static BotType fromDbValue(String value) {
+        for (BotType type : values()) {
+            if (type.dbValue.equals(value)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Invalid bot type: " + value);
     }
 }
