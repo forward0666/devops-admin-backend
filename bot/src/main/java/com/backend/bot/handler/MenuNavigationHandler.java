@@ -84,7 +84,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
 
             // 先从数据库查
             log.info("{}🔍 [MenuNav] Searching DB: botName={}, menuKey={}", traceLogPrefix, context.botName(), menuKey);
-            return botMenuService.findKeyboardByBotNameAndMenuKey(context.botName(), menuKey)
+            return botMenuService.findKeyboardByBotTypeAndMenuKey(context.botEntity().getBotType().getDbValue(), menuKey)
                     .flatMap(newMarkup -> {
                         if (newMarkup == null || newMarkup.isEmpty()) return Mono.empty();
                         return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);

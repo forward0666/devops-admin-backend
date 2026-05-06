@@ -21,11 +21,18 @@ public class BotMenuController {
 
     private final BotMenuService botMenuService;
 
-    @GetMapping("/bot/{botName}")
-    public Mono<ResponseEntity<Map<String, Object>>> getMenusByBot(@PathVariable String botName) {
+    @GetMapping
+    public Mono<ResponseEntity<Map<String, Object>>> getAllMenus(@RequestParam(required = false) String botType) {
         return Mono.deferContextual(ctx -> {
             LogUtils.syncTraceIdToMDC(ctx);
-            return botMenuService.findByBotName(botName)
+            if (botType != null) {
+                return botMenuService.findAll()
+                        .filter(e -> botType.equals(e.getBotType()))
+                        .map(BotMenuVo::fromEntity)
+                        .collectList()
+                        .map(list -> HttpResponseUtils.ok(Map.of("menus", list)));
+            }
+            return botMenuService.findAll()
                     .map(BotMenuVo::fromEntity)
                     .collectList()
                     .map(list -> HttpResponseUtils.ok(Map.of("menus", list)));
@@ -56,7 +63,7 @@ public class BotMenuController {
                     .flatMap(saved -> {
                         Map<String, Object> data = new HashMap<>();
                         data.put("menu", BotMenuVo.fromEntity(saved));
-                        return botMenuService.deleteCacheByBotName(saved.getBotName())
+                        return botMenuService.deleteCacheByBotType(saved.getBotType())
                                 .thenReturn(ResponseEntity.status(201).body(data));
                     });
         }).doFinally(LogUtils::clearMDC);
@@ -74,12 +81,12 @@ public class BotMenuController {
                         existing.setMenuKey(e.getMenuKey());
                         existing.setMenuLevel(e.getMenuLevel());
                         existing.setParentId(e.getParentId());
-                        existing.setBotName(e.getBotName());
+                        existing.setBotType(e.getBotType());
                         existing.setUpdatedAt(LocalDateTime.now());
                         return existing;
                     }))
                     .flatMap(botMenuService::save)
-                    .flatMap(saved -> botMenuService.deleteCacheByBotName(saved.getBotName())
+                    .flatMap(saved -> botMenuService.deleteCacheByBotType(saved.getBotType())
                             .thenReturn(HttpResponseUtils.ok(Map.of("menu", BotMenuVo.fromEntity(saved)))))
                     .defaultIfEmpty(HttpResponseUtils.badRequest("Menu not found"));
         }).doFinally(LogUtils::clearMDC);
@@ -91,7 +98,7 @@ public class BotMenuController {
             LogUtils.syncTraceIdToMDC(ctx);
             return botMenuService.findById(id)
                     .flatMap(existing -> botMenuService.deleteById(id).thenReturn(existing))
-                    .flatMap(deleted -> botMenuService.deleteCacheByBotName(deleted.getBotName())
+                    .flatMap(deleted -> botMenuService.deleteCacheByBotType(deleted.getBotType())
                             .thenReturn(HttpResponseUtils.ok(Map.of())))
                     .defaultIfEmpty(HttpResponseUtils.badRequest("Menu not found"));
         }).doFinally(LogUtils::clearMDC);

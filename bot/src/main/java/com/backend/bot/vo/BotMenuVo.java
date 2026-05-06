@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class BotMenuVo {
     private Long id;
-    private String botName;
+    private String botType;
     private Integer menuLevel;
     private String menuKey;
     private String title;
@@ -21,7 +21,7 @@ public class BotMenuVo {
     public static BotMenuVo fromEntity(BotMenuEntity entity) {
         BotMenuVo vo = new BotMenuVo();
         vo.setId(entity.getId());
-        vo.setBotName(entity.getBotName());
+        vo.setBotType(entity.getBotType());
         vo.setMenuLevel(entity.getMenuLevel());
         vo.setMenuKey(entity.getMenuKey());
         vo.setTitle(entity.getTitle());
