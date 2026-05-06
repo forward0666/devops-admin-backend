@@ -64,7 +64,12 @@ public class BotGroupController {
                                         return m;
                                     }))
                             .collectList()
-                            .map(enriched -> HttpResponseUtils.ok(Map.of("groups", enriched, "total", enriched.size())));
+                            .map(enriched -> {
+                                Map<String, Object> result = new java.util.HashMap<>();
+                                result.put("groups", enriched);
+                                result.put("total", enriched.size());
+                                return HttpResponseUtils.ok(result);
+                            });
                 });
     }
 
