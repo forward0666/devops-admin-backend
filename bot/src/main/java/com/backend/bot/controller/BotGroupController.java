@@ -154,4 +154,12 @@ public class BotGroupController {
                         .thenReturn(HttpResponseUtils.ok(Map.of("deleted", id))))
                 .defaultIfEmpty(HttpResponseUtils.notFound("Topic not found: " + id));
     }
+
+    @DeleteMapping("/topics/{groupId}")
+    public Mono<ResponseEntity<Map<String, Object>>> clearTopics(@PathVariable Long groupId) {
+        return botGroupRepository.findById(groupId)
+                .flatMap(group -> botGroupTopicRepository.deleteByBotNameAndChatId(group.getBotName(), group.getChatId())
+                        .thenReturn(HttpResponseUtils.ok(Map.of("cleared", groupId))))
+                .defaultIfEmpty(HttpResponseUtils.notFound("Group not found: " + groupId));
+    }
 }
