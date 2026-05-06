@@ -45,7 +45,7 @@ public class UserController {
         try {
             UserEntity user = userService.getUserById(id);
             if (user != null) {
-                return ApiResponseDto.success("User retrieved successfully", UserVo.fromEntity(user));
+                return ApiResponseDto.success("User retrieved successfully", UserVo.fromEntity(user, isLocked(user.getUsername())));
             } else {
                 return ApiResponseDto.error("User not found");
             }
