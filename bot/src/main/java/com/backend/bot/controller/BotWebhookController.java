@@ -71,11 +71,21 @@ public class BotWebhookController {
                         chatId = null;
                     }
 
-                    if (user == null || user.id() == null) {
-                        LogUtils.processWebhookUpdateAndPublishEvent(
-                                reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate
-                        );
-                        return Mono.empty();
+                    // Bot disabled check
+                    return botCoreService.findByBotName(botName)
+                            .timeout(Duration.ofSeconds(3))
+                            .flatMap(bot -> {
+                                if (bot.getStatus() != null && bot.getStatus() != 1) {
+                                    log.info("⛔ Bot {} is disabled, ignoring message", botName);
+                                    return Mono.empty();
+                                }
+
+                                if (user == null || user.id() == null) {
+                                    LogUtils.processWebhookUpdateAndPublishEvent(
+                                            reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate
+                                    );
+                                    return Mono.empty();
+                                }
                     }
 
                     if (chatId != null && chatId.equals(user.id())) {
@@ -149,7 +159,10 @@ public class BotWebhookController {
                                         reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate)
                                 ).subscribeOn(Schedulers.boundedElastic()).then();
                             });
-                })
+                            })
+                .defaultIfEmpty(Mono.empty())
+                .then()
+                )
                 .timeout(Duration.ofSeconds(10))
                 .doOnError(e -> log.error("❌ [WebhookController] 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
                 .onErrorResume(e -> Mono.empty())
