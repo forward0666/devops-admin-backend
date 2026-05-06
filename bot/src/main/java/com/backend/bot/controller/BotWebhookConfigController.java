@@ -59,8 +59,7 @@ public class BotWebhookConfigController {
                                                     .flatMap(resultJson -> {
                                                         boolean success = resultJson != null && resultJson.contains("\"ok\":true");
                                                         if (success) {
-                                                            botEntity.setWebhookUrl(finalUrl);
-                                                            return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
+                                                            return botCoreService.updateWebhookUrl(botEntity.getBotName(), finalUrl).thenReturn(HttpResponseUtils.ok());
                                                         } else {
                                                             return Mono.just(HttpResponseUtils.internalError("❌ Webhook 设置失败，Telegram API 返回错误"));
                                                         }
@@ -183,8 +182,7 @@ public class BotWebhookConfigController {
                                 .doOnNext(res -> log.info("TG deleteWebhook response: {}", res))
                                 .flatMap(res -> {
                                     if (res != null && res.contains("\"ok\":true")) {
-                                        botEntity.setWebhookUrl(null);
-                                        return botCoreService.saveBot(botEntity).thenReturn(HttpResponseUtils.ok());
+                                        return botCoreService.clearWebhookUrl(botEntity.getBotName()).thenReturn(HttpResponseUtils.ok());
                                     }
                                     return Mono.just(HttpResponseUtils.internalError("❌ 删除 Webhook 失败: " + res));
                                 });

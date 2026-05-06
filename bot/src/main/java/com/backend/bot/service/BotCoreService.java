@@ -198,6 +198,14 @@ public class BotCoreService {
         return botRepository.save(bot);
     }
 
+    public Mono<Void> updateWebhookUrl(String botName, String webhookUrl) {
+        return botRepository.updateWebhookUrl(webhookUrl, botName);
+    }
+
+    public Mono<Void> clearWebhookUrl(String botName) {
+        return botRepository.clearWebhookUrl(botName);
+    }
+
     /**
      * 【重构】异步检查指定的 Chat ID 是否在 Bot 的白名单中 (使用 CacheTemplateService)
      *
