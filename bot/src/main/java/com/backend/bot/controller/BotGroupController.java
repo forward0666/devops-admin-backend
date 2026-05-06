@@ -115,17 +115,14 @@ public class BotGroupController {
         entity.setCreatedAt(LocalDateTime.now());
         if (entity.getThreadId() == null && entity.getTopicName() != null) {
             return botCoreService.findByBotName(entity.getBotName())
-                    .flatMap(botConfig -> botClientService.createForumTopic(botConfig.getBotToken(), entity.getChatId(), entity.getTopicName()))
-                    .flatMap(threadId -> {
-                        entity.setThreadId(threadId);
-                        return botGroupTopicRepository.save(entity)
-                                .flatMap(saved -> {
-                                    String welcomeMsg = "📋 " + entity.getTopicName();
-                                    return botClientService.sendMessageToThread(botConfig.getBotToken(), entity.getChatId(), threadId, welcomeMsg)
-                                            .thenReturn(saved);
-                                })
-                                .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
-                    })
+                    .flatMap(botConfig -> botClientService.createForumTopic(botConfig.getBotToken(), entity.getChatId(), entity.getTopicName())
+                            .flatMap(threadId -> {
+                                entity.setThreadId(threadId);
+                                String welcomeMsg = "📋 " + entity.getTopicName();
+                                return botGroupTopicRepository.save(entity)
+                                        .flatMap(saved -> botClientService.sendMessageToThread(botConfig.getBotToken(), entity.getChatId(), threadId, welcomeMsg).thenReturn(saved))
+                                        .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
+                            }))
                     .switchIfEmpty(Mono.defer(() -> botGroupTopicRepository.save(entity).map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)))));
         }
         return botGroupTopicRepository.save(entity)
