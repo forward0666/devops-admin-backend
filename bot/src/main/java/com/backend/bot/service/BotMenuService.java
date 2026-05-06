@@ -29,7 +29,7 @@ public class BotMenuService {
     private static final Duration MENU_CACHE_TTL = Duration.ofSeconds(300);
 
     public Flux<BotMenuEntity> findByBotName(String botName) {
-        return botMenuRepository.findByBotNameOrderByLevelAndSort(botName);
+        return botMenuRepository.findByBotNameOrdered(botName).collectList();
     }
 
     public Mono<BotMenuEntity> findById(Long id) {
@@ -110,7 +110,7 @@ public class BotMenuService {
                     }
                 })
                 .switchIfEmpty(Mono.defer(() ->
-                        botMenuRepository.findByBotNameAndMenuLevel(botName, menuLevel)
+                        botMenuRepository.findByBotNameAndMenuLevelOrdered(botName, menuLevel)
                                 .next()
                                 .map(this::entityToKeyboard)
                                 .doOnNext(markup -> {
