@@ -3,8 +3,8 @@ package com.backend.bot.handler;
 import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
-import com.backend.bot.entity.BotGroupProjectEntity;
-import com.backend.bot.repository.BotGroupProjectRepository;
+import com.backend.bot.entity.BotGroupEntity;
+import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.LogUtils;
@@ -30,7 +30,7 @@ import java.util.Map;
 @Order(5)
 public class GroupProjectQueryHandler implements CallbackActionHandler {
 
-    private final BotGroupProjectRepository botGroupProjectRepository;
+    private final BotGroupRepository botGroupRepository;
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
     private final WebClient.Builder webClientBuilder;
@@ -88,13 +88,13 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
             return redisTemplate.opsForValue().get(gpCacheKey)
                     .flatMap(cached -> {
                         try {
-                            return Mono.just(objectMapper.readValue(cached, BotGroupProjectEntity.class));
+                            return Mono.just(objectMapper.readValue(cached, BotGroupEntity.class));
                         } catch (Exception e) {
                             log.warn("{}⚠️ Failed to deserialize cached groupProject, fetching from DB", traceLogPrefix);
                             return Mono.empty();
                         }
                     })
-                    .switchIfEmpty(botGroupProjectRepository.findByBotNameAndChatId(botName, chatId)
+                    .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
                             .flatMap(entity -> {
                                 try {
                                     String json = objectMapper.writeValueAsString(entity);
@@ -182,7 +182,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .onErrorReturn("None");
     }
 
-    private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupProjectEntity binding,
+    private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupEntity binding,
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
         log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
         String projectCacheKey = "bot:project:" + binding.getProjectId();
@@ -220,7 +220,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 });
     }
 
-    private Mono<Void> fetchList(WebClient webClient, BotGroupProjectEntity binding, String uri,
+    private Mono<Void> fetchList(WebClient webClient, BotGroupEntity binding, String uri,
                                   String token, Long chatId, Long messageId, String title, String role, String traceLogPrefix) {
         log.info("{}🔍 Fetching list: title={}, role={}", traceLogPrefix, title, role);
         // Determine cache key based on URI
