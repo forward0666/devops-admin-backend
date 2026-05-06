@@ -21,5 +21,7 @@ public class BotGroupTopicEntity {
 
     private String topicName;
 
+    private Integer sortOrder;
+
     private LocalDateTime createdAt;
 }

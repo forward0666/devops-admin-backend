@@ -9,5 +9,8 @@ public interface BotGroupTopicRepository extends R2dbcRepository<BotGroupTopicEn
 
     Flux<BotGroupTopicEntity> findByBotNameAndChatId(String botName, Long chatId);
 
+    @Query("SELECT * FROM bot_group_topic WHERE bot_name = :botName AND chat_id = :chatId ORDER BY sort_order ASC, id ASC")
+    Flux<BotGroupTopicEntity> findByBotNameAndChatIdOrderBySortOrder(String botName, Long chatId);
+
     Mono<Void> deleteByBotNameAndChatId(String botName, Long chatId);
 }

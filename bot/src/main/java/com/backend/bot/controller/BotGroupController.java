@@ -40,7 +40,7 @@ public class BotGroupController {
                         return Mono.just(HttpResponseUtils.ok(Map.of("groups", List.of(), "total", 0)));
                     }
                     return Flux.fromIterable(groups)
-                            .flatMap(group -> botGroupTopicRepository.findByBotNameAndChatId(group.getBotName(), group.getChatId())
+                            .flatMap(group -> botGroupTopicRepository.findByBotNameAndChatIdOrderBySortOrder(group.getBotName(), group.getChatId())
                                     .collectList()
                                     .map(topics -> {
                                         Map<String, Object> m = new java.util.HashMap<>();
@@ -59,6 +59,7 @@ public class BotGroupController {
                                             tm.put("id", t.getId());
                                             tm.put("threadId", t.getThreadId() != null ? t.getThreadId() : 0);
                                             tm.put("topicName", t.getTopicName() != null ? t.getTopicName() : "");
+                                            tm.put("sortOrder", t.getSortOrder() != null ? t.getSortOrder() : 0);
                                             return tm;
                                         }).toList());
                                         return m;
@@ -144,6 +145,7 @@ public class BotGroupController {
                     String oldName = existing.getTopicName();
                     if (entity.getTopicName() != null) existing.setTopicName(entity.getTopicName());
                     if (entity.getThreadId() != null) existing.setThreadId(entity.getThreadId());
+                    if (entity.getSortOrder() != null) existing.setSortOrder(entity.getSortOrder());
                     return botGroupTopicRepository.save(existing);
                 })
                 .flatMap(saved -> {
