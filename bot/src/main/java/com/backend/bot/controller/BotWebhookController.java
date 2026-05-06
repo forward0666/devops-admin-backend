@@ -55,122 +55,115 @@ public class BotWebhookController {
                     processAsync(botName, botUpdate);
                 });
     }
-
     private void processAsync(String botName, BotUpdateDto botUpdate) {
         Mono.defer(() -> {
-                    final UserDto user;
-                    final Long chatId;
-                    if (botUpdate.message() != null) {
-                        user = botUpdate.message().from();
-                        chatId = botUpdate.message().chat().id();
-                    } else if (botUpdate.callbackQuery() != null) {
-                        user = botUpdate.callbackQuery().from();
-                        chatId = botUpdate.callbackQuery().message().chat().id();
-                    } else {
-                        user = null;
-                        chatId = null;
-                    }
+            final UserDto user;
+            final Long chatId;
+            if (botUpdate.message() != null) {
+                user = botUpdate.message().from();
+                chatId = botUpdate.message().chat().id();
+            } else if (botUpdate.callbackQuery() != null) {
+                user = botUpdate.callbackQuery().from();
+                chatId = botUpdate.callbackQuery().message().chat().id();
+            } else {
+                user = null;
+                chatId = null;
+            }
 
-                    // Bot disabled check
-                    return botCoreService.findByBotName(botName)
-                            .timeout(Duration.ofSeconds(3))
-                            .flatMap(bot -> {
-                                if (bot.getStatus() != null && bot.getStatus() != 1) {
-                                    log.info("⛔ Bot {} is disabled, ignoring message", botName);
-                                    return Mono.empty();
-                                }
+            if (user == null || user.id() == null) {
+                LogUtils.processWebhookUpdateAndPublishEvent(
+                        reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate
+                );
+                return Mono.empty();
+            }
 
-                                if (user == null || user.id() == null) {
-                                    LogUtils.processWebhookUpdateAndPublishEvent(
-                                            reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate
-                                    );
-                                    return Mono.empty();
-                                }
-                    }
+            if (chatId != null && chatId.equals(user.id())) {
+                final String privateAttemptsKey = "bot:privateAttempts:" + botName + ":" + user.id();
+                return redisTemplate.opsForValue().increment(privateAttemptsKey)
+                        .flatMap(count -> {
+                            log.info("🔒 Private chat attempt {}/2: botName={}, userId={}", count, botName, user.id());
+                            if (count >= 2) {
+                                String blacklistValue = String.format("userId=%d, username=%s, tgUsername=%s, chatId=%d",
+                                        user.id(),
+                                        user.firstName() != null ? user.firstName() : "",
+                                        user.username() != null ? "@" + user.username() : "N/A",
+                                        chatId);
+                                redisTemplate.opsForValue().set("bot:blacklist:" + botName + ":" + user.id(), blacklistValue, java.time.Duration.ofDays(3650)).subscribe();
+                                log.warn("🚫 Auto-blacklisted private chat user: botName={}, userId={}", botName, user.id());
+                            }
+                            redisTemplate.expire(privateAttemptsKey, java.time.Duration.ofMinutes(5)).subscribe();
+                            return Mono.empty();
+                        })
+                        .onErrorResume(e -> {
+                            log.error("❌ Redis error tracking private attempts", e);
+                            return Mono.empty();
+                        });
+            }
 
-                    if (chatId != null && chatId.equals(user.id())) {
-                        final String privateAttemptsKey = "bot:privateAttempts:" + botName + ":" + user.id();
-                        return redisTemplate.opsForValue().increment(privateAttemptsKey)
-                                .flatMap(count -> {
-                                    log.info("🔒 Private chat attempt {}/2: botName={}, userId={}", count, botName, user.id());
-                                    if (count >= 2) {
-                                        // 自动拉黑30天
-                                        String blacklistValue = String.format("userId=%d, username=%s, tgUsername=%s, chatId=%d",
-                                                user.id(),
-                                                user.firstName() != null ? user.firstName() : "",
-                                                user.username() != null ? "@" + user.username() : "N/A",
-                                                chatId);
-                                        redisTemplate.opsForValue().set("bot:blacklist:" + botName + ":" + user.id(), blacklistValue, java.time.Duration.ofDays(3650)).subscribe();
-                                        log.warn("🚫 Auto-blacklisted private chat user: botName={}, userId={}", botName, user.id());
-                                    }
-                                    redisTemplate.expire(privateAttemptsKey, java.time.Duration.ofMinutes(5)).subscribe();
-                                    return Mono.empty();
-                                })
+            final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
+            log.info("🔍 processAsync | botName={}, userId={}, chatId={}", botName, user.id(), chatId);
+
+            return botCoreService.findByBotName(botName)
+                    .timeout(Duration.ofSeconds(3))
+                    .flatMap(bot -> {
+                        if (bot.getStatus() != null && bot.getStatus() != 1) {
+                            log.info("⛔ Bot {} is disabled, ignoring message", botName);
+                            return Mono.<Void>empty();
+                        }
+
+                        return redisTemplate.hasKey(blacklistKey)
+                                .timeout(Duration.ofSeconds(3))
                                 .onErrorResume(e -> {
-                                    log.error("❌ Redis error tracking private attempts", e);
-                                    return Mono.empty();
+                                    log.error("❌ Redis超时/异常，直接发布事件 | botName={}, error={}", botName, e.getMessage());
+                                    return Mono.just(false);
+                                })
+                                .flatMap(isBlacklisted -> {
+                                    if (Boolean.TRUE.equals(isBlacklisted)) {
+                                        log.info("🔒 BLACKLISTED group chat: botName={}, userId={}", botName, user.id());
+                                        return botCoreService.findByBotName(botName)
+                                                .timeout(Duration.ofSeconds(3))
+                                                .flatMap(bl -> {
+                                                    final Long msgId = extractMessageId(botUpdate);
+                                                    String warnMsg = String.format(
+                                                            "🚫 %s (%s) 已在黑名单中，如需解封请联系管理员。",
+                                                            user.firstName() != null ? user.firstName() : "",
+                                                            user.username() != null ? "@" + user.username() : "N/A");
+                                                    Mono<Void> sendWarning = botClientService.sendMenuMessageWithResponse(
+                                                            bl.getBotToken(), chatId, warnMsg, null
+                                                    ).flatMap(respJson -> {
+                                                        try {
+                                                            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
+                                                            Long warnMsgId = root.path("result").path("message_id").asLong(0);
+                                                            if (warnMsgId != 0) {
+                                                                return interactiveMessageService.scheduleMessageDeletion(
+                                                                        bl.getBotToken(), 0L, chatId, warnMsgId, 5, null, reactor.util.context.Context.empty()
+                                                                );
+                                                            }
+                                                        } catch (Exception ignored) {}
+                                                        return Mono.empty();
+                                                    }).onErrorResume(e -> Mono.empty());
+                                                    Mono<Void> deleteMsg = msgId != null
+                                                            ? botClientService.deleteMessage(bl.getBotToken(), chatId, msgId)
+                                                            : Mono.empty();
+                                                    return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
+                                                })
+                                                .then(Mono.empty());
+                                    }
+                                    log.info("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
+                                    return Mono.<Void>fromRunnable(() ->
+                                        LogUtils.processWebhookUpdateAndPublishEvent(
+                                            reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate)
+                                    ).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
-                    }
-
-                    final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
-                    log.info("🔍 [WebhookController] processAsync | botName={}, userId={}, chatId={}", botName, user.id(), chatId);
-
-                    return redisTemplate.hasKey(blacklistKey)
-                            .timeout(Duration.ofSeconds(3))
-                            .onErrorResume(e -> {
-                                log.error("❌ [WebhookController] Redis超时/异常，直接发布事件 | botName={}, error={}", botName, e.getMessage());
-                                return Mono.just(false);
-                            })
-                            .flatMap(isBlacklisted -> {
-                                if (Boolean.TRUE.equals(isBlacklisted)) {
-                                    log.info("🔒 BLACKLISTED group chat: botName={}, userId={}", botName, user.id());
-                                    return botCoreService.findByBotName(botName)
-                                                    .timeout(Duration.ofSeconds(3))
-                                            .flatMap(bot -> {
-                                                final Long msgId = extractMessageId(botUpdate);
-                                                String warnMsg = String.format(
-                                                        "🚫 %s (%s) 已在黑名单中，如需解封请联系管理员。",
-                                                        user.firstName() != null ? user.firstName() : "",
-                                                        user.username() != null ? "@" + user.username() : "N/A");
-                                                Mono<Void> sendWarning = botClientService.sendMenuMessageWithResponse(
-                                                        bot.getBotToken(), chatId, warnMsg, null
-                                                ).flatMap(respJson -> {
-                                                    try {
-                                                        com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
-                                                        Long warnMsgId = root.path("result").path("message_id").asLong(0);
-                                                        if (warnMsgId != 0) {
-                                                            return interactiveMessageService.scheduleMessageDeletion(
-                                                                    bot.getBotToken(), 0L, chatId, warnMsgId, 5, null, reactor.util.context.Context.empty()
-                                                            );
-                                                        }
-                                                    } catch (Exception ignored) {}
-                                                    return Mono.empty();
-                                                }).onErrorResume(e -> Mono.empty());
-                                                Mono<Void> deleteMsg = msgId != null
-                                                        ? botClientService.deleteMessage(bot.getBotToken(), chatId, msgId)
-                                                        : Mono.empty();
-                                                return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
-                                            })
-                                            .then(Mono.empty());
-                                }
-                                log.info("🔓 [WebhookController] Not blacklisted | botName={}, userId={}, isBlacklisted={}", botName, user.id(), isBlacklisted);
-                                return Mono.<Void>fromRunnable(() ->
-                                    LogUtils.processWebhookUpdateAndPublishEvent(
-                                        reactor.util.context.Context.empty(), eventPublisher, botName, botUpdate)
-                                ).subscribeOn(Schedulers.boundedElastic()).then();
-                            });
-                            })
-                .defaultIfEmpty(Mono.empty())
-                .then()
-                )
-                .timeout(Duration.ofSeconds(10))
-                .doOnError(e -> log.error("❌ [WebhookController] 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
-                .onErrorResume(e -> Mono.empty())
-                .doFinally(LogUtils::clearMDC)
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe();
+                    });
+        })
+        .timeout(Duration.ofSeconds(10))
+        .doOnError(e -> log.error("❌ 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
+        .onErrorResume(e -> Mono.empty())
+        .doFinally(LogUtils::clearMDC)
+        .subscribeOn(Schedulers.boundedElastic())
+        .subscribe();
     }
-
     private Long extractMessageId(BotUpdateDto update) {
         if (update.message() != null) return update.message().messageId();
         if (update.callbackQuery() != null) return update.callbackQuery().message().messageId();
