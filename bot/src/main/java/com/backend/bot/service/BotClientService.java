@@ -384,4 +384,19 @@ public class BotClientService {
                     }
                 });
     }
+
+    public Mono<Void> sendMessageToThread(String token, Long chatId, Long threadId, String text) {
+        String url = telegramProperties.getApiBaseUrl() + "/bot" + token + "/sendMessage";
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chat_id", chatId);
+        body.put("message_thread_id", threadId);
+        body.put("text", text);
+        return telegramWebClient.post()
+                .uri(url)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(String.class)
+                .doOnNext(res -> log.debug("sendMessageToThread response: {}", res))
+                .then();
+    }
 }

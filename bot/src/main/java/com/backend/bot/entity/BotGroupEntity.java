@@ -21,6 +21,12 @@ public class BotGroupEntity {
 
     private String chatType;
 
+    private Long botConfigId;
+
+    private Long projectId;
+
+    private String projectName;
+
     private Integer status;
 
     private LocalDateTime createdAt;

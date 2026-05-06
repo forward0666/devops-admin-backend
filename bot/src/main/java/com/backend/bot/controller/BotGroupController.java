@@ -39,24 +39,30 @@ public class BotGroupController {
                     if (groups.isEmpty()) {
                         return Mono.just(HttpResponseUtils.ok(Map.of("groups", List.of(), "total", 0)));
                     }
-                    // Fetch topics for each group
                     return Flux.fromIterable(groups)
                             .flatMap(group -> botGroupTopicRepository.findByBotNameAndChatId(group.getBotName(), group.getChatId())
                                     .collectList()
-                                    .map(topics -> Map.of(
-                                            "id", group.getId(),
-                                            "botName", group.getBotName() != null ? group.getBotName() : "",
-                                            "chatId", group.getChatId(),
-                                            "chatTitle", group.getChatTitle() != null ? group.getChatTitle() : "",
-                                            "chatType", group.getChatType() != null ? group.getChatType() : "",
-                                            "status", group.getStatus() != null ? group.getStatus() : 0,
-                                            "topicCount", topics.size(),
-                                            "topics", topics.stream().map(t -> Map.of(
-                                                    "id", t.getId(),
-                                                    "threadId", t.getThreadId() != null ? t.getThreadId() : 0,
-                                                    "topicName", t.getTopicName() != null ? t.getTopicName() : ""
-                                            )).toList()
-                                    )))
+                                    .map(topics -> {
+                                            Map<String, Object> m = new java.util.HashMap<>();
+                                            m.put("id", group.getId());
+                                            m.put("botName", group.getBotName() != null ? group.getBotName() : "");
+                                            m.put("botConfigId", group.getBotConfigId() != null ? group.getBotConfigId() : 0);
+                                            m.put("chatId", group.getChatId());
+                                            m.put("chatTitle", group.getChatTitle() != null ? group.getChatTitle() : "");
+                                            m.put("chatType", group.getChatType() != null ? group.getChatType() : "");
+                                            m.put("projectId", group.getProjectId() != null ? group.getProjectId() : 0);
+                                            m.put("projectName", group.getProjectName() != null ? group.getProjectName() : "");
+                                            m.put("status", group.getStatus() != null ? group.getStatus() : 0);
+                                            m.put("topicCount", topics.size());
+                                            m.put("topics", topics.stream().map(t -> {
+                                                Map<String, Object> tm = new java.util.HashMap<>();
+                                                tm.put("id", t.getId());
+                                                tm.put("threadId", t.getThreadId() != null ? t.getThreadId() : 0);
+                                                tm.put("topicName", t.getTopicName() != null ? t.getTopicName() : "");
+                                                return tm;
+                                            }).toList());
+                                            return m;
+                                    })
                             .collectList()
                             .map(enriched -> HttpResponseUtils.ok(Map.of("groups", enriched, "total", enriched.size())));
                 });
@@ -77,6 +83,9 @@ public class BotGroupController {
                 .flatMap(existing -> {
                     if (entity.getChatTitle() != null) existing.setChatTitle(entity.getChatTitle());
                     if (entity.getChatType() != null) existing.setChatType(entity.getChatType());
+                    if (entity.getProjectId() != null) existing.setProjectId(entity.getProjectId());
+                    if (entity.getProjectName() != null) existing.setProjectName(entity.getProjectName());
+                    if (entity.getBotConfigId() != null) existing.setBotConfigId(entity.getBotConfigId());
                     if (entity.getStatus() != null) existing.setStatus(entity.getStatus());
                     existing.setUpdatedAt(LocalDateTime.now());
                     return botGroupRepository.save(existing);
@@ -105,9 +114,14 @@ public class BotGroupController {
                     .flatMap(threadId -> {
                         entity.setThreadId(threadId);
                         return botGroupTopicRepository.save(entity)
+                                .flatMap(saved -> {
+                                    String welcomeMsg = "📋 " + entity.getTopicName();
+                                    return botClientService.sendMessageToThread(botConfig.getBotToken(), entity.getChatId(), threadId, welcomeMsg)
+                                            .thenReturn(saved);
+                                })
                                 .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
                     })
-                    .defaultIfEmpty(HttpResponseUtils.ok(Map.of("topic", entity)));
+                    .switchIfEmpty(Mono.defer(() -> botGroupTopicRepository.save(entity).map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)))));
         }
         return botGroupTopicRepository.save(entity)
                 .map(saved -> HttpResponseUtils.ok(Map.of("topic", saved)));
