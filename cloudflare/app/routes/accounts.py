@@ -4,6 +4,10 @@ from app.services.db import query_all, query_one, execute
 router = APIRouter()
 
 
+def _parse_tags(body: dict) -> str:
+    return ",".join([t.strip() for t in body.get("tags", []) if t.strip()])
+
+
 @router.get("")
 async def list_accounts():
     rows = await query_all("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM account ORDER BY id DESC")
@@ -23,7 +27,7 @@ async def create_account(body: dict):
     name = body.get("name", "").strip()
     api_key = body.get("apiKey", "").strip()
     description = body.get("description", "").strip()
-    tags = ",".join(body.get("tags", []))
+    tags = _parse_tags(body)
 
     if not name or not api_key:
         raise HTTPException(status_code=400, detail="name and apiKey are required")
@@ -44,7 +48,7 @@ async def update_account(account_id: int, body: dict):
     name = body.get("name", "").strip()
     api_key = body.get("apiKey", "").strip()
     description = body.get("description", "").strip()
-    tags = ",".join(body.get("tags", []))
+    tags = _parse_tags(body)
 
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
@@ -74,7 +78,6 @@ async def delete_account(account_id: int):
 
 @router.get("/{account_id}/key")
 async def get_account_key(account_id: int):
-    """Return masked API key for display"""
     row = await query_one("SELECT api_key FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -85,7 +88,6 @@ async def get_account_key(account_id: int):
 
 @router.get("/{account_id}/token")
 async def get_account_token(account_id: int):
-    """Return full API token for proxy calls"""
     row = await query_one("SELECT api_key FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
