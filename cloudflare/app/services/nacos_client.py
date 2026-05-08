@@ -37,6 +37,7 @@ async def fetch_config():
                     key = key.strip()
                     value = value.strip()
                     mapping = {
+                        "service.name": ("SERVICE_NAME", str),
                         "service.port": ("SERVICE_PORT", int),
                         "service.ip": ("SERVICE_IP", str),
                         "cf.base-url": ("CF_BASE_URL", str),
