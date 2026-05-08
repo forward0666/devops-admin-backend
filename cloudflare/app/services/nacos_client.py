@@ -54,7 +54,7 @@ async def fetch_config():
                         "mongodb.username": ("MONGODB_USER", str),
                         "mongodb.password": ("MONGODB_PASSWORD", str),
                         "mongodb.database": ("MONGODB_DATABASE", str),
-                        "mongodb.authentication-database": ("MONGODB_AUTH_DB", str),
+                        "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
                     }
                     if key in mapping:
                         attr, cast = mapping[key]
