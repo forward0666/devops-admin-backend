@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from app.routes import accounts, zones, dns, firewall, ssl, cache
 from app.services.db import close_pool
 from app.services.redis import close_redis
+from app.services.mongodb import close_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Cloudflare Manager shutting down...")
     await close_pool()
     await close_redis()
+    await close_db()
 
 
 app = FastAPI(title="Cloudflare Manager API", version="1.0.0", lifespan=lifespan)
