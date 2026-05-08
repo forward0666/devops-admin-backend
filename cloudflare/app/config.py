@@ -11,3 +11,10 @@ SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8090"))
 SERVICE_IP = os.getenv("SERVICE_IP", "127.0.0.1")
 
 CF_BASE_URL = os.getenv("CF_BASE_URL", "https://api.cloudflare.com/client/v4")
+#
+# cd ~/Desktop/projects/devops-admin-backend/cloudflare
+# python3.12 -m venv venv
+# source venv/bin/activate
+# pip3 install -r requirements.txt
+#  pip install --upgrade pip
+# python run.py

@@ -1,35 +1,19 @@
-import nacos
+import asyncio
+import logging
 import uvicorn
 
-from app.config import (
-    NACOS_HOST, NACOS_PORT, NACOS_NAMESPACE,
-    NACOS_USERNAME, NACOS_PASSWORD,
-    SERVICE_NAME, SERVICE_PORT, SERVICE_IP,
-)
+from app.config import SERVICE_PORT
+from app.services.nacos_client import register_service
 
-
-def register_service():
-    client = nacos.NacosClient(
-        f"{NACOS_HOST}:{NACOS_PORT}",
-        namespace=NACOS_NAMESPACE,
-        username=NACOS_USERNAME,
-        password=NACOS_PASSWORD,
-    )
-    client.add_naming_instance(
-        SERVICE_NAME,
-        SERVICE_IP,
-        SERVICE_PORT,
-        healthy=True,
-        enabled=True,
-        weight=1.0,
-        metadata={"version": "1.0.0", "type": "python"},
-    )
-    print(f"✅ Registered to Nacos: {SERVICE_NAME} ({SERVICE_IP}:{SERVICE_PORT})")
-    return client
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def main():
-    register_service()
+    # Register to Nacos before starting server
+    asyncio.run(register_service())
+
+    logger.info(f"🚀 Starting Cloudflare Manager on port {SERVICE_PORT}")
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
