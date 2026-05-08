@@ -14,13 +14,13 @@ import reactor.core.scheduler.Scheduler;
 @Component("CloudflareAuth")
 public class CloudflareAuth extends AuthFilter<BaseAuthConfig> {
 
-    @Value("${secure.header.cf.secret:default-secret}")
+    @Value("${secure.header.cloudflare.secret:default-secret}")
     private String secret;
 
-    @Value("${secure.cf.whitelist-paths:/health}")
+    @Value("${secure.cloudflare.whitelist-paths:/health}")
     private String whitelistPaths;
 
-    @Value("${secure.cf.authorized-methods:}")
+    @Value("${secure.cloudflare.authorized-methods:}")
     private String authorizedMethods;
 
     public CloudflareAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
