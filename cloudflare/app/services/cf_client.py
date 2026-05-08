@@ -1,12 +1,12 @@
 import httpx
+import logging
 
-from app.config import CF_BASE_URL
-
-BASE_URL = CF_BASE_URL
+logger = logging.getLogger(__name__)
 
 
 async def cf_request(api_token: str, method: str, path: str, **kwargs):
-    url = f"{BASE_URL}{path}"
+    from app.config import CF_BASE_URL
+    url = f"{CF_BASE_URL}{path}"
     headers = {
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json",
