@@ -1,6 +1,5 @@
 import httpx
 import logging
-import os
 
 from app.config import (
     NACOS_HOST, NACOS_PORT, NACOS_NAMESPACE,
@@ -41,13 +40,28 @@ async def fetch_config():
                         "service.port": ("SERVICE_PORT", int),
                         "service.ip": ("SERVICE_IP", str),
                         "cf.base-url": ("CF_BASE_URL", str),
+                        "mysql.host": ("MYSQL_HOST", str),
+                        "mysql.port": ("MYSQL_PORT", int),
+                        "mysql.user": ("MYSQL_USER", str),
+                        "mysql.password": ("MYSQL_PASSWORD", str),
+                        "mysql.database": ("MYSQL_DATABASE", str),
+                        "redis.host": ("REDIS_HOST", str),
+                        "redis.port": ("REDIS_PORT", int),
+                        "redis.password": ("REDIS_PASSWORD", str),
+                        "redis.database": ("REDIS_DATABASE", int),
+                        "mongodb.host": ("MONGODB_HOST", str),
+                        "mongodb.port": ("MONGODB_PORT", int),
+                        "mongodb.username": ("MONGODB_USER", str),
+                        "mongodb.password": ("MONGODB_PASSWORD", str),
+                        "mongodb.database": ("MONGODB_DATABASE", str),
+                        "mongodb.authentication-database": ("MONGODB_AUTH_DB", str),
                     }
                     if key in mapping:
                         attr, cast = mapping[key]
                         setattr(config, attr, cast(value))
-                logger.info(f"✅ Loaded config from Nacos: cloudflare.properties")
+                logger.info("✅ Loaded config from Nacos: cloudflare.properties")
             else:
-                logger.warning(f"⚠️ Nacos config not found, using defaults")
+                logger.warning("⚠️ Nacos config not found, using defaults")
     except Exception as e:
         logger.warning(f"⚠️ Failed to fetch Nacos config: {e}")
 

@@ -13,4 +13,23 @@ SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8090"))
 SERVICE_IP = os.getenv("SERVICE_IP", "127.0.0.1")
 CF_BASE_URL = os.getenv("CF_BASE_URL", "https://api.cloudflare.com/client/v4")
 
+# MySQL
+MYSQL_HOST = os.getenv("MYSQL_HOST", "10.10.72.33")
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", "31130"))
+MYSQL_USER = os.getenv("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "cloudflare")
 
+# Redis
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+REDIS_DATABASE = int(os.getenv("REDIS_DATABASE", "0"))
+
+# MongoDB
+MONGODB_HOST = os.getenv("MONGODB_HOST", "10.10.72.40")
+MONGODB_PORT = int(os.getenv("MONGODB_PORT", "32290"))
+MONGODB_USER = os.getenv("MONGODB_USERNAME", "root")
+MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root")
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "cloudflare")
+MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
