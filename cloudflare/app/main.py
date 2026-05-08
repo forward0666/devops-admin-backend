@@ -1,7 +1,6 @@
 import logging
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.routes import accounts, zones, dns, firewall, ssl, cache
@@ -22,14 +21,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Cloudflare Manager API", version="1.0.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
 app.include_router(zones.router, prefix="/zones", tags=["Zones"])
