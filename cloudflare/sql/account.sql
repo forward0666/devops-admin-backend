@@ -1,5 +1,5 @@
 -- Cloudflare 账号表
-CREATE TABLE IF NOT EXISTS cf_account (
+CREATE TABLE IF NOT EXISTS account (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL COMMENT '账号名称',
     api_key VARCHAR(256) NOT NULL COMMENT 'Cloudflare API Token',

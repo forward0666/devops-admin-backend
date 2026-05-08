@@ -6,13 +6,13 @@ router = APIRouter()
 
 @router.get("")
 async def list_accounts():
-    rows = await query_all("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM cf_account ORDER BY id DESC")
+    rows = await query_all("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM account ORDER BY id DESC")
     return {"code": 200, "data": rows}
 
 
 @router.get("/{account_id}")
 async def get_account(account_id: int):
-    row = await query_one("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM cf_account WHERE id = %s", (account_id,))
+    row = await query_one("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"code": 200, "data": row}
@@ -29,7 +29,7 @@ async def create_account(body: dict):
         raise HTTPException(status_code=400, detail="name and apiKey are required")
 
     await execute(
-        "INSERT INTO cf_account (name, api_key, description, tags) VALUES (%s, %s, %s, %s)",
+        "INSERT INTO account (name, api_key, description, tags) VALUES (%s, %s, %s, %s)",
         (name, api_key, description, tags),
     )
     return {"code": 200, "message": "ok"}
@@ -37,7 +37,7 @@ async def create_account(body: dict):
 
 @router.put("/{account_id}")
 async def update_account(account_id: int, body: dict):
-    existing = await query_one("SELECT id FROM cf_account WHERE id = %s", (account_id,))
+    existing = await query_one("SELECT id FROM account WHERE id = %s", (account_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -51,12 +51,12 @@ async def update_account(account_id: int, body: dict):
 
     if api_key:
         await execute(
-            "UPDATE cf_account SET name = %s, api_key = %s, description = %s, tags = %s WHERE id = %s",
+            "UPDATE account SET name = %s, api_key = %s, description = %s, tags = %s WHERE id = %s",
             (name, api_key, description, tags, account_id),
         )
     else:
         await execute(
-            "UPDATE cf_account SET name = %s, description = %s, tags = %s WHERE id = %s",
+            "UPDATE account SET name = %s, description = %s, tags = %s WHERE id = %s",
             (name, description, tags, account_id),
         )
     return {"code": 200, "message": "ok"}
@@ -64,18 +64,18 @@ async def update_account(account_id: int, body: dict):
 
 @router.delete("/{account_id}")
 async def delete_account(account_id: int):
-    existing = await query_one("SELECT id FROM cf_account WHERE id = %s", (account_id,))
+    existing = await query_one("SELECT id FROM account WHERE id = %s", (account_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    await execute("DELETE FROM cf_account WHERE id = %s", (account_id,))
+    await execute("DELETE FROM account WHERE id = %s", (account_id,))
     return {"code": 200, "message": "ok"}
 
 
 @router.get("/{account_id}/key")
 async def get_account_key(account_id: int):
     """Return masked API key for display"""
-    row = await query_one("SELECT api_key FROM cf_account WHERE id = %s", (account_id,))
+    row = await query_one("SELECT api_key FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
     key = row["api_key"]
@@ -86,7 +86,7 @@ async def get_account_key(account_id: int):
 @router.get("/{account_id}/token")
 async def get_account_token(account_id: int):
     """Return full API token for proxy calls"""
-    row = await query_one("SELECT api_key FROM cf_account WHERE id = %s", (account_id,))
+    row = await query_one("SELECT api_key FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"code": 200, "data": {"token": row["api_key"]}}
