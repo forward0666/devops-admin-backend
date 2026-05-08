@@ -23,14 +23,11 @@
         <module>utils-core</module>                             <!-- 工具模块 -->
         <module>utils-webflux</module>                          <!-- 工具模块，针对webflux -->
         <module>gateway</module>                                <!-- 网关模块：负责请求路由和过滤 -->
-        <module>cloudflare-logs-producer</module>               <!-- Cloudflare日志生成者 -->
-        <module>cloudflare-logs-consumer</module>               <!-- Cloudflare日志消费者：处理日志数据 -->
         <module>bot</module>                                    <!-- Bot 管理模块-->
         <module>security</module>                               <!-- 安全模块：负责用户认证和授权 -->
         <module>manage</module>                                 <!-- 管理服务模块 -->
         <module>user</module>                                   <!-- 用户服务模块 -->
         <module>login</module>                                  <!-- 登录服务模块 -->
-        <module>cloudflare</module>                               <!-- Cloudflare 管理模块 -->
 
     </modules>
 
