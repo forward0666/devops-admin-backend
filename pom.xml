@@ -30,6 +30,7 @@
         <module>manage</module>                                 <!-- 管理服务模块 -->
         <module>user</module>                                   <!-- 用户服务模块 -->
         <module>login</module>                                  <!-- 登录服务模块 -->
+        <module>cloudflare</module>                               <!-- Cloudflare 管理模块 -->
 
     </modules>
 
