@@ -6,23 +6,15 @@ router = APIRouter()
 
 @router.get("")
 async def list_zones(x_cf_token: str = Header(..., alias="X-Cf-Token")):
-    data, status = await cf_client.cf_request(x_cf_token, "GET", "/zones?per_page=50")
-    if not data.get("success"):
-        raise HTTPException(status_code=status, detail=data.get("errors", []))
-    return data
+    try:
+        return cf_client.list_zones(x_cf_token)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{zone_id}")
 async def get_zone(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token")):
-    data, status = await cf_client.cf_request(x_cf_token, "GET", f"/zones/{zone_id}")
-    if not data.get("success"):
-        raise HTTPException(status_code=status, detail=data.get("errors", []))
-    return data
-
-
-@router.get("/{zone_id}/settings")
-async def get_zone_settings(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token")):
-    data, status = await cf_client.cf_request(x_cf_token, "GET", f"/zones/{zone_id}/settings")
-    if not data.get("success"):
-        raise HTTPException(status_code=status, detail=data.get("errors", []))
-    return data
+    try:
+        return cf_client.get_zone(x_cf_token, zone_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
