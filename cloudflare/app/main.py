@@ -26,7 +26,8 @@ app = FastAPI(title="Cloudflare Manager API", version="1.0.0", lifespan=lifespan
 
 app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
 app.include_router(zones.router, prefix="/zones", tags=["Zones"])
-app.include_router(security.router, prefix="/zones/{zone_id}/security", tags=["Security"])
+app.include_router(security.router, prefix="/security", tags=["Security"])
+app.include_router(security.zone_router, prefix="/zones/{zone_id}/security", tags=["Security"])
 app.include_router(ssl.router, prefix="/zones/{zone_id}/ssl", tags=["SSL"])
 app.include_router(cache.router, prefix="/zones/{zone_id}/cache", tags=["Cache"])
 app.include_router(dns.router, prefix="/dns", tags=["DNS"])
