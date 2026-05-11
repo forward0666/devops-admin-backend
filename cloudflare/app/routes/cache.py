@@ -1,36 +1,109 @@
 from fastapi import APIRouter, Header, HTTPException
+from datetime import datetime
+
+from app.services.db import query_one
+from app.services.mongodb import get_db
 from app.services import cf_client
 
 router = APIRouter()
+zone_router = APIRouter()
 
 
-@router.post("/purge")
-async def purge_all(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token")):
-    try:
-        return cf_client.purge_all(x_cf_token, zone_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def get_collection_name(account_id: int, zone_id: str) -> str:
+    return f"account_{account_id}_zone_{zone_id}_cache"
 
 
-@router.post("/purge/urls")
-async def purge_urls(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token"), body: dict = None):
-    try:
-        return cf_client.purge_by_urls(x_cf_token, zone_id, body.get("files", []))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# --- Top-level routes (no zone_id) ---
+
+@router.get("")
+async def list_all_cache(account_id: int):
+    """Read all cache purge logs for an account from MongoDB"""
+    db = await get_db()
+    all_logs = []
+    collection_prefix = f"account_{account_id}_zone_"
+    collections = await db.list_collection_names()
+    for coll_name in collections:
+        if coll_name.startswith(collection_prefix) and coll_name.endswith("_cache"):
+            coll = db[coll_name]
+            rows = await coll.find({"account_id": str(account_id)}).sort("timestamp", -1).to_list(length=5000)
+            for r in rows:
+                r["_id"] = str(r["_id"])
+            all_logs.extend(rows)
+    return {"code": 200, "data": all_logs}
 
 
-@router.post("/purge/tags")
-async def purge_tags(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token"), body: dict = None):
-    try:
-        return cf_client.purge_by_tags(x_cf_token, zone_id, body.get("tags", []))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# --- Zone-level routes ---
+
+@zone_router.post("/purge")
+async def purge_all(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+):
+    """Purge all cache and log to MongoDB"""
+    cf_client.purge_all(x_cf_token, zone_id)
+    await _log_purge(account_id, zone_id, "Purge All", "All cached files")
+    return {"code": 200, "data": {"success": True}}
 
 
-@router.post("/purge/hosts")
-async def purge_hosts(zone_id: str, x_cf_token: str = Header(..., alias="X-Cf-Token"), body: dict = None):
-    try:
-        return cf_client.purge_by_hosts(x_cf_token, zone_id, body.get("hosts", []))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@zone_router.post("/purge/urls")
+async def purge_urls(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+    body: dict = None,
+):
+    files = (body or {}).get("files", [])
+    cf_client.purge_by_urls(x_cf_token, zone_id, files)
+    await _log_purge(account_id, zone_id, "Purge URL", ", ".join(files))
+    return {"code": 200, "data": {"success": True}}
+
+
+@zone_router.post("/purge/tags")
+async def purge_tags(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+    body: dict = None,
+):
+    tags = (body or {}).get("tags", [])
+    cf_client.purge_by_tags(x_cf_token, zone_id, tags)
+    await _log_purge(account_id, zone_id, "Purge Tag", ", ".join(tags))
+    return {"code": 200, "data": {"success": True}}
+
+
+@zone_router.post("/purge/hosts")
+async def purge_hosts(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+    body: dict = None,
+):
+    hosts = (body or {}).get("hosts", [])
+    cf_client.purge_by_hosts(x_cf_token, zone_id, hosts)
+    await _log_purge(account_id, zone_id, "Purge Host", ", ".join(hosts))
+    return {"code": 200, "data": {"success": True}}
+
+
+@zone_router.get("")
+async def list_cache_logs(account_id: int, zone_id: str):
+    """Read cache purge logs for a specific zone from MongoDB"""
+    db = await get_db()
+    collection = db[get_collection_name(account_id, zone_id)]
+    rows = await collection.find({"account_id": str(account_id)}).sort("timestamp", -1).to_list(length=500)
+    for r in rows:
+        r["_id"] = str(r["_id"])
+    return {"code": 200, "data": rows}
+
+
+async def _log_purge(account_id: int, zone_id: str, log_type: str, target: str):
+    db = await get_db()
+    collection = db[get_collection_name(account_id, zone_id)]
+    doc = {
+        "zone_id": zone_id,
+        "account_id": str(account_id),
+        "type": log_type,
+        "target": target,
+        "timestamp": datetime.utcnow(),
+    }
+    await collection.insert_one(doc)
