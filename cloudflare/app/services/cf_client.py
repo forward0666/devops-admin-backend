@@ -8,10 +8,17 @@ def get_client(api_token: str) -> Cloudflare:
     return Cloudflare(api_token=api_token)
 
 
+def _auto_paginate(paginated_result):
+    """Iterate all pages of a paginated CF result."""
+    for item in paginated_result:
+        yield item
+
+
 def list_zones(api_token: str, per_page: int = 50) -> dict:
     cf = get_client(api_token)
     resp = cf.zones.list(per_page=per_page)
-    return {"success": True, "result": [z.model_dump() for z in resp], "result_info": {}}
+    result = [z.model_dump() for z in _auto_paginate(resp)]
+    return {"success": True, "result": result, "result_info": {}}
 
 
 def get_zone(api_token: str, zone_id: str) -> dict:
@@ -23,7 +30,8 @@ def get_zone(api_token: str, zone_id: str) -> dict:
 def list_dns(api_token: str, zone_id: str, per_page: int = 100) -> dict:
     cf = get_client(api_token)
     resp = cf.dns.records.list(zone_id=zone_id, per_page=per_page)
-    return {"success": True, "result": [r.model_dump() for r in resp], "result_info": {}}
+    result = [r.model_dump() for r in _auto_paginate(resp)]
+    return {"success": True, "result": result, "result_info": {}}
 
 
 def create_dns(api_token: str, zone_id: str, data: dict) -> dict:
@@ -47,7 +55,8 @@ def delete_dns(api_token: str, zone_id: str, record_id: str) -> dict:
 def list_firewall_rules(api_token: str, zone_id: str) -> dict:
     cf = get_client(api_token)
     resp = cf.firewall.rules.list(zone_id=zone_id)
-    return {"success": True, "result": [r.model_dump() for r in resp], "result_info": {}}
+    result = [r.model_dump() for r in _auto_paginate(resp)]
+    return {"success": True, "result": result, "result_info": {}}
 
 
 def create_firewall_rule(api_token: str, zone_id: str, data: dict) -> dict:

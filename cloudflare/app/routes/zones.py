@@ -7,21 +7,22 @@ from app.services import cf_client
 
 router = APIRouter()
 
-COLLECTION = "cf_zones"
+
+def get_collection_name(account_id: int, suffix: str) -> str:
+    """Generate collection name based on account: account_{id}_{suffix}"""
+    return f"account_{account_id}_{suffix}"
 
 
 @router.post("/sync")
 async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-Token")):
     """Fetch zones from Cloudflare API and sync to MongoDB"""
-    # Get account info
     account = await query_one("SELECT id, name, tags FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
     db = await get_db()
-    collection = db[COLLECTION]
+    collection = db[get_collection_name(account_id, "zones")]
 
-    # Fetch from CF API
     cf_data = cf_client.list_zones(x_cf_token)
     if not cf_data.get("success"):
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
@@ -58,14 +59,15 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
 async def list_zones(account_id: int = None):
     """Read zones from MongoDB"""
     db = await get_db()
-    collection = db[COLLECTION]
 
-    query = {}
     if account_id:
-        query["account_id"] = str(account_id)
+        collection = db[get_collection_name(account_id, "zones")]
+        query = {"account_id": str(account_id)}
+    else:
+        # No account filter - not supported with dynamic collections
+        raise HTTPException(status_code=400, detail="account_id is required")
 
-    rows = await collection.find(query).sort("name", 1).to_list(length=200)
-    # Convert ObjectId to string
+    rows = await collection.find(query).sort("name", 1).to_list(length=5000)
     for r in rows:
         r["_id"] = str(r["_id"])
 
@@ -76,11 +78,12 @@ async def list_zones(account_id: int = None):
 async def clear_zones(account_id: int = None):
     """Clear synced zone data from MongoDB"""
     db = await get_db()
-    collection = db[COLLECTION]
 
-    query = {}
     if account_id:
-        query["account_id"] = str(account_id)
+        collection = db[get_collection_name(account_id, "zones")]
+        query = {"account_id": str(account_id)}
+    else:
+        raise HTTPException(status_code=400, detail="account_id is required")
 
     result = await collection.delete_many(query)
     return {"code": 200, "data": {"deleted": result.deleted_count}}
