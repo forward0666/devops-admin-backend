@@ -56,14 +56,30 @@ async def sync_rules(
 
 
 @router.get("")
-async def list_rules(account_id: int, zone_id: str):
-    """Read security rules from MongoDB"""
+async def list_rules(account_id: int, zone_id: str = None):
+    """Read security rules from MongoDB. If zone_id is given, return that zone's rules.
+    If not, return all rules grouped by zone_id."""
     db = await get_db()
-    collection = db[get_collection_name(account_id, zone_id)]
-    rows = await collection.find({"account_id": str(account_id)}).sort("priority", 1).to_list(length=5000)
-    for r in rows:
-        r["_id"] = str(r["_id"])
-    return {"code": 200, "data": rows}
+
+    if zone_id:
+        collection = db[get_collection_name(account_id, zone_id)]
+        rows = await collection.find({"account_id": str(account_id)}).sort("priority", 1).to_list(length=5000)
+        for r in rows:
+            r["_id"] = str(r["_id"])
+        return {"code": 200, "data": rows}
+
+    # No zone_id: scan all collections matching this account
+    all_rules = []
+    collection_prefix = f"account_{account_id}_zone_"
+    collections = await db.list_collection_names()
+    for coll_name in collections:
+        if coll_name.startswith(collection_prefix) and coll_name.endswith("_security"):
+            coll = db[coll_name]
+            rows = await coll.find({"account_id": str(account_id)}).to_list(length=5000)
+            for r in rows:
+                r["_id"] = str(r["_id"])
+            all_rules.extend(rows)
+    return {"code": 200, "data": all_rules}
 
 
 @router.delete("/sync")
