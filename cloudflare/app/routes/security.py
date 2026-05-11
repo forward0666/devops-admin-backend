@@ -61,7 +61,7 @@ async def sync_rules(
             "zone_id": zone_id,
             "account_id": str(account_id),
             "description": rule.get("description", ""),
-            "expression": rule.get("expression", ""),
+            "expression": (rule.get("filter") or {}).get("expression", "") or rule.get("expression", ""),
             "action": rule.get("action", "block"),
             "priority": rule.get("priority", 0),
             "paused": rule.get("paused", False),
