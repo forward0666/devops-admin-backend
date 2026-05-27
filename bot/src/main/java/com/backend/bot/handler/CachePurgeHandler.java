@@ -46,11 +46,11 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${bot.cf-service-name:cloudflare}")
-    private String cfServiceName;
+    @Value("${bot.cf-service-url:http://192.168.86.9:8090}")
+    private String cfServiceUrl;
 
-    @Value("${bot.user-service-name:user}")
-    private String userServiceName;
+    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
+    private String userServiceUrl;
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -110,7 +110,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just("http://" + cfServiceName)
+                Mono.just(cfServiceUrl)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -163,7 +163,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just("http://" + cfServiceName)
+                Mono.just(cfServiceUrl)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -253,7 +253,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return Mono.just("http://" + userServiceName).flatMap(userUrl -> {
+        return Mono.just(userServiceUrl).flatMap(userUrl -> {
         WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
