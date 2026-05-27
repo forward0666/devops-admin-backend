@@ -85,8 +85,12 @@ public class CachePurgeHandler implements CallbackActionHandler {
                 String env = action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", "");
                 return handlePurgeCacheList(prefix, botName, chatId, messageId, token, env);
             } else if (action.startsWith("PURGE_RULE_")) {
-                String ruleId = action.replace("PURGE_RULE_", "");
-                return handlePurgeRule(prefix, botName, chatId, messageId, token, ruleId, tgUsername);
+                // PURGE_RULE_{ruleId}_{env}
+                String parts = action.replace("PURGE_RULE_", "");
+                int lastUnderscore = parts.lastIndexOf("_");
+                String ruleId = lastUnderscore > 0 ? parts.substring(0, lastUnderscore) : parts;
+                String ruleEnv = lastUnderscore > 0 ? parts.substring(lastUnderscore + 1) : "";
+                return handlePurgeRule(prefix, botName, chatId, messageId, token, ruleId, tgUsername, ruleEnv);
             }
             return Mono.empty();
         })
@@ -124,7 +128,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
                             String ruleId = String.valueOf(rule.get("id"));
                             String name = String.valueOf(rule.get("name"));
                             String url = String.valueOf(rule.getOrDefault("url", ""));
-                            markup.addRow(new InlineKeyboardButtonDto(name + " " + url, "callback_data_PURGE_RULE_" + ruleId));
+                            String ruleEnv = String.valueOf(rule.getOrDefault("env", "")).toLowerCase();
+                            markup.addRow(new InlineKeyboardButtonDto(name + " " + url, "callback_data_PURGE_RULE_" + ruleId + "_" + ruleEnv));
                         }
                         return sendMsg(token, chatId, "🧹 " + (env != null ? env : "全部") + " 缓存规则\n点击规则执行清理：", markup);
                     });
@@ -136,7 +141,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handlePurgeRule(String prefix, String botName, Long chatId,
-                                         Long messageId, String token, String ruleId, String tgUsername) {
+                                         Long messageId, String token, String ruleId, String tgUsername, String env) {
         log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", prefix, ruleId, botName);
 
         return Mono.zip(
@@ -148,7 +153,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
             WebClient cfClient = webClientBuilder.baseUrl(cfUrl).build();
             WebClient userClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
 
-            return userClient.get().uri("/domain/list?projectId=" + projectId)
+            String uri = "/domain/list?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
+            return userClient.get().uri(uri)
                     .header("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
