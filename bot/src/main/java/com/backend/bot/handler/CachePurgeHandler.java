@@ -130,7 +130,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                             String url = String.valueOf(rule.getOrDefault("url", ""));
                             markup.addRow(new InlineKeyboardButtonDto(name, "callback_data_PURGE_RULE_" + ruleId + "_" + env.toLowerCase()));
                         }
-                        return sendMsg(token, chatId, "🧹 " + (env != null ? env : "全部") + " 缓存规则,点击规则执行清理：👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇", markup);
+                        return sendMsg(token, chatId, "🧹 " + (env != null ? env : "全部") + " 缓存规则👇👇👇👇👇👇👇", markup);
                     });
         })
         .onErrorResume(e -> {
