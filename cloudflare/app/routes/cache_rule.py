@@ -368,9 +368,12 @@ async def purge_by_rule(body: dict):
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": "cloudflare"})
             resp_data = resp.json()
+            logger.info(f"PurgeByRule: user service response keys={list(resp_data.keys())}, data type={type(resp_data.get('data')).__name__}")
             domain_list = resp_data.get("data", [])
             if isinstance(domain_list, dict):
+                logger.info(f"PurgeByRule: data is dict, keys={list(domain_list.keys())}")
                 domain_list = domain_list.get("data", [])
+            logger.info(f"PurgeByRule: domain_list len={len(domain_list)}, sample={domain_list[:2] if domain_list else 'empty'}")
             domains = [d["domain"] for d in domain_list if d.get("type") == "web"]
             logger.info(f"PurgeByRule: fetched {len(domain_list)} domains, {len(domains)} web type: {domains}")
     except Exception as e:
