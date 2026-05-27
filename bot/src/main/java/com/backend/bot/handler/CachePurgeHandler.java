@@ -9,6 +9,7 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
+import com.backend.bot.service.ServiceDiscovery;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,12 +45,13 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ServiceDiscovery serviceDiscovery;
 
-    @Value("${bot.cf-service-url:http://192.168.86.9:8090}")
-    private String cfServiceUrl;
+    @Value("${bot.cf-service-name:cloudflare}")
+    private String cfServiceName;
 
-    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
-    private String userServiceUrl;
+    @Value("${bot.user-service-name:user}")
+    private String userServiceName;
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -109,7 +111,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just(cfServiceUrl)
+                serviceDiscovery.resolve(cfServiceName)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -162,7 +164,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just(cfServiceUrl)
+                serviceDiscovery.resolve(cfServiceName)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -252,7 +254,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return Mono.just(userServiceUrl).flatMap(userUrl -> {
+        return serviceDiscovery.resolve(userServiceName).flatMap(userUrl -> {
         WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
