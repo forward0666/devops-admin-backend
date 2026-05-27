@@ -83,8 +83,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
         String botName = ctx.botName();
         String callbackData = botUpdate.callbackQuery().data();
         String action = callbackData.replace("callback_data_", "");
+        String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
+                ? botUpdate.callbackQuery().from().username() : "bot";
 
-        log.info("🚀🚀🚀 CachePurgeHandler ENTERED: callbackData={}, action={}, chatId={}, botName={}", callbackData, action, chatId, botName);
+        log.info("🚀🚀🚀 CachePurgeHandler ENTERED: callbackData={}, action={}, chatId={}, botName={}, tgUsername={}", callbackData, action, chatId, botName, tgUsername);
 
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
@@ -96,7 +98,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                 return handlePurgeCacheList(traceLogPrefix, botName, chatId, messageId, token, env);
             } else if (action.startsWith("PURGE_RULE_")) {
                 String ruleId = action.replace("PURGE_RULE_", "");
-                return handlePurgeRule(traceLogPrefix, botName, chatId, messageId, token, ruleId);
+                return handlePurgeRule(traceLogPrefix, botName, chatId, messageId, token, ruleId, tgUsername);
             }
             log.warn("⚠️ CachePurgeHandler: unhandled action={}", action);
             return Mono.empty();
@@ -165,7 +167,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      * 执行单条规则的缓存清理
      */
     private Mono<Void> handlePurgeRule(String traceLogPrefix, String botName, Long chatId,
-                                         Long messageId, String token, String ruleId) {
+                                         Long messageId, String token, String ruleId, String tgUsername) {
         log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", traceLogPrefix, ruleId, botName);
 
         return Mono.zip(
@@ -177,8 +179,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
                     // Bot 传 ruleId + projectId + tgUsername，CF 服务查域名再清缓存
-                    String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
-                            ? botUpdate.callbackQuery().from().username() : "bot";
                     Map<String, Object> body = Map.of("ruleId", ruleId, "projectId", projectId, "tgUsername", tgUsername != null ? tgUsername : "bot");
                     return webClient.post().uri("/cacheRule/purgeByRule")
                                 .bodyValue(body)
