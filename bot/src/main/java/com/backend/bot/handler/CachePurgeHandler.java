@@ -138,7 +138,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                 }
 
                                 if (rules.isEmpty()) {
-                                    return editText(token, chatId, messageId, "📋 " + (env != null ? env : "全部") + " 暂无缓存规则", null);
+                                    return sendOrEdit(token, chatId, messageId, "📋 " + (env != null ? env : "全部") + " 暂无缓存规则", null);
                                 }
 
                                 // 构建按钮：每行一个规则
@@ -152,12 +152,12 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                 }
 
                                 String text = "🧹 " + (env != null ? env : "全部") + " 缓存规则\n点击规则执行清理：";
-                                return editText(token, chatId, messageId, text, markup);
+                                return sendOrEdit(token, chatId, messageId, text, markup);
                             });
                 })
                 .onErrorResume(e -> {
                     log.error("{}❌ CachePurge list error: {}", traceLogPrefix, e.getMessage());
-                    return editText(token, chatId, messageId, "⚠️ 获取缓存规则失败: " + e.getMessage(), null);
+                    return sendOrEdit(token, chatId, messageId, "⚠️ 获取缓存规则失败: " + e.getMessage(), null);
                 });
     }
 
@@ -180,7 +180,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
                     return domainsMono.flatMap(domains -> {
                         if (domains.isEmpty()) {
-                            return editText(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
+                            return sendOrEdit(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
                         }
 
                         Map<String, Object> body = Map.of("ruleId", ruleId, "domains", domains);
@@ -209,13 +209,13 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                     InlineKeyboardMarkupDto markup = new InlineKeyboardMarkupDto();
                                     markup.addRow(new InlineKeyboardButtonDto("🔙 返回列表", "callback_data_PURGECACHE_ALL_ACTION"));
 
-                                    return editText(token, chatId, messageId, sb.toString(), markup);
+                                    return sendOrEdit(token, chatId, messageId, sb.toString(), markup);
                                 });
                     });
                 })
                 .onErrorResume(e -> {
                     log.error("{}❌ CachePurge rule error: {}", traceLogPrefix, e.getMessage());
-                    return editText(token, chatId, messageId, "⚠️ 清理失败: " + e.getMessage(), null);
+                    return sendOrEdit(token, chatId, messageId, "⚠️ 清理失败: " + e.getMessage(), null);
                 });
     }
 
@@ -285,9 +285,9 @@ public class CachePurgeHandler implements CallbackActionHandler {
         });
     }
 
-    private Mono<Void> editText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto markup) {
-        return botClientService.editMessageText(token, chatId, messageId, text, markup)
-                .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, markup))
+    private Mono<Void> sendOrEdit(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto markup) {
+        // Always send new message to avoid race condition with deletion timer
+        return botClientService.sendMessage(token, chatId, text, markup)
                 .then();
     }
 }
