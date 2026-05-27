@@ -39,7 +39,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
     public boolean supports(String callbackData) {
         if (callbackData == null) return false;
         // 排除动态 handler 处理的回调
-        if (callbackData.startsWith("callback_data_PURGECACHE_")
+        if (callbackData.startsWith("callback_data_PROJECT_PURGECACHE_")
                 || callbackData.startsWith("callback_data_PURGE_RULE_")) return false;
         // 支持 fallback 硬编码
         if (MenuType.createFallbackKeyboard(callbackData) != null) return true;
