@@ -9,6 +9,7 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
+import com.backend.bot.service.NacosServiceDiscovery;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -43,8 +44,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-
-    private static final String CF_SERVICE_URL = "http://127.0.0.1:8090";
+    private final NacosServiceDiscovery nacosServiceDiscovery;
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -102,10 +102,14 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                               Long messageId, String token, String env) {
         log.info("{}🔍 CachePurge: listing rules for botName={}, env={}", traceLogPrefix, botName, env);
 
-        return getProjectId(botName, chatId)
-                .doOnNext(pid -> log.info("{}🔍 CachePurge: got projectId={}", traceLogPrefix, pid))
-                .flatMap(projectId -> {
-                    WebClient webClient = webClientBuilder.baseUrl(CF_SERVICE_URL).build();
+        return Mono.zip(
+                getProjectId(botName, chatId),
+                nacosServiceDiscovery.getServiceUrl("cloudflare")
+        ).flatMap(tuple -> {
+                    Long projectId = tuple.getT1();
+                    String cfUrl = tuple.getT2();
+                    log.info("{}🔍 CachePurge: projectId={}, cfUrl={}", traceLogPrefix, projectId, cfUrl);
+                    WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
                     String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
                     log.info("{}🔍 CachePurge: fetching {}", traceLogPrefix, uri);
 
@@ -151,12 +155,14 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                          Long messageId, String token, String ruleId) {
         log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", traceLogPrefix, ruleId, botName);
 
-        return getProjectId(botName, chatId)
-                .flatMap(projectId -> {
-                    // 先获取规则信息和域名列表
-                    WebClient webClient = webClientBuilder.baseUrl(CF_SERVICE_URL).build();
+        return Mono.zip(
+                getProjectId(botName, chatId),
+                nacosServiceDiscovery.getServiceUrl("cloudflare")
+        ).flatMap(tuple -> {
+                    Long projectId = tuple.getT1();
+                    String cfUrl = tuple.getT2();
+                    WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
-                    // 获取域名列表（web 类型）
                     Mono<List<String>> domainsMono = getWebDomains(projectId, traceLogPrefix);
 
                     return domainsMono.flatMap(domains -> {
@@ -241,7 +247,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        WebClient webClient = webClientBuilder.baseUrl("http://127.0.0.1:8084").build();
+        return nacosServiceDiscovery.getServiceUrl("user").flatMap(userUrl -> {
+        WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
@@ -262,6 +269,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                             .toList();
                 })
                 .onErrorReturn(List.of());
+        });
     }
 
     private Mono<Void> editText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto markup) {
