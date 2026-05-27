@@ -372,12 +372,16 @@ async def purge_by_rule(body: dict):
             if isinstance(domain_list, dict):
                 domain_list = domain_list.get("data", [])
             domains = [d["domain"] for d in domain_list if d.get("type") == "web"]
+            logger.info(f"PurgeByRule: fetched {len(domain_list)} domains, {len(domains)} web type: {domains}")
     except Exception as e:
         logger.error(f"Failed to fetch domains from user service: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch domains")
 
     if not domains:
+        logger.warning(f"PurgeByRule: no web domains found for projectId={project_id}")
         return {"code": 200, "data": {"succeeded": [], "failed": [], "message": "No web domains found"}}
 
     # 复用已有的 purge 逻辑
-    return await _do_purge(db, rule, domains)
+    result = await _do_purge(db, rule, domains)
+    logger.info(f"PurgeByRule result: {result}")
+    return result
