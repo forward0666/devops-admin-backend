@@ -46,8 +46,17 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${bot.cloudflare-service-url:http://192.168.86.9:8090}")
+    @Value("${bot.cloudflare-service-url:}")
     private String cloudflareServiceUrl;
+
+    @Value("${bot.cloudflare-service-name:cloudflare}")
+    private String cloudflareServiceName;
+
+    private String getCloudflareBaseUrl() {
+        return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
+                ? cloudflareServiceUrl
+                : "http://" + cloudflareServiceName;
+    }
     private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
@@ -108,7 +117,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just(cloudflareServiceUrl)
+                Mono.just(getCloudflareBaseUrl())
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -161,7 +170,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                Mono.just(cloudflareServiceUrl)
+                Mono.just(getCloudflareBaseUrl())
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
