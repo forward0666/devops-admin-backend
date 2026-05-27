@@ -366,7 +366,7 @@ async def purge_by_rule(body: dict):
     # 从 user 服务获取 web 类型域名（内部调用，X-Tg-Username 跳过 JWT）
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": "cloudflare"})
+            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": "bot"})
             resp_data = resp.json()
             logger.info(f"PurgeByRule: user service response keys={list(resp_data.keys())}, data type={type(resp_data.get('data')).__name__}")
             domain_list = resp_data.get("data", [])
