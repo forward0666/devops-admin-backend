@@ -198,9 +198,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                             sb.append("  ").append(f.get("domain")).append(": ").append(f.get("reason")).append("\n");
                                         }
                                     }
-                                    InlineKeyboardMarkupDto markup = new InlineKeyboardMarkupDto();
-                                    markup.addRow(new InlineKeyboardButtonDto("🔙 返回列表", "callback_data_PURGECACHE_ALL_ACTION"));
-                                    return sendMsg(token, chatId, sb.toString(), markup);
+                                    return sendMsg(token, chatId, sb.toString(), null);
                                 });
                     });
         })
