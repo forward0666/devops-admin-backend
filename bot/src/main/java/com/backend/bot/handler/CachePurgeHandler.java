@@ -9,12 +9,11 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
-
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
@@ -24,19 +23,13 @@ import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 处理缓存清理相关的 callback：
- * - PURGECACHE_{ENV} → 获取该环境的 cache rules，展示按钮
- * - PURGE_RULE_{ruleId} → 执行清理
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(5) // 低于 MenuNavigationHandler(10)，优先匹配
+@Order(5)
 public class CachePurgeHandler implements CallbackActionHandler {
 
     private final BotClientService botClientService;
@@ -54,11 +47,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
-                ? cloudflareServiceUrl
-                : "http://" + cloudflareServiceName;
+                ? cloudflareServiceUrl : "http://" + cloudflareServiceName;
     }
-    private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
-    private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
     public boolean supports(String callbackData) {
@@ -86,125 +76,105 @@ public class CachePurgeHandler implements CallbackActionHandler {
         String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
                 ? botUpdate.callbackQuery().from().username() : "bot";
 
-        log.info("🚀🚀🚀 CachePurgeHandler ENTERED: callbackData={}, action={}, chatId={}, botName={}, tgUsername={}", callbackData, action, chatId, botName, tgUsername);
+        log.info("🚀 CachePurgeHandler: action={}, chatId={}, botName={}, tgUsername={}", action, chatId, botName, tgUsername);
 
         return Mono.deferContextual(contextView -> {
-            String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
+            String prefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
             if (action.startsWith("PROJECT_PURGECACHE_")) {
-                log.info("🚀🚀🚀 CachePurgeHandler: matched PURGECACHE, env={}", action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", ""));
-                // PROJECT_PURGECACHE_PROD_ACTION → PROD
                 String env = action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", "");
-                return handlePurgeCacheList(traceLogPrefix, botName, chatId, messageId, token, env);
+                return handlePurgeCacheList(prefix, botName, chatId, messageId, token, env);
             } else if (action.startsWith("PURGE_RULE_")) {
                 String ruleId = action.replace("PURGE_RULE_", "");
-                return handlePurgeRule(traceLogPrefix, botName, chatId, messageId, token, ruleId, tgUsername);
+                return handlePurgeRule(prefix, botName, chatId, messageId, token, ruleId, tgUsername);
             }
-            log.warn("⚠️ CachePurgeHandler: unhandled action={}", action);
             return Mono.empty();
         })
         .doOnError(e -> log.error("❌ CachePurgeHandler error: {}", e.getMessage(), e))
+        .onErrorResume(e -> botClientService.sendMessage(token, chatId, "⚠️ 操作失败: " + e.getMessage()).then());
+    }
+
+    private Mono<Void> handlePurgeCacheList(String prefix, String botName, Long chatId,
+                                              Long messageId, String token, String env) {
+        log.info("{}🔍 CachePurge: listing rules for botName={}, env={}", prefix, botName, env);
+
+        return Mono.zip(
+                getProjectId(botName, chatId),
+                Mono.just(getCloudflareBaseUrl())
+        ).flatMap(tuple -> {
+            Long projectId = tuple.getT1();
+            String cfUrl = tuple.getT2();
+            WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
+            String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
+            log.info("{}🔍 CachePurge: fetching {}", prefix, uri);
+
+            return webClient.get().uri(uri).retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .flatMap(response -> {
+                        Object dataObj = response.get("data");
+                        List<Map<String, Object>> rules = (dataObj instanceof List)
+                                ? (List<Map<String, Object>>) dataObj : List.of();
+
+                        if (rules.isEmpty()) {
+                            return sendMsg(token, chatId, "📋 " + (env != null ? env : "全部") + " 暂无缓存规则", null);
+                        }
+
+                        InlineKeyboardMarkupDto markup = new InlineKeyboardMarkupDto();
+                        for (Map<String, Object> rule : rules) {
+                            String ruleId = String.valueOf(rule.get("id"));
+                            String name = String.valueOf(rule.get("name"));
+                            String url = String.valueOf(rule.getOrDefault("url", ""));
+                            markup.addRow(new InlineKeyboardButtonDto(name + " " + url, "callback_data_PURGE_RULE_" + ruleId));
+                        }
+                        return sendMsg(token, chatId, "🧹 " + (env != null ? env : "全部") + " 缓存规则\n点击规则执行清理：", markup);
+                    });
+        })
         .onErrorResume(e -> {
-            log.error("❌ CachePurgeHandler onErrorResume: {}", e.getMessage());
-            return botClientService.sendMessage(token, chatId, "⚠️ 操作失败: " + e.getMessage()).then();
+            log.error("{}❌ CachePurge list error: {}", prefix, e.getMessage());
+            return sendMsg(token, chatId, "⚠️ 获取缓存规则失败: " + e.getMessage(), null);
         });
     }
 
-    /**
-     * 展示某环境的 cache rules 列表（按钮形式）
-     */
-    private Mono<Void> handlePurgeCacheList(String traceLogPrefix, String botName, Long chatId,
-                                              Long messageId, String token, String env) {
-        log.info("{}🔍 CachePurge: listing rules for botName={}, env={}", traceLogPrefix, botName, env);
-
-        return Mono.zip(
-                getProjectId(botName, chatId),
-                Mono.just(getCloudflareBaseUrl())
-        ).flatMap(tuple -> {
-                    Long projectId = tuple.getT1();
-                    String cfUrl = tuple.getT2();
-                    log.info("{}🔍 CachePurge: projectId={}, cfUrl={}", traceLogPrefix, projectId, cfUrl);
-                    WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
-                    String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
-                    log.info("{}🔍 CachePurge: fetching {}", traceLogPrefix, uri);
-
-                    return webClient.get().uri(uri).retrieve()
-                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                            .flatMap(response -> {
-                                Object dataObj = response.get("data");
-                                List<Map<String, Object>> rules;
-                                if (dataObj instanceof List) {
-                                    rules = (List<Map<String, Object>>) dataObj;
-                                } else {
-                                    rules = List.of();
-                                }
-
-                                if (rules.isEmpty()) {
-                                    return sendOrEdit(token, chatId, messageId, "📋 " + (env != null ? env : "全部") + " 暂无缓存规则", null);
-                                }
-
-                                // 构建按钮：每行一个规则
-                                InlineKeyboardMarkupDto markup = new InlineKeyboardMarkupDto();
-                                for (Map<String, Object> rule : rules) {
-                                    String ruleId = String.valueOf(rule.get("id"));
-                                    String name = String.valueOf(rule.get("name"));
-                                    String url = String.valueOf(rule.getOrDefault("url", ""));
-                                    String btnText = name + " " + url;
-                                    markup.addRow(new InlineKeyboardButtonDto(btnText, "callback_data_PURGE_RULE_" + ruleId));
-                                }
-
-                                String text = "🧹 " + (env != null ? env : "全部") + " 缓存规则\n点击规则执行清理：";
-                                return sendOrEdit(token, chatId, messageId, text, markup);
-                            });
-                })
-                .onErrorResume(e -> {
-                    log.error("{}❌ CachePurge list error: {}", traceLogPrefix, e.getMessage());
-                    return sendOrEdit(token, chatId, messageId, "⚠️ 获取缓存规则失败: " + e.getMessage(), null);
-                });
-    }
-
-    /**
-     * 执行单条规则的缓存清理
-     */
-    private Mono<Void> handlePurgeRule(String traceLogPrefix, String botName, Long chatId,
+    private Mono<Void> handlePurgeRule(String prefix, String botName, Long chatId,
                                          Long messageId, String token, String ruleId, String tgUsername) {
-        log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", traceLogPrefix, ruleId, botName);
+        log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", prefix, ruleId, botName);
 
         return Mono.zip(
                 getProjectId(botName, chatId),
                 Mono.just(getCloudflareBaseUrl())
         ).flatMap(tuple -> {
-                    Long projectId = tuple.getT1();
-                    String cfUrl = tuple.getT2();
-                    WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
+            Long projectId = tuple.getT1();
+            String cfUrl = tuple.getT2();
+            WebClient cfClient = webClientBuilder.baseUrl(cfUrl).build();
+            WebClient userClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
 
-                    // Bot 传 ruleId + projectId + tgUsername，CF 服务查域名再清缓存
-                    // 从 user 服务获取 web 类型域名
-                    WebClient userWebClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
-                    return userWebClient.get().uri("/domain/list?projectId=" + projectId)
-                            .header("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
-                            .retrieve()
-                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                            .map(resp -> {
-                                Object data = resp.get("data");
-                                List<Map<String, Object>> domainList;
-                                if (data instanceof List) domainList = (List<Map<String, Object>>) data;
-                                else if (data instanceof Map) {
-                                    Object inner = ((Map<String, Object>) data).get("data");
-                                    domainList = (inner instanceof List) ? (List<Map<String, Object>>) inner : List.of();
-                                } else domainList = List.of();
-                                return domainList.stream()
-                                        .filter(d -> "web".equals(String.valueOf(d.get("type"))))
-                                        .map(d -> String.valueOf(d.get("domain")))
-                                        .toList();
-                            })
-                            .flatMap(domains -> {
-                                log.info("🔍 CachePurgeRule: web domains={}", domains);
-                                if (domains.isEmpty()) {
-                                    return sendOrEdit(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
-                                }
-                                Map<String, Object> body = Map.of("ruleId", ruleId, "domains", domains);
-                                return webClient.post().uri("/cacheRule/purge")
+            return userClient.get().uri("/domain/list?projectId=" + projectId)
+                    .header("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .map(resp -> {
+                        Object data = resp.get("data");
+                        List<Map<String, Object>> domainList;
+                        if (data instanceof List) {
+                            domainList = (List<Map<String, Object>>) data;
+                        } else if (data instanceof Map) {
+                            Object inner = ((Map<String, Object>) data).get("data");
+                            domainList = (inner instanceof List) ? (List<Map<String, Object>>) inner : List.of();
+                        } else {
+                            domainList = List.of();
+                        }
+                        return domainList.stream()
+                                .filter(d -> "web".equals(String.valueOf(d.get("type"))))
+                                .map(d -> String.valueOf(d.get("domain")))
+                                .toList();
+                    })
+                    .flatMap(domains -> {
+                        log.info("🔍 CachePurgeRule: web domains={}", domains);
+                        if (domains.isEmpty()) {
+                            return sendMsg(token, chatId, "⚠️ 无 web 类型域名", null);
+                        }
+                        Map<String, Object> body = Map.of("ruleId", ruleId, "domains", domains);
+                        return cfClient.post().uri("/cacheRule/purge")
                                 .bodyValue(body)
                                 .retrieve()
                                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
@@ -213,8 +183,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                     List<String> succeeded = (List<String>) result.getOrDefault("succeeded", List.of());
                                     List<Map<String, Object>> failed = (List<Map<String, Object>>) result.getOrDefault("failed", List.of());
 
-                                    StringBuilder sb = new StringBuilder();
-                                    sb.append("🧹 清理结果\n\n");
+                                    StringBuilder sb = new StringBuilder("🧹 清理结果\n\n");
                                     if (!succeeded.isEmpty()) {
                                         sb.append("✅ 成功: ").append(String.join(", ", succeeded)).append("\n");
                                     }
@@ -224,91 +193,41 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                             sb.append("  ").append(f.get("domain")).append(": ").append(f.get("reason")).append("\n");
                                         }
                                     }
-
-                                    // 返回按钮：返回列表
                                     InlineKeyboardMarkupDto markup = new InlineKeyboardMarkupDto();
                                     markup.addRow(new InlineKeyboardButtonDto("🔙 返回列表", "callback_data_PURGECACHE_ALL_ACTION"));
-
-                                    return sendOrEdit(token, chatId, messageId, sb.toString(), markup);
+                                    return sendMsg(token, chatId, sb.toString(), markup);
                                 });
-                    })
-                .onErrorResume(e -> {
-                    log.error("{}❌ CachePurge rule error: {}", traceLogPrefix, e.getMessage());
-                    return sendOrEdit(token, chatId, messageId, "⚠️ 清理失败: " + e.getMessage(), null);
-                });
-    }
-
-    /**
-     * 获取群组绑定的 projectId
-     */
-    private Mono<Long> getProjectId(String botName, Long chatId) {
-        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
-        log.info("🔍 getProjectId: botName={}, chatId={}, cacheKey={}", botName, chatId, cacheKey);
-        return redisTemplate.opsForValue().get(cacheKey)
-                .doOnNext(cached -> log.info("🔍 getProjectId: redis cached={}", cached))
-                .flatMap(cached -> {
-                    try {
-                        BotGroupEntity entity = objectMapper.readValue(cached, BotGroupEntity.class);
-                        log.info("🔍 getProjectId: parsed projectId={}", entity.getProjectId());
-                        return Mono.just(entity.getProjectId());
-                    } catch (Exception e) {
-                        log.warn("⚠️ getProjectId: failed to parse cached value: {}", e.getMessage());
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.info("🔍 getProjectId: redis miss, querying DB for botName={}, chatId={}", botName, chatId);
-                    return botGroupRepository.findByBotNameAndChatId(botName, chatId)
-                            .doOnNext(entity -> log.info("🔍 getProjectId: DB found projectId={}", entity.getProjectId()))
-                            .flatMap(entity -> {
-                                try {
-                                    String json = objectMapper.writeValueAsString(entity);
-                                    redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
-                                } catch (Exception ignored) {}
-                                return Mono.just(entity.getProjectId());
-                            })
-                            .switchIfEmpty(Mono.defer(() -> {
-                                log.error("❌ CachePurge: no project binding for botName={}, chatId={}", botName, chatId);
-                                return Mono.error(new RuntimeException("该群组未绑定项目"));
-                            }));
-                }));
-    }
-
-    /**
-     * 获取项目的 web 类型域名列表
-     */
-    @SuppressWarnings("unchecked")
-    private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return Mono.just(USER_SERVICE_URL).flatMap(userUrl -> {
-        WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
-        return webClient.get().uri("/domain/list?projectId=" + projectId)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .map(response -> {
-                    Object dataObj = response.get("data");
-                    List<Map<String, Object>> domains;
-                    if (dataObj instanceof List) {
-                        domains = (List<Map<String, Object>>) dataObj;
-                    } else if (dataObj instanceof Map) {
-                        Object inner = ((Map<String, Object>) dataObj).get("data");
-                        domains = (inner instanceof List) ? (List<Map<String, Object>>) inner : List.of();
-                    } else {
-                        domains = List.of();
-                    }
-                    log.info("🔍 getWebDomains: total={}, types={}", domains.size(),
-                            domains.stream().map(d -> String.valueOf(d.get("type"))).distinct().toList());
-                    return domains.stream()
-                            .filter(d -> "web".equals(String.valueOf(d.get("type"))))
-                            .map(d -> String.valueOf(d.get("domain")))
-                            .toList();
-                })
-                .onErrorReturn(List.of());
+                    });
+        })
+        .onErrorResume(e -> {
+            log.error("{}❌ CachePurge rule error: {}", prefix, e.getMessage());
+            return sendMsg(token, chatId, "⚠️ 清理失败: " + e.getMessage(), null);
         });
     }
 
-    private Mono<Void> sendOrEdit(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto markup) {
-        // Always send new message to avoid race condition with deletion timer
-        return botClientService.sendMessage(token, chatId, text, markup)
-                .then();
+    private Mono<Long> getProjectId(String botName, Long chatId) {
+        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        BotGroupEntity entity = objectMapper.readValue(cached, BotGroupEntity.class);
+                        return Mono.just(entity.getProjectId());
+                    } catch (Exception e) {
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
+                        .flatMap(entity -> {
+                            try {
+                                String json = objectMapper.writeValueAsString(entity);
+                                redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
+                            } catch (Exception ignored) {}
+                            return Mono.just(entity.getProjectId());
+                        })
+                        .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))));
+    }
+
+    private Mono<Void> sendMsg(String token, Long chatId, String text, InlineKeyboardMarkupDto markup) {
+        return botClientService.sendMessage(token, chatId, text, markup).then();
     }
 }
