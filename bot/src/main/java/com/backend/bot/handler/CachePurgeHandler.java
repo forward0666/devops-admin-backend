@@ -176,8 +176,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     String cfUrl = tuple.getT2();
                     WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
-                    // Bot 只传 ruleId + projectId，CF 服务自己查域名再清缓存
-                    Map<String, Object> body = Map.of("ruleId", ruleId, "projectId", projectId);
+                    // Bot 传 ruleId + projectId + tgUsername，CF 服务查域名再清缓存
+                    String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
+                            ? botUpdate.callbackQuery().from().username() : "bot";
+                    Map<String, Object> body = Map.of("ruleId", ruleId, "projectId", projectId, "tgUsername", tgUsername != null ? tgUsername : "bot");
                     return webClient.post().uri("/cacheRule/purgeByRule")
                                 .bodyValue(body)
                                 .retrieve()

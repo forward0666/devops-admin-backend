@@ -350,6 +350,7 @@ async def purge_by_rule(body: dict):
     """Bot 调用：传 ruleId + projectId，CF 自己查域名再清缓存."""
     rule_id = body.get("ruleId")
     project_id = body.get("projectId")
+    tg_username = body.get("tgUsername", "bot")
     if not rule_id or not project_id:
         raise HTTPException(status_code=400, detail="ruleId and projectId are required")
 
@@ -366,7 +367,7 @@ async def purge_by_rule(body: dict):
     # 从 user 服务获取 web 类型域名（内部调用，X-Tg-Username 跳过 JWT）
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": "bot"})
+            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": tg_username})
             resp_data = resp.json()
             logger.info(f"PurgeByRule: user service response keys={list(resp_data.keys())}, data type={type(resp_data.get('data')).__name__}")
             domain_list = resp_data.get("data", [])
