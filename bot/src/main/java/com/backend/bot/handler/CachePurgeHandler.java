@@ -44,7 +44,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    private static final String CF_SERVICE_URL = "http://192.168.86.9:8081/cloudflare";
+    private static final String CF_SERVICE_URL = "http://127.0.0.1:8090";
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -241,7 +241,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        WebClient webClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
+        WebClient webClient = webClientBuilder.baseUrl("http://127.0.0.1:8084").build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
