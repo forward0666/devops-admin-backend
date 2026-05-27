@@ -9,7 +9,7 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
-import com.backend.bot.service.NacosServiceDiscovery;
+import com.backend.bot.service.ServiceDiscovery;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final NacosServiceDiscovery nacosServiceDiscovery;
+    private final ServiceDiscovery nacosServiceDiscovery;
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
