@@ -179,8 +179,32 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
                     // Bot 传 ruleId + projectId + tgUsername，CF 服务查域名再清缓存
-                    Map<String, Object> body = Map.of("ruleId", ruleId, "projectId", projectId, "tgUsername", tgUsername != null ? tgUsername : "bot");
-                    return webClient.post().uri("/cacheRule/purgeByRule")
+                    // 从 user 服务获取 web 类型域名
+                    WebClient userWebClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
+                    return userWebClient.get().uri("/domain/list?projectId=" + projectId)
+                            .header("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
+                            .retrieve()
+                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                            .map(resp -> {
+                                Object data = resp.get("data");
+                                List<Map<String, Object>> domainList;
+                                if (data instanceof List) domainList = (List<Map<String, Object>>) data;
+                                else if (data instanceof Map) {
+                                    Object inner = ((Map<String, Object>) data).get("data");
+                                    domainList = (inner instanceof List) ? (List<Map<String, Object>>) inner : List.of();
+                                } else domainList = List.of();
+                                return domainList.stream()
+                                        .filter(d -> "web".equals(String.valueOf(d.get("type"))))
+                                        .map(d -> String.valueOf(d.get("domain")))
+                                        .toList();
+                            })
+                            .flatMap(domains -> {
+                                log.info("🔍 CachePurgeRule: web domains={}", domains);
+                                if (domains.isEmpty()) {
+                                    return sendOrEdit(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
+                                }
+                                Map<String, Object> body = Map.of("ruleId", ruleId, "domains", domains);
+                                return webClient.post().uri("/cacheRule/purge")
                                 .bodyValue(body)
                                 .retrieve()
                                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
