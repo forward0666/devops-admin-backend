@@ -170,7 +170,10 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                         return userSessionService.clearUserSession(userId).then();
                     }
                     String mention = context.username() != null ? "@" + context.username() : (context.firstName() != null ? context.firstName() : "");
-                    String welcomeText = "欢迎使用运维助手 " + mention + "👇👇";
+                    String base = "欢迎使用运维助手 " + mention;
+                    int padCount = Math.max(0, 18 - base.codePointCount(0, base.length()));
+                    String padding = "👇".repeat(padCount);
+                    String welcomeText = base + padding;
                     return botClientService.sendMenuMessageWithResponse(token, chatId, welcomeText, mainMenuMarkup, context.chatTitle())
                     .doOnNext(responseJson -> handleSendResponse(responseJson, token, userId, chatId, logPrefix, contextView, context))
                     .doOnError(e -> {
