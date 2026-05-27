@@ -103,9 +103,11 @@ public class CachePurgeHandler implements CallbackActionHandler {
         log.info("{}🔍 CachePurge: listing rules for botName={}, env={}", traceLogPrefix, botName, env);
 
         return getProjectId(botName, chatId)
+                .doOnNext(pid -> log.info("{}🔍 CachePurge: got projectId={}", traceLogPrefix, pid))
                 .flatMap(projectId -> {
                     WebClient webClient = webClientBuilder.baseUrl(CF_SERVICE_URL).build();
                     String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
+                    log.info("{}🔍 CachePurge: fetching {}", traceLogPrefix, uri);
 
                     return webClient.get().uri(uri).retrieve()
                             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
@@ -203,24 +205,35 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     private Mono<Long> getProjectId(String botName, Long chatId) {
         String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
+        log.info("🔍 getProjectId: botName={}, chatId={}, cacheKey={}", botName, chatId, cacheKey);
         return redisTemplate.opsForValue().get(cacheKey)
+                .doOnNext(cached -> log.info("🔍 getProjectId: redis cached={}", cached))
                 .flatMap(cached -> {
                     try {
                         BotGroupEntity entity = objectMapper.readValue(cached, BotGroupEntity.class);
+                        log.info("🔍 getProjectId: parsed projectId={}", entity.getProjectId());
                         return Mono.just(entity.getProjectId());
                     } catch (Exception e) {
+                        log.warn("⚠️ getProjectId: failed to parse cached value: {}", e.getMessage());
                         return Mono.empty();
                     }
                 })
-                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
-                        .flatMap(entity -> {
-                            try {
-                                String json = objectMapper.writeValueAsString(entity);
-                                redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
-                            } catch (Exception ignored) {}
-                            return Mono.just(entity.getProjectId());
-                        }))
-                .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目")));
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("🔍 getProjectId: redis miss, querying DB for botName={}, chatId={}", botName, chatId);
+                    return botGroupRepository.findByBotNameAndChatId(botName, chatId)
+                            .doOnNext(entity -> log.info("🔍 getProjectId: DB found projectId={}", entity.getProjectId()))
+                            .flatMap(entity -> {
+                                try {
+                                    String json = objectMapper.writeValueAsString(entity);
+                                    redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
+                                } catch (Exception ignored) {}
+                                return Mono.just(entity.getProjectId());
+                            })
+                            .switchIfEmpty(Mono.defer(() -> {
+                                log.error("❌ CachePurge: no project binding for botName={}, chatId={}", botName, chatId);
+                                return Mono.error(new RuntimeException("该群组未绑定项目"));
+                            }));
+                }));
     }
 
     /**
