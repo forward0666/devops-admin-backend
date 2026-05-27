@@ -46,7 +46,11 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         log.info("{}⚙️ {} [Step1] 收到callback | data={}, userId={}, chatId={}", logPrefix, logIdentifier, callbackData, userId, chatId);
 
         boolean isMenuNavigation = actionHandlers.stream()
-                .anyMatch(handler -> (handler instanceof MenuNavigationHandler || handler instanceof CachePurgeHandler) && handler.supports(callbackData));
+                .anyMatch(handler -> {
+                    boolean supported = handler.supports(callbackData);
+                    if (supported) log.info("{}🔍 isMenuNavigation check: {} supports={}", logPrefix, handler.getClass().getSimpleName(), callbackData);
+                    return (handler instanceof MenuNavigationHandler || handler instanceof CachePurgeHandler) && supported;
+                });
 
         // ⚠️ 关键：flatMap 里返回 Mono<Void> 也会触发 switchIfEmpty（因为 Mono<Void> 不发射元素）
         // 用 hasSession boolean 避免这个问题

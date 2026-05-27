@@ -50,8 +50,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
     @Override
     public boolean supports(String callbackData) {
         if (callbackData == null) return false;
-        return callbackData.startsWith("callback_data_PROJECT_PURGECACHE_")
+        boolean match = callbackData.startsWith("callback_data_PROJECT_PURGECACHE_")
                 || callbackData.startsWith("callback_data_PURGE_RULE_");
+        log.info("🔍 CachePurgeHandler.supports({}) = {}", callbackData, match);
+        return match;
     }
 
     @Override
@@ -69,12 +71,13 @@ public class CachePurgeHandler implements CallbackActionHandler {
         String callbackData = botUpdate.callbackQuery().data();
         String action = callbackData.replace("callback_data_", "");
 
-        log.info("🚀 CachePurgeHandler: callbackData={}, action={}, chatId={}, botName={}", callbackData, action, chatId, botName);
+        log.info("🚀🚀🚀 CachePurgeHandler ENTERED: callbackData={}, action={}, chatId={}, botName={}", callbackData, action, chatId, botName);
 
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
             if (action.startsWith("PROJECT_PURGECACHE_")) {
+                log.info("🚀🚀🚀 CachePurgeHandler: matched PURGECACHE, env={}", action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", ""));
                 // PROJECT_PURGECACHE_PROD_ACTION → PROD
                 String env = action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", "");
                 return handlePurgeCacheList(traceLogPrefix, botName, chatId, messageId, token, env);
