@@ -190,12 +190,15 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
                                     StringBuilder sb = new StringBuilder("🧹 清理结果\n\n");
                                     if (!succeeded.isEmpty()) {
-                                        sb.append("✅ 成功: ").append(String.join(", ", succeeded)).append("\n");
+                                        sb.append("✅ 成功:\n");
+                                        for (String s : succeeded) {
+                                            sb.append(" - ").append(s).append("\n");
+                                        }
                                     }
                                     if (!failed.isEmpty()) {
                                         sb.append("❌ 失败:\n");
                                         for (Map<String, Object> f : failed) {
-                                            sb.append("  ").append(f.get("domain")).append(": ").append(f.get("reason")).append("\n");
+                                            sb.append(" - ").append(f.get("domain")).append(": ").append(f.get("reason")).append("\n");
                                         }
                                     }
                                     return sendMsg(token, chatId, sb.toString(), null);
