@@ -50,8 +50,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     @Override
     public boolean supports(String callbackData) {
         if (callbackData == null) return false;
-        return callbackData.equals("callback_data_PURGE_CACHE_ACTION")
-                || callbackData.startsWith("callback_data_PURGECACHE_")
+        return callbackData.startsWith("callback_data_PURGECACHE_")
                 || callbackData.startsWith("callback_data_PURGE_RULE_");
     }
 
@@ -73,10 +72,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            if ("PURGE_CACHE_ACTION".equals(action)) {
-                // 直接展示全部规则
-                return handlePurgeCacheList(traceLogPrefix, botName, chatId, messageId, token, null);
-            } else if (action.startsWith("PURGECACHE_")) {
+            if (action.startsWith("PURGECACHE_")) {
                 String env = action.replace("PURGECACHE_", "").replace("_ACTION", "");
                 String envParam = "ALL".equals(env) ? null : env;
                 return handlePurgeCacheList(traceLogPrefix, botName, chatId, messageId, token, envParam);
