@@ -9,7 +9,7 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
-import com.backend.bot.service.ServiceDiscovery;
+
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final ServiceDiscovery serviceDiscovery;
 
     @Value("${bot.cf-service-name:cloudflare}")
     private String cfServiceName;
@@ -111,7 +110,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                serviceDiscovery.resolve(cfServiceName)
+                Mono.just("http://" + cfServiceName)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -164,7 +163,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                serviceDiscovery.resolve(cfServiceName)
+                Mono.just("http://" + cfServiceName)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -254,7 +253,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return serviceDiscovery.resolve(userServiceName).flatMap(userUrl -> {
+        return Mono.just("http://" + userServiceName).flatMap(userUrl -> {
         WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
