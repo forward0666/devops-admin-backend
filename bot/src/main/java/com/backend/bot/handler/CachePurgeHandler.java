@@ -235,16 +235,16 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
     private Mono<Void> sendMsg(String token, Long chatId, String text, InlineKeyboardMarkupDto markup) {
         return botClientService.sendMenuMessageWithResponse(token, chatId, text, markup)
-                .flatMap(msgIdStr -> {
-                    log.info("🔍 sendMsg: msgIdStr={}", msgIdStr);
+                .flatMap(responseJson -> {
                     try {
-                        Long msgId = Long.parseLong(msgIdStr);
-                        log.info("🔍 sendMsg: scheduling deletion for msgId={}, delay=30s", msgId);
+                        Map<String, Object> resp = objectMapper.readValue(responseJson, Map.class);
+                        Map<String, Object> result = (Map<String, Object>) resp.get("result");
+                        Long msgId = Long.valueOf(String.valueOf(result.get("message_id")));
                         interactiveMessageService.scheduleMessageDeletion(
                                 token, null, chatId, msgId, 30, "CachePurgeHandler", Context.empty()
                         ).subscribe();
                     } catch (Exception e) {
-                        log.warn("⚠️ sendMsg: failed to schedule deletion: {}", e.getMessage());
+                        log.warn("⚠️ sendMsg: failed to parse msgId: {}", e.getMessage());
                     }
                     return Mono.empty();
                 })
