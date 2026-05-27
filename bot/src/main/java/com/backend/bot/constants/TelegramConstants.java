@@ -137,7 +137,7 @@ public final class TelegramConstants {
      * 主菜单的欢迎提示，引导用户选择服务。
      */
 //    public static final String WELCOME_MESSAGE = "✨✨✨ 选择服务: 👇👇";
-     public static final String WELCOME_MESSAGE = "欢迎使用运维助手 👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇👇";
+     public static final String WELCOME_MESSAGE = "欢迎使用运维助手。\n选择服务: 👇👇👇👇👇👇👇👇👇👇👇👇";
     
     /**
      * IP 输入提示消息
