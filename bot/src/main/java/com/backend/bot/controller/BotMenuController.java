@@ -5,6 +5,7 @@ import com.backend.bot.service.BotMenuService;
 import com.backend.bot.util.LogUtils;
 import com.backend.bot.vo.BotMenuVo;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/menu")
 @RequiredArgsConstructor
@@ -55,11 +57,37 @@ public class BotMenuController {
             LogUtils.syncTraceIdToMDC(ctx);
             return entityMono
                     .doOnNext(e -> {
-                        e.setCreatedAt(LocalDateTime.now());
-                        e.setUpdatedAt(LocalDateTime.now());
                         if (e.getSortOrder() == null) e.setSortOrder(0);
                     })
-                    .flatMap(botMenuService::save)
+                    .flatMap(newMenu -> botMenuService.save(newMenu)
+                            .onErrorResume(ex -> {
+                                boolean isDuplicate = false;
+                                Throwable t = ex;
+                                while (t != null) {
+                                    if (t instanceof org.springframework.dao.DuplicateKeyException
+                                            || (t.getMessage() != null && t.getMessage().contains("Duplicate entry"))) {
+                                        isDuplicate = true;
+                                        break;
+                                    }
+                                    t = t.getCause();
+                                }
+                                if (!isDuplicate) return Mono.error(ex);
+
+                                log.warn("Menu key conflict, attempting update: botType={}, menuKey={}", newMenu.getBotType(), newMenu.getMenuKey());
+                                // Key exists → find and update
+                                return botMenuService.findByBotTypeAndMenuKey(newMenu.getBotType(), newMenu.getMenuKey())
+                                        .flatMap(existing -> {
+                                            existing.setTitle(newMenu.getTitle());
+                                            existing.setButtons(newMenu.getButtons());
+                                            existing.setSortOrder(newMenu.getSortOrder());
+                                            existing.setMenuLevel(newMenu.getMenuLevel());
+                                            existing.setParentId(newMenu.getParentId());
+                                            existing.setUpdatedAt(LocalDateTime.now());
+                                            return botMenuService.save(existing);
+                                        })
+                                        .switchIfEmpty(Mono.error(new RuntimeException("Menu key exists but could not be found: " + newMenu.getMenuKey())));
+                            })
+                    )
                     .flatMap(saved -> {
                         Map<String, Object> data = new HashMap<>();
                         data.put("menu", BotMenuVo.fromEntity(saved));

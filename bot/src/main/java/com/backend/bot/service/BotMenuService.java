@@ -36,6 +36,10 @@ public class BotMenuService {
         return botMenuRepository.findById(id);
     }
 
+    public Mono<BotMenuEntity> findByBotTypeAndMenuKey(String botType, String menuKey) {
+        return botMenuRepository.findByBotTypeAndMenuKey(botType, menuKey);
+    }
+
     public Mono<BotMenuEntity> save(BotMenuEntity entity) {
         return botMenuRepository.save(entity)
                 .doOnNext(saved -> evictMenuCache(saved.getBotType()));

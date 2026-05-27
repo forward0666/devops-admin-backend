@@ -34,6 +34,57 @@ async def list_all_cache(account_id: int):
 
 # --- Zone-level routes ---
 
+@zone_router.post("/sync")
+async def sync_cache_rules(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+):
+    """Fetch cache rules from Cloudflare API and sync to MongoDB"""
+    account = await query_one("SELECT id, name FROM account WHERE id = %s", (account_id,))
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    cf_data = cf_client.list_cache_rules(x_cf_token, zone_id)
+    if not cf_data.get("success"):
+        raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
+
+    rules = cf_data.get("result", [])
+    now = datetime.utcnow()
+    db = await get_db()
+    collection = db[get_collection_name(account_id, zone_id)]
+
+    synced = 0
+    for rule in rules:
+        action_params = rule.get("action_parameters", {}) or {}
+        cache_status = action_params.get("cache", "")
+        edge_ttl = action_params.get("edge_ttl", {})
+        browser_ttl = action_params.get("browser_ttl", {})
+
+        doc = {
+            "rule_id": rule["id"],
+            "zone_id": zone_id,
+            "account_id": str(account_id),
+            "description": rule.get("description", ""),
+            "expression": rule.get("expression", ""),
+            "action": cache_status or "cache_rule",
+            "edge_ttl": edge_ttl,
+            "browser_ttl": browser_ttl,
+            "status": rule.get("status", "active"),
+            "last_updated": rule.get("last_updated", ""),
+            "enabled": rule.get("enabled", True),
+            "synced_at": now,
+        }
+        await collection.update_one(
+            {"rule_id": rule["id"]},
+            {"$set": doc},
+            upsert=True,
+        )
+        synced += 1
+
+    return {"code": 200, "data": {"synced": synced, "total": len(rules)}}
+
+
 @zone_router.post("/purge")
 async def purge_all(
     account_id: int,
@@ -85,12 +136,36 @@ async def purge_hosts(
     return {"code": 200, "data": {"success": True}}
 
 
+@zone_router.post("/purge/prefixes")
+async def purge_prefixes(
+    account_id: int,
+    zone_id: str,
+    x_cf_token: str = Header(..., alias="X-Cf-Token"),
+    body: dict = None,
+):
+    prefixes = (body or {}).get("prefixes", [])
+    cf_client.purge_by_prefixes(x_cf_token, zone_id, prefixes)
+    await _log_purge(account_id, zone_id, "Purge Prefix", ", ".join(prefixes))
+    return {"code": 200, "data": {"success": True}}
+
+
 @zone_router.get("")
 async def list_cache_logs(account_id: int, zone_id: str):
     """Read cache purge logs for a specific zone from MongoDB"""
     db = await get_db()
     collection = db[get_collection_name(account_id, zone_id)]
     rows = await collection.find({"account_id": str(account_id)}).sort("timestamp", -1).to_list(length=500)
+    for r in rows:
+        r["_id"] = str(r["_id"])
+    return {"code": 200, "data": rows}
+
+
+@zone_router.get("/rules")
+async def list_cache_rules(account_id: int, zone_id: str):
+    """Read cache rules for a specific zone from MongoDB"""
+    db = await get_db()
+    collection = db[get_collection_name(account_id, zone_id)]
+    rows = await collection.find({"account_id": str(account_id)}).sort("synced_at", -1).to_list(length=5000)
     for r in rows:
         r["_id"] = str(r["_id"])
     return {"code": 200, "data": rows}

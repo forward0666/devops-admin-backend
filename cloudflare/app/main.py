@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from app.routes import accounts, zones, dns, security, ssl, cache
+from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, cache_rule
 from app.services.db import close_pool
 from app.services.redis import close_redis
 from app.services.mongodb import close_db
@@ -33,6 +33,9 @@ app.include_router(ssl.zone_router, prefix="/zones/{zone_id}/ssl", tags=["SSL"])
 app.include_router(cache.router, prefix="/cache", tags=["Cache"])
 app.include_router(cache.zone_router, prefix="/zones/{zone_id}/cache", tags=["Cache"])
 app.include_router(dns.router, prefix="/dns", tags=["DNS"])
+app.include_router(cache_rule.router, prefix="/cacheRule", tags=["CacheRule"])
+app.include_router(cache_rule.router, prefix="/cacheRule", tags=["CacheRule"])
+
 
 
 @app.get("/health")
