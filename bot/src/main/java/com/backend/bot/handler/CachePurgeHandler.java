@@ -69,6 +69,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
         String callbackData = botUpdate.callbackQuery().data();
         String action = callbackData.replace("callback_data_", "");
 
+        log.info("🚀 CachePurgeHandler: callbackData={}, action={}, chatId={}, botName={}", callbackData, action, chatId, botName);
+
         return Mono.deferContextual(contextView -> {
             String traceLogPrefix = LogUtils.prepareMdcAndGetPrefix(contextView);
 
@@ -80,7 +82,13 @@ public class CachePurgeHandler implements CallbackActionHandler {
                 String ruleId = action.replace("PURGE_RULE_", "");
                 return handlePurgeRule(traceLogPrefix, botName, chatId, messageId, token, ruleId);
             }
+            log.warn("⚠️ CachePurgeHandler: unhandled action={}", action);
             return Mono.empty();
+        })
+        .doOnError(e -> log.error("❌ CachePurgeHandler error: {}", e.getMessage(), e))
+        .onErrorResume(e -> {
+            log.error("❌ CachePurgeHandler onErrorResume: {}", e.getMessage());
+            return botClientService.sendMessage(token, chatId, "⚠️ 操作失败: " + e.getMessage()).then();
         });
     }
 
