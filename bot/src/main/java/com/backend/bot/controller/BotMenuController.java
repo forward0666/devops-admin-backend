@@ -4,6 +4,7 @@ import com.backend.bot.entity.BotMenuEntity;
 import com.backend.bot.service.BotMenuService;
 import com.backend.bot.util.LogUtils;
 import com.backend.bot.vo.BotMenuVo;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +24,23 @@ import java.util.Map;
 public class BotMenuController {
 
     private final BotMenuService botMenuService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Normalize buttons JSON: ensure valid UTF-8 encoding for MySQL JSON column
+     */
+    private String normalizeButtons(String buttons) {
+        if (buttons == null || buttons.isBlank()) return buttons;
+        try {
+            // Remove control characters (newline, tab, etc.) that break JSON parsing
+            String cleaned = buttons.replaceAll("[\\x00-\\x1F]", "");
+            Object parsed = objectMapper.readValue(cleaned, Object.class);
+            return objectMapper.writeValueAsString(parsed);
+        } catch (Exception e) {
+            log.warn("Invalid buttons JSON: {}", e.getMessage());
+            return buttons;
+        }
+    }
 
     @GetMapping
     public Mono<ResponseEntity<Map<String, Object>>> getAllMenus(@RequestParam(required = false) String botType) {
@@ -58,6 +77,7 @@ public class BotMenuController {
             return entityMono
                     .doOnNext(e -> {
                         if (e.getSortOrder() == null) e.setSortOrder(0);
+                        e.setButtons(normalizeButtons(e.getButtons()));
                     })
                     .flatMap(newMenu -> botMenuService.save(newMenu)
                             .onErrorResume(ex -> {
@@ -78,7 +98,7 @@ public class BotMenuController {
                                 return botMenuService.findByBotTypeAndMenuKey(newMenu.getBotType(), newMenu.getMenuKey())
                                         .flatMap(existing -> {
                                             existing.setTitle(newMenu.getTitle());
-                                            existing.setButtons(newMenu.getButtons());
+                                            existing.setButtons(normalizeButtons(newMenu.getButtons()));
                                             existing.setSortOrder(newMenu.getSortOrder());
                                             existing.setMenuLevel(newMenu.getMenuLevel());
                                             existing.setParentId(newMenu.getParentId());
@@ -92,7 +112,7 @@ public class BotMenuController {
                         Map<String, Object> data = new HashMap<>();
                         data.put("menu", BotMenuVo.fromEntity(saved));
                         return botMenuService.deleteCacheByBotType(saved.getBotType())
-                                .thenReturn(ResponseEntity.status(201).body(data));
+                                .thenReturn(HttpResponseUtils.created("Menu saved", data));
                     });
         }).doFinally(LogUtils::clearMDC);
     }
@@ -104,7 +124,7 @@ public class BotMenuController {
             return botMenuService.findById(id)
                     .flatMap(existing -> entityMono.map(e -> {
                         existing.setTitle(e.getTitle());
-                        existing.setButtons(e.getButtons());
+                        existing.setButtons(normalizeButtons(e.getButtons()));
                         existing.setSortOrder(e.getSortOrder());
                         existing.setMenuKey(e.getMenuKey());
                         existing.setMenuLevel(e.getMenuLevel());
