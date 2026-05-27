@@ -276,6 +276,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     } else {
                         domains = List.of();
                     }
+                    log.info("🔍 getWebDomains: total={}, types={}", domains.size(),
+                            domains.stream().map(d -> String.valueOf(d.get("type"))).distinct().toList());
                     return domains.stream()
                             .filter(d -> "web".equals(String.valueOf(d.get("type"))))
                             .map(d -> String.valueOf(d.get("domain")))
