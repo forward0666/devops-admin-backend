@@ -176,9 +176,11 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     String cfUrl = tuple.getT2();
                     WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
-                    Mono<List<String>> domainsMono = getWebDomains(projectId, traceLogPrefix);
+                    Mono<List<String>> domainsMono = getWebDomains(projectId, traceLogPrefix)
+                            .defaultIfEmpty(List.of());
 
                     return domainsMono.flatMap(domains -> {
+                        log.info("🔍 CachePurgeRule: domains count={}, domains={}", domains.size(), domains);
                         if (domains.isEmpty()) {
                             return sendOrEdit(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
                         }
