@@ -206,7 +206,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                     return sendOrEdit(token, chatId, messageId, sb.toString(), markup);
                                 });
                     })
-                )
                 .onErrorResume(e -> {
                     log.error("{}❌ CachePurge rule error: {}", traceLogPrefix, e.getMessage());
                     return sendOrEdit(token, chatId, messageId, "⚠️ 清理失败: " + e.getMessage(), null);
