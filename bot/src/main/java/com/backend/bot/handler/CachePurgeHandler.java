@@ -48,9 +48,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
     @Value("${bot.cf-service-url:http://192.168.86.9:8090}")
     private String cfServiceUrl;
-
-    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
-    private String userServiceUrl;
+    private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -253,7 +251,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return Mono.just(userServiceUrl).flatMap(userUrl -> {
+        return Mono.just(USER_SERVICE_URL).flatMap(userUrl -> {
         WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
