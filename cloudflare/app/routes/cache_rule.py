@@ -24,7 +24,7 @@ async def list_cache_rules(projectId: int = Query(...), env: str = Query(None)):
     db = await get_db()
     query = {"projectId": projectId}
     if env:
-        query["env"] = env
+        query["env"] = {"$regex": f"^{env}$", "$options": "i"}
     rows = await db[COLLECTION].find(query).sort("createdAt", -1).to_list(length=500)
     return {"code": 200, "data": [_serialize(r) for r in rows]}
 
