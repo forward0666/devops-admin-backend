@@ -246,3 +246,93 @@ async def purge_cache_rule(body: dict):
         "total": len(domains),
         "zones": zone_results,
     }}
+
+
+@router.post("/purgeAll")
+async def purge_all_cache(body: dict):
+    """Purge ALL cached resources for given domains (purge_everything)."""
+    domains = body.get("domains", [])
+    if not domains:
+        raise HTTPException(status_code=400, detail="domains is required")
+
+    db = await get_db()
+    accounts = await query_all("SELECT id FROM account")
+
+    all_zones: list[dict] = []
+    for acc in accounts:
+        coll = db[f"account_{acc['id']}_zones"]
+        async for zone in coll.find({}):
+            all_zones.append({
+                "name": zone.get("name", ""),
+                "zone_id": zone.get("zone_id", ""),
+                "account_id": str(zone.get("account_id", "")),
+                "status": zone.get("status", ""),
+            })
+
+    # Match domains to zones by suffix
+    domain_zone_candidates: dict[str, list[dict]] = {d: [] for d in domains}
+    for d in domains:
+        for z in all_zones:
+            zone_name = z["name"]
+            if d == zone_name or d.endswith("." + zone_name):
+                domain_zone_candidates[d].append(z)
+
+    # Resolve: prefer active
+    domain_zone_map: dict[str, dict] = {}
+    failed: list[dict] = []
+    for d in domains:
+        candidates = domain_zone_candidates[d]
+        if not candidates:
+            failed.append({"domain": d, "reason": "no zone found"})
+            continue
+        active = [c for c in candidates if c["status"] == "active"]
+        if len(active) > 1:
+            accounts_str = ", ".join(c["account_id"] for c in active)
+            failed.append({"domain": d, "reason": f"active in multiple accounts ({accounts_str})"})
+            continue
+        chosen = active[0] if active else candidates[0]
+        domain_zone_map[d] = chosen
+
+    # Dedupe zones (multiple domains may share same zone)
+    zone_set: dict[str, dict] = {}  # zone_id -> {account_id, domains}
+    for d, info in domain_zone_map.items():
+        zid = info["zone_id"]
+        if zid not in zone_set:
+            zone_set[zid] = {"account_id": info["account_id"], "domains": []}
+        zone_set[zid]["domains"].append(d)
+
+    token_cache: dict[str, str] = {}
+
+    async def get_token(account_id: str) -> str:
+        if account_id in token_cache:
+            return token_cache[account_id]
+        row = await query_one("SELECT api_key FROM account WHERE id = %s", (int(account_id),))
+        if not row:
+            return None
+        token_cache[account_id] = row["api_key"]
+        return row["api_key"]
+
+    succeeded: list[str] = []
+    zone_results = []
+    for zone_id, zinfo in zone_set.items():
+        try:
+            token = await get_token(zinfo["account_id"])
+            if not token:
+                for d in zinfo["domains"]:
+                    failed.append({"domain": d, "reason": f"account {zinfo['account_id']} not found"})
+                continue
+            cf_client.purge_all(token, zone_id)
+            succeeded.extend(zinfo["domains"])
+            zone_results.append({"zone_id": zone_id, "account_id": zinfo["account_id"], "domains": zinfo["domains"], "success": True})
+        except Exception as e:
+            logger.error(f"Purge all failed for zone {zone_id}: {e}")
+            for d in zinfo["domains"]:
+                failed.append({"domain": d, "reason": str(e)})
+            zone_results.append({"zone_id": zone_id, "account_id": zinfo["account_id"], "domains": zinfo["domains"], "success": False, "error": str(e)})
+
+    return {"code": 200, "data": {
+        "succeeded": succeeded,
+        "failed": failed,
+        "total": len(domains),
+        "zones": zone_results,
+    }}
