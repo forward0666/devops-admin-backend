@@ -234,6 +234,16 @@ public class CachePurgeHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> sendMsg(String token, Long chatId, String text, InlineKeyboardMarkupDto markup) {
-        return botClientService.sendMessage(token, chatId, text, markup).then();
+        return botClientService.sendMenuMessageWithResponse(token, chatId, text, markup)
+                .flatMap(msgIdStr -> {
+                    try {
+                        Long msgId = Long.parseLong(msgIdStr);
+                        interactiveMessageService.scheduleMessageDeletion(
+                                token, null, chatId, msgId, 30, "CachePurgeHandler", Context.empty()
+                        ).subscribe();
+                    } catch (Exception ignored) {}
+                    return Mono.empty();
+                })
+                .then();
     }
 }
