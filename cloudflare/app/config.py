@@ -33,3 +33,7 @@ MONGODB_USER = os.getenv("MONGODB_USERNAME", "root")
 MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root123")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "cloudflare")
 MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
+
+# Service-to-service auth
+GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://192.168.86.9:8084")
