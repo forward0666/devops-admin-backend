@@ -44,7 +44,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    private static final String CF_SERVICE_URL = "http://192.168.86.9:8090";
+    private static final String CF_SERVICE_URL = "http://192.168.86.9:8081/cloudflare";
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
