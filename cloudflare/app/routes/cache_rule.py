@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
 from bson import ObjectId
 import logging
+import os
+import httpx
 
 from app.services.mongodb import get_db
 from app.services.db import query_one, query_all
@@ -118,25 +120,8 @@ async def delete_cache_rule(rule_id: str, projectId: int = Query(...)):
     return {"code": 200, "data": None, "message": "Rule deleted"}
 
 
-@router.post("/purge")
-async def purge_cache_rule(body: dict):
-    """Purge cache by prefix for a rule across given domains."""
-    rule_id = body.get("ruleId")
-    domains = body.get("domains", [])
-
-    if not rule_id or not domains:
-        raise HTTPException(status_code=400, detail="ruleId and domains are required")
-
-    db = await get_db()
-    try:
-        oid = ObjectId(rule_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid rule id")
-
-    rule = await db[COLLECTION].find_one({"_id": oid})
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
-
+async def _do_purge(db, rule: dict, domains: list[str]) -> dict:
+    """Common purge logic: resolve domains to zones and purge by prefix."""
     url_path = rule.get("url", "")
 
     # Get all accounts from MySQL, then query each account's zones collection directly
@@ -248,6 +233,27 @@ async def purge_cache_rule(body: dict):
     }}
 
 
+@router.post("/purge")
+async def purge_cache_rule(body: dict):
+    """Purge cache by prefix for a rule across given domains."""
+    rule_id = body.get("ruleId")
+    domains = body.get("domains", [])
+    if not rule_id or not domains:
+        raise HTTPException(status_code=400, detail="ruleId and domains are required")
+
+    db = await get_db()
+    try:
+        oid = ObjectId(rule_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid rule id")
+
+    rule = await db[COLLECTION].find_one({"_id": oid})
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    return await _do_purge(db, rule, domains)
+
+
 @router.post("/purgeAll")
 async def purge_all_cache(body: dict):
     """Purge ALL cached resources for given domains (purge_everything)."""
@@ -336,3 +342,42 @@ async def purge_all_cache(body: dict):
         "total": len(domains),
         "zones": zone_results,
     }}
+
+
+@router.post("/purgeByRule")
+async def purge_by_rule(body: dict):
+    """Bot 调用：传 ruleId + projectId，CF 自己查域名再清缓存."""
+    rule_id = body.get("ruleId")
+    project_id = body.get("projectId")
+    if not rule_id or not project_id:
+        raise HTTPException(status_code=400, detail="ruleId and projectId are required")
+
+    db = await get_db()
+    try:
+        oid = ObjectId(rule_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid rule id")
+
+    rule = await db[COLLECTION].find_one({"_id": oid})
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    # 从 user 服务获取 web 类型域名
+    user_url = os.getenv("USER_SERVICE_URL", "http://192.168.86.9:8084")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{user_url}/domain/list", params={"projectId": project_id})
+            resp_data = resp.json()
+            domain_list = resp_data.get("data", [])
+            if isinstance(domain_list, dict):
+                domain_list = domain_list.get("data", [])
+            domains = [d["domain"] for d in domain_list if d.get("type") == "web"]
+    except Exception as e:
+        logger.error(f"Failed to fetch domains from user service: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch domains")
+
+    if not domains:
+        return {"code": 200, "data": {"succeeded": [], "failed": [], "message": "No web domains found"}}
+
+    # 复用已有的 purge 逻辑
+    return await _do_purge(db, rule, domains)

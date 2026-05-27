@@ -176,17 +176,9 @@ public class CachePurgeHandler implements CallbackActionHandler {
                     String cfUrl = tuple.getT2();
                     WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
 
-                    Mono<List<String>> domainsMono = getWebDomains(projectId, traceLogPrefix)
-                            .defaultIfEmpty(List.of());
-
-                    return domainsMono.flatMap(domains -> {
-                        log.info("🔍 CachePurgeRule: domains count={}, domains={}", domains.size(), domains);
-                        if (domains.isEmpty()) {
-                            return sendOrEdit(token, chatId, messageId, "⚠️ 无 web 类型域名", null);
-                        }
-
-                        Map<String, Object> body = Map.of("ruleId", ruleId, "domains", domains);
-                        return webClient.post().uri("/cacheRule/purge")
+                    // Bot 只传 ruleId + projectId，CF 服务自己查域名再清缓存
+                    Map<String, Object> body = Map.of("ruleId", ruleId, "projectId", projectId);
+                    return webClient.post().uri("/cacheRule/purgeByRule")
                                 .bodyValue(body)
                                 .retrieve()
                                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
