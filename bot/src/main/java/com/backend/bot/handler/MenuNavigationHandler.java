@@ -85,22 +85,26 @@ public class MenuNavigationHandler implements CallbackActionHandler {
         return Mono.deferContextual(contextView -> {
             final String traceLogPrefix = com.backend.bot.util.LogUtils.prepareMdcAndGetPrefix(contextView);
 
-            // 先从数据库查
-            log.info("{}🔍 [MenuNav] Searching DB: botName={}, menuKey={}", traceLogPrefix, context.botName(), menuKey);
-            return botMenuService.findKeyboardByBotTypeAndMenuKey(context.botEntity().getBotType().getDbValue(), menuKey)
+            // MAIN_MENU 特殊处理：返回主菜单
+            Mono<InlineKeyboardMarkupDto> menuMono;
+            if ("MAIN_MENU".equals(menuKey)) {
+                log.info("{}🔍 [MenuNav] Returning to main menu: botType={}", traceLogPrefix, context.botEntity().getBotType().getDbValue());
+                menuMono = botMenuService.findMainMenuByBotType(context.botEntity().getBotType().getDbValue(), 1);
+            } else {
+                log.info("{}🔍 [MenuNav] Searching DB: botName={}, menuKey={}", traceLogPrefix, context.botName(), menuKey);
+                menuMono = botMenuService.findKeyboardByBotTypeAndMenuKey(context.botEntity().getBotType().getDbValue(), menuKey);
+            }
+            return menuMono
                     .flatMap(newMarkup -> {
                         if (newMarkup == null || newMarkup.isEmpty()) return Mono.empty();
                         return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
                     })
-                    // DB 查不到 → 试试 fallback 硬编码
                     .switchIfEmpty(Mono.defer(() -> {
                         if (fallbackMarkup != null && !fallbackMarkup.isEmpty()) {
                             return editWithKeyboard(token, chatId, messageId, menuText, fallbackMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
                         }
-                        // 都没有 → 不是菜单导航，返回 Mono.error 让后续 handler 处理
                         return Mono.error(new UnsupportedOperationException("Not a menu navigation callback"));
                     }))
-                    // 不是菜单导航，静默跳过
                     .onErrorResume(UnsupportedOperationException.class, e -> Mono.empty());
         });
     }
