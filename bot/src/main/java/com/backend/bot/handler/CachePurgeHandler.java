@@ -9,10 +9,10 @@ import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
-import com.backend.bot.service.ServiceDiscovery;
 import com.backend.bot.util.LogUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.annotation.Order;
@@ -44,7 +44,12 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final ServiceDiscovery nacosServiceDiscovery;
+
+    @Value("${bot.cf-service-url:http://192.168.86.9:8090}")
+    private String cfServiceUrl;
+
+    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
+    private String userServiceUrl;
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     @Override
@@ -104,7 +109,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                nacosServiceDiscovery.getServiceUrl("cloudflare")
+                Mono.just(cfServiceUrl)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -157,7 +162,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
         return Mono.zip(
                 getProjectId(botName, chatId),
-                nacosServiceDiscovery.getServiceUrl("cloudflare")
+                Mono.just(cfServiceUrl)
         ).flatMap(tuple -> {
                     Long projectId = tuple.getT1();
                     String cfUrl = tuple.getT2();
@@ -247,7 +252,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Mono<List<String>> getWebDomains(Long projectId, String traceLogPrefix) {
-        return nacosServiceDiscovery.getServiceUrl("user").flatMap(userUrl -> {
+        return Mono.just(userServiceUrl).flatMap(userUrl -> {
         WebClient webClient = webClientBuilder.baseUrl(userUrl).build();
         return webClient.get().uri("/domain/list?projectId=" + projectId)
                 .retrieve()
