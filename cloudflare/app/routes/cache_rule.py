@@ -8,7 +8,7 @@ import httpx
 from app.services.mongodb import get_db
 from app.services.db import query_one, query_all
 from app.services import cf_client
-from app.config import GATEWAY_SECRET, USER_SERVICE_URL
+from app.config import USER_SERVICE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -363,11 +363,10 @@ async def purge_by_rule(body: dict):
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    # 从 user 服务获取 web 类型域名
+    # 从 user 服务获取 web 类型域名（内部调用，X-Tg-Username 跳过 JWT）
     try:
-        headers = {"X-Encrypted-Data": GATEWAY_SECRET} if GATEWAY_SECRET else {}
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers=headers)
+            resp = await client.get(f"{USER_SERVICE_URL}/domain/list", params={"projectId": project_id}, headers={"X-Tg-Username": "cloudflare"})
             resp_data = resp.json()
             domain_list = resp_data.get("data", [])
             if isinstance(domain_list, dict):
