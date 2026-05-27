@@ -154,7 +154,7 @@ public final class TelegramConstants {
      * 
      * 使用示例：String.format(MENU_TIMEOUT_TEMPLATE, 30)
      */
-    public static final String MENU_TIMEOUT_TEMPLATE = "⏱️ %d秒后关闭";
+    public static final String MENU_TIMEOUT_TEMPLATE = "⏱️ %d秒后关闭👇👇👇👇👇👇👇👇👇👇👇";
     
     /**
      * 操作成功提示
