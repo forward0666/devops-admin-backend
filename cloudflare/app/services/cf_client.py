@@ -65,6 +65,12 @@ def create_firewall_rule(api_token: str, zone_id: str, data: dict) -> dict:
     return {"success": True, "result": resp.model_dump()}
 
 
+def get_firewall_rule(api_token: str, zone_id: str, rule_id: str) -> dict:
+    cf = get_client(api_token)
+    resp = cf.firewall.rules.get(rule_id=rule_id, zone_id=zone_id)
+    return {"success": True, "result": resp.model_dump()}
+
+
 def update_firewall_rule(api_token: str, zone_id: str, rule_id: str, data: dict) -> dict:
     cf = get_client(api_token)
     resp = cf.firewall.rules.update(rule_id=rule_id, zone_id=zone_id, **data)
