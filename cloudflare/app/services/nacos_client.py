@@ -107,3 +107,29 @@ async def register_service():
                 logger.error(f"❌ Nacos registration failed: {resp.status_code} {resp.text}")
     except Exception as e:
         logger.error(f"❌ Nacos registration failed: {e}")
+
+
+async def send_heartbeat():
+    """Send heartbeat to Nacos to keep instance alive"""
+    from app.config import SERVICE_PORT, SERVICE_IP
+    import json, time
+
+    beat = json.dumps({"ip": SERVICE_IP, "port": SERVICE_PORT, "serviceName": SERVICE_NAME})
+    params = {
+        "serviceName": SERVICE_NAME,
+        "ip": SERVICE_IP,
+        "port": SERVICE_PORT,
+        "namespaceId": NACOS_NAMESPACE,
+        "beat": beat,
+        "username": NACOS_USERNAME,
+        "password": NACOS_PASSWORD,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.put(f"{NACOS_URL}/ns/instance/beat", params=params)
+            if resp.status_code == 200:
+                logger.debug("💓 Nacos heartbeat sent")
+            else:
+                logger.warning(f"⚠️ Nacos heartbeat failed: {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"⚠️ Nacos heartbeat error: {e}")
