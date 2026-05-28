@@ -38,7 +38,6 @@ async def create_cache_rule(body: dict):
     env = (body.get("env") or "").strip()
     name = (body.get("name") or "").strip()
     url = (body.get("url") or "").strip()
-    callback_data = body.get("callbackData", "")
 
     if not project_id or not name or not url:
         raise HTTPException(status_code=400, detail="projectId, name, url are required")
@@ -56,7 +55,6 @@ async def create_cache_rule(body: dict):
         "env": env,
         "name": name,
         "url": url,
-        "callbackData": callback_data,
         "createdAt": datetime.utcnow(),
         "updatedAt": datetime.utcnow(),
     }
@@ -97,8 +95,7 @@ async def update_cache_rule(rule_id: str, body: dict):
         update_fields["name"] = new_name
     if body.get("url") is not None:
         update_fields["url"] = body["url"].strip()
-    if body.get("callbackData") is not None:
-        update_fields["callbackData"] = body["callbackData"]
+
 
     await db[COLLECTION].update_one({"_id": oid}, {"$set": update_fields})
     updated = await db[COLLECTION].find_one({"_id": oid})
