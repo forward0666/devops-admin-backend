@@ -14,7 +14,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "operation_logs_190001")
+@Document(collection = "operation_logs")
 public class OperationLogEntity {
 
     @Id

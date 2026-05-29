@@ -8,7 +8,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,7 +18,7 @@ public class OperationLogService {
 
     private final MongoTemplate mongoTemplate;
 
-    private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
+    private static final String COLLECTION = "operation_logs";
 
     @Async
     public void logUserOperation(
@@ -47,8 +46,7 @@ public class OperationLogService {
                     .createdAt(LocalDateTime.now())
                     .build();
 
-            String collectionName = "operation_logs_" + operationLog.getCreatedAt().format(MONTH_FORMATTER);
-            mongoTemplate.save(operationLog, collectionName);
+            mongoTemplate.save(operationLog, COLLECTION);
         } catch (Exception e) {
             log.error("Failed to save login operation log: {}", e.getMessage());
         }

@@ -32,8 +32,7 @@ public class OperationLogService {
             if (operationLog.getCreatedAt() == null) {
                 operationLog.setCreatedAt(LocalDateTime.now());
             }
-            String collectionName = operationLogMapper.getCollectionName(operationLog.getCreatedAt());
-            operationLogMapper.insert(operationLog, collectionName);
+            operationLogMapper.insert(operationLog);
         } catch (Exception e) {
             log.error("Failed to save operation log: {}", e.getMessage(), e);
         }

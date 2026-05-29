@@ -20,7 +20,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "operation_logs_190001") // placeholder, actual collection set at runtime
+@Document(collection = "operation_logs")
 public class OperationLogEntity {
 
     @Id
