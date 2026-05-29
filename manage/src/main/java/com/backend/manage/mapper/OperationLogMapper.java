@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -80,8 +81,8 @@ public class OperationLogMapper {
                                                 int page, int size, String sortBy, String sortDir) {
         Query query = buildCriteriaQuery(category, startDate, endDate);
 
-        // Count total
-        long total = mongoTemplate.count(query, OperationLogEntity.class, COLLECTION);
+        // Count total (use raw collection to avoid _class filtering)
+        long total = mongoTemplate.count(query, COLLECTION);
 
         // Sort
         if (sortBy != null && !sortBy.isEmpty()) {
@@ -94,14 +95,57 @@ public class OperationLogMapper {
         // Pagination
         query.skip((long) page * size).limit(size);
 
-        List<OperationLogEntity> logs = mongoTemplate.find(query, OperationLogEntity.class, COLLECTION);
+        // Use BasicDBObject to avoid _class filtering
+        List<org.bson.Document> docs = mongoTemplate.find(query, org.bson.Document.class, COLLECTION);
+        List<OperationLogEntity> logs = docs.stream().map(doc -> {
+            OperationLogEntity entity = new OperationLogEntity();
+            entity.setId(doc.getObjectId("_id") != null ? doc.getObjectId("_id").toString() : null);
+            entity.setOperationId(doc.getString("operationId"));
+            Object userId = doc.get("userId");
+            if (userId instanceof Number) entity.setUserId(((Number) userId).longValue());
+            entity.setUsername(doc.getString("username"));
+            entity.setOperationType(doc.getString("operationType"));
+            entity.setOperationName(doc.getString("operationName"));
+            entity.setResourceType(doc.getString("resourceType"));
+            entity.setResourceId(doc.getString("resourceId"));
+            entity.setMethod(doc.getString("method"));
+            entity.setUrl(doc.getString("url"));
+            entity.setIpAddress(doc.getString("ipAddress"));
+            entity.setUserAgent(doc.getString("userAgent"));
+            entity.setStatus(doc.getString("status"));
+            entity.setErrorMessage(doc.getString("errorMessage"));
+            entity.setCategory(doc.getString("category"));
+            entity.setCreatedAt(doc.getDate("createdAt") != null ? doc.getDate("createdAt").toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() : null);
+            return entity;
+        }).toList();
         return new QueryResult(logs, total);
     }
 
     public List<OperationLogEntity> findRecent(int limit) {
         Query query = buildQueryFromTemplate("findRecentLogs");
         query.limit(limit);
-        return mongoTemplate.find(query, OperationLogEntity.class, COLLECTION);
+        List<org.bson.Document> docs = mongoTemplate.find(query, org.bson.Document.class, COLLECTION);
+        return docs.stream().map(doc -> {
+            OperationLogEntity entity = new OperationLogEntity();
+            entity.setId(doc.getObjectId("_id") != null ? doc.getObjectId("_id").toString() : null);
+            entity.setOperationId(doc.getString("operationId"));
+            Object userId = doc.get("userId");
+            if (userId instanceof Number) entity.setUserId(((Number) userId).longValue());
+            entity.setUsername(doc.getString("username"));
+            entity.setOperationType(doc.getString("operationType"));
+            entity.setOperationName(doc.getString("operationName"));
+            entity.setResourceType(doc.getString("resourceType"));
+            entity.setResourceId(doc.getString("resourceId"));
+            entity.setMethod(doc.getString("method"));
+            entity.setUrl(doc.getString("url"));
+            entity.setIpAddress(doc.getString("ipAddress"));
+            entity.setUserAgent(doc.getString("userAgent"));
+            entity.setStatus(doc.getString("status"));
+            entity.setErrorMessage(doc.getString("errorMessage"));
+            entity.setCategory(doc.getString("category"));
+            entity.setCreatedAt(doc.getDate("createdAt") != null ? doc.getDate("createdAt").toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() : null);
+            return entity;
+        }).toList();
     }
 
     // ==================== Private Helpers ====================
@@ -111,25 +155,19 @@ public class OperationLogMapper {
 
         if (category != null && !category.isEmpty()) {
             query.addCriteria(Criteria.where("category").is(category));
-            log.info("[QUERY] category={}", category);
         }
 
         if ((startDate != null && !startDate.isEmpty()) || (endDate != null && !endDate.isEmpty())) {
             Criteria dateCriteria = Criteria.where("createdAt");
             if (startDate != null && !startDate.isEmpty()) {
-                LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
-                dateCriteria.gte(start);
-                log.info("[QUERY] startDate={} -> gte={}", startDate, start);
+                dateCriteria.gte(LocalDate.parse(startDate).atStartOfDay());
             }
             if (endDate != null && !endDate.isEmpty()) {
-                LocalDateTime end = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
-                dateCriteria.lt(end);
-                log.info("[QUERY] endDate={} -> lt={}", endDate, end);
+                dateCriteria.lt(LocalDate.parse(endDate).atStartOfDay().plusDays(1));
             }
             query.addCriteria(dateCriteria);
         }
 
-        log.info("[QUERY] final query={}", query);
         return query;
     }
 }
