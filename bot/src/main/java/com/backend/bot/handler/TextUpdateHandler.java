@@ -226,7 +226,7 @@ public class TextUpdateHandler implements UpdateHandler {
     }
 
     // 原有的 getOperatorName 辅助方法已移除，移入 BotUserUtils 类中
-}
+
     /**
      * 处理白名单 IP 输入。格式: IP 用户名 或 IP+用户名
      * state 格式: AWAITING_WHITELIST_IP:{ruleId}:{env}
