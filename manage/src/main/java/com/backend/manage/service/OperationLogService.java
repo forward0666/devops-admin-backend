@@ -87,7 +87,7 @@ public class OperationLogService {
     public Page<OperationLogEntity> getOperationLogs(int page, int size, String sortBy, String sortDir,
             String category, String startDate, String endDate) {
         try {
-            log.debug("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}, category={}, startDate={}, endDate={}",
+            log.info("Fetching operation logs: page={}, size={}, sortBy={}, sortDir={}, category={}, startDate={}, endDate={}",
                 page, size, sortBy, sortDir, category, startDate, endDate);
 
             Pageable pageable = PageRequest.of(page, size);

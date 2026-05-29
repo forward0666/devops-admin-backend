@@ -111,19 +111,25 @@ public class OperationLogMapper {
 
         if (category != null && !category.isEmpty()) {
             query.addCriteria(Criteria.where("category").is(category));
+            log.info("[QUERY] category={}", category);
         }
 
         if ((startDate != null && !startDate.isEmpty()) || (endDate != null && !endDate.isEmpty())) {
             Criteria dateCriteria = Criteria.where("createdAt");
             if (startDate != null && !startDate.isEmpty()) {
-                dateCriteria.gte(LocalDate.parse(startDate).atStartOfDay());
+                LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+                dateCriteria.gte(start);
+                log.info("[QUERY] startDate={} -> gte={}", startDate, start);
             }
             if (endDate != null && !endDate.isEmpty()) {
-                dateCriteria.lt(LocalDate.parse(endDate).atStartOfDay().plusDays(1));
+                LocalDateTime end = LocalDate.parse(endDate).atStartOfDay().plusDays(1);
+                dateCriteria.lt(end);
+                log.info("[QUERY] endDate={} -> lt={}", endDate, end);
             }
             query.addCriteria(dateCriteria);
         }
 
+        log.info("[QUERY] final query={}", query);
         return query;
     }
 }
