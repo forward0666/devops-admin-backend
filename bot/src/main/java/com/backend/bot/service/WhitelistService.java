@@ -14,5 +14,5 @@ public interface WhitelistService {
 
     Mono<java.util.List<String>> getWhitelistIps(String domainType);
 
-    Mono<String> addCfWhitelistIp(Long projectId, String ruleId, String ip, String username, String env);
+    Mono<String> addCfWhitelistIp(Long projectId, String ruleId, String ip, String username, String env, String operator);
 }

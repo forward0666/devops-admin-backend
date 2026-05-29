@@ -157,7 +157,7 @@ async def add_whitelist_ip(body: dict):
     if errors and not results:
         raise HTTPException(status_code=400, detail={"message": "All entries failed", "errors": errors})
 
-    return {"code": 200, "data": {"updated": len(results), "errors": errors}, "message": f"IP added to {len(results)} rule(s)"}
+    return {"code": 200, "data": {"updated": len(results), "errors": errors}, "message": f"已添加至规则 [{rule.get('name', '')}]"}
 
 
 @router.put("")
@@ -320,7 +320,7 @@ async def _add_ip_to_cf(db, project_id: int, rule_id: str, ip: str):
 
 
 @router.delete("/remove")
-async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(None), ip: str = Query(...)):
+async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(None), ip: str = Query(...), username: str = Query(None)):
     """Remove IP from CF filter expression"""
     logger.info(f"========== Remove IP ========== projectId={projectId}, ruleId={ruleId}, ip={ip}")
     db = await get_db()
@@ -436,6 +436,8 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
     delete_query: dict = {"ip": ip, "projectId": projectId}
     if ruleId:
         delete_query["ruleId"] = ruleId
+    if username:
+        delete_query["username"] = username
     delete_result = await db[WHITELIST_COLLECTION].delete_many(delete_query)
     logger.info(f"[8] Deleted {delete_result.deleted_count} whitelist records")
 

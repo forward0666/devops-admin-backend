@@ -8,6 +8,7 @@ import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
+import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.BotUserUtils; // 引入新增的工具类
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.util.context.ContextView;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +36,7 @@ public class TextUpdateHandler implements UpdateHandler {
     private final com.backend.bot.repository.BotGroupRepository botGroupRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.data.redis.core.ReactiveStringRedisTemplate redisTemplate;
+    private final InteractiveMessageService interactiveMessageService;
 
     // 定义用于解析输入的正则表达式
     private static final String IP_USER_PATTERN_REGEX = "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\+(\\w+)$";
@@ -94,6 +97,7 @@ public class TextUpdateHandler implements UpdateHandler {
             // 🌟 优化：在方法开始处统一提取并声明为 final，使代码更具可读性和响应式安全
             final String userText = botUpdate.message().text().trim();
             final Long chatId = botUpdate.message().chat().id();
+            final Long userMessageId = botUpdate.message().messageId();
 
             // --- 优化点：使用 BotUserUtils 提取 User 和 OperatorName ---
             final UserDto user = BotUserUtils.extractUser(botUpdate)
@@ -113,7 +117,7 @@ public class TextUpdateHandler implements UpdateHandler {
                         if (state.equals(STATE_AWAITING_FRONTEND_WEB_IP) || state.equals(STATE_AWAITING_FRONTEND_ADMIN_IP)) {
                             return handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
                         } else if (state.startsWith(WhitelistIpHandler.STATE_AWAITING_WHITELIST_IP_PREFIX)) {
-                            return handleWhitelistIpInput(token, chatId, userId, userText, state, finalOperatorName, botEntity.getBotName(), traceLogPrefix);
+                            return handleWhitelistIpInput(token, chatId, userId, userMessageId, userText, state, finalOperatorName, botEntity.getBotName(), traceLogPrefix);
                         } else if (state.equals(TelegramConstants.SESSION_STATE_PROCESSING_START)) {
                             return handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
                         } else {
@@ -231,7 +235,7 @@ public class TextUpdateHandler implements UpdateHandler {
      * 处理白名单 IP 输入。格式: IP 用户名 或 IP+用户名
      * state 格式: AWAITING_WHITELIST_IP:{ruleId}:{env}
      */
-    private Mono<Void> handleWhitelistIpInput(String token, Long chatId, Long userId, String userText,
+    private Mono<Void> handleWhitelistIpInput(String token, Long chatId, Long userId, Long userMessageId, String userText,
                                                   String state, String operatorName, String botName, String traceLogPrefix) {
         String[] parts = state.replace(WhitelistIpHandler.STATE_AWAITING_WHITELIST_IP_PREFIX, "").split(":");
         if (parts.length < 2) {
@@ -248,6 +252,13 @@ public class TextUpdateHandler implements UpdateHandler {
         }
         String ip = inputParts[0];
         String username = inputParts.length > 1 ? inputParts[1] : "";
+
+        // Validate IP format (IPv4 or IPv4/CIDR)
+        if (!ip.matches("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(/\\d{1,2})?$")) {
+            return botClientService.sendMessage(token, chatId, "⚠️ IP 格式不正确: " + ip + "\n请输入有效的 IPv4 地址，例如: 1.2.3.4 或 1.2.3.4/32", null)
+                    .then(userSessionService.clearUserSession(userId))
+                    .then();
+        }
 
         log.info("{}✅ Whitelist input parsed. IP: {}, Username: {}, RuleId: {}, Env: {}, Operator: {}",
                 traceLogPrefix, ip, username, ruleId, env, operatorName);
@@ -266,16 +277,48 @@ public class TextUpdateHandler implements UpdateHandler {
                         .map(com.backend.bot.entity.BotGroupEntity::getProjectId)
                         .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))))
                 .flatMap(projectId -> {
-                    return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env)
+                    return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env, operatorName)
                             .flatMap(result -> {
+                                String text = "✅ " + result + "\n\nIP: " + ip + " | 用户: " + (username.isEmpty() ? "未填写" : username) + "\n操作人: " + operatorName + "\n\n⏳ 此消息将在 30 秒后自动销毁";
+                                // 删除用户发送的原始消息
+                                botClientService.deleteMessage(token, chatId, userMessageId).subscribe();
                                 return userSessionService.clearUserSession(userId)
-                                        .then(botClientService.sendMessage(token, chatId, "✅ " + result + "\n\n操作人: " + operatorName, null));
+                                        .then(botClientService.sendMenuMessageWithResponse(token, chatId, text, null))
+                                        .flatMap(resp -> {
+                                            try {
+                                                Map<String, Object> respMap = objectMapper.readValue(resp, Map.class);
+                                                Map<String, Object> res = (Map<String, Object>) respMap.get("result");
+                                                Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
+                                                interactiveMessageService.scheduleMessageDeletion(
+                                                        token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.empty()
+                                                ).subscribe();
+                                            } catch (Exception e) {
+                                                log.warn("⚠️ Failed to schedule message deletion: {}", e.getMessage());
+                                            }
+                                            return Mono.empty();
+                                        });
                             });
                 })
                 .onErrorResume(e -> {
                     log.error("{}❌ Whitelist add error: {}", traceLogPrefix, e.getMessage());
+                    String errText = "⚠️ 加白失败: " + e.getMessage() + "\n\n⏳ 此消息将在 30 秒后自动销毁";
+                    // 删除用户发送的原始消息
+                    botClientService.deleteMessage(token, chatId, userMessageId).subscribe();
                     return userSessionService.clearUserSession(userId)
-                            .then(botClientService.sendMessage(token, chatId, "⚠️ 加白失败: " + e.getMessage(), null));
+                            .then(botClientService.sendMenuMessageWithResponse(token, chatId, errText, null))
+                            .flatMap(resp -> {
+                                try {
+                                    Map<String, Object> respMap = objectMapper.readValue(resp, Map.class);
+                                    Map<String, Object> res = (Map<String, Object>) respMap.get("result");
+                                    Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
+                                    interactiveMessageService.scheduleMessageDeletion(
+                                            token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.empty()
+                                    ).subscribe();
+                                } catch (Exception ex) {
+                                    log.warn("⚠️ Failed to schedule message deletion: {}", ex.getMessage());
+                                }
+                                return Mono.empty();
+                            });
                 })
                 .then();
     }

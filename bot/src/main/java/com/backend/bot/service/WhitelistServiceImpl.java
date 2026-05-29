@@ -22,6 +22,7 @@ public class WhitelistServiceImpl implements WhitelistService {
 
     private final org.springframework.data.redis.core.ReactiveStringRedisTemplate redisTemplate;
     private final WebClient.Builder webClientBuilder;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Value("${bot.cloudflare-service-url:}")
     private String cloudflareServiceUrl;
@@ -78,14 +79,15 @@ public class WhitelistServiceImpl implements WhitelistService {
     }
 
     @Override
-    public Mono<String> addCfWhitelistIp(Long projectId, String ruleId, String ip, String username, String env) {
+    public Mono<String> addCfWhitelistIp(Long projectId, String ruleId, String ip, String username, String env, String operator) {
         WebClient webClient = webClientBuilder.baseUrl(getCloudflareBaseUrl()).build();
         Map<String, Object> body = Map.of(
                 "projectId", projectId,
                 "ruleId", ruleId,
                 "ip", ip,
                 "username", username != null ? username : "",
-                "env", env != null ? env : ""
+                "env", env != null ? env : "",
+                "operator", operator != null ? operator : ""
         );
         return webClient.post().uri("/whitelist")
                 .bodyValue(body)
@@ -93,8 +95,16 @@ public class WhitelistServiceImpl implements WhitelistService {
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .map(resp -> String.valueOf(resp.getOrDefault("message", "操作完成")))
                 .onErrorResume(e -> {
-                    log.error("❌ CF Whitelist: failed to add IP {}", ip, e);
-                    return Mono.just("失败: " + e.getMessage());
+                    String errMsg = e.getMessage();
+                    if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wce) {
+                        try {
+                            Map<String, Object> errBody = objectMapper.readValue(wce.getResponseBodyAsString(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                            Object detail = errBody.get("detail");
+                            if (detail != null) errMsg = String.valueOf(detail);
+                        } catch (Exception ignored) {}
+                    }
+                    log.error("❌ CF Whitelist: failed to add IP {}: {}", ip, errMsg);
+                    return Mono.just("失败: " + errMsg);
                 });
     }
 }

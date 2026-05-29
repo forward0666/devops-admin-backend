@@ -151,7 +151,10 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                         }
                         markup.addRow(new InlineKeyboardButtonDto("↩️ 返回主菜单", "callback_data_MAIN_MENU"));
                         log.info("[STEP 6] Sending rules list to chat");
-                        return sendMsg(token, chatId, "📋 " + env + " 安全规则👇\n选择要加白的规则", markup);
+                        String base = "📋 " + env + "：选择要操作的规则";
+                        int padLen = 20 - base.length();
+                        String padding = padLen > 0 ? "👇".repeat(padLen) : "";
+                        return sendMsg(token, chatId, base + padding, markup);
                     });
         })
         .onErrorResume(e -> {
