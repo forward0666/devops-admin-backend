@@ -20,7 +20,7 @@ public class OperationLogService {
 
     private static final String COLLECTION = "operation_logs";
 
-    @Async
+    // @Async - 暂时改为同步，排查日志写入问题
     public void logUserOperation(
             Long userId, String username, String operationType, String operationName,
             String resourceType, String resourceId, String method, String url,
@@ -47,8 +47,9 @@ public class OperationLogService {
                     .build();
 
             mongoTemplate.save(operationLog, COLLECTION);
+            log.info("✅ Login operation log saved: username={}, category={}", username, category);
         } catch (Exception e) {
-            log.error("Failed to save login operation log: {}", e.getMessage());
+            log.error("Failed to save login operation log: {}", e.getMessage(), e);
         }
     }
 }
