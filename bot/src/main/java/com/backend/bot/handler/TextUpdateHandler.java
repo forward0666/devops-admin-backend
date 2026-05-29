@@ -31,6 +31,9 @@ public class TextUpdateHandler implements UpdateHandler {
     private final BotClientService botClientService;
     private final UserSessionService userSessionService;
     private final WhitelistService whitelistService;
+    private final com.backend.bot.repository.BotGroupRepository botGroupRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final org.springframework.data.redis.core.ReactiveStringRedisTemplate redisTemplate;
 
     // 定义用于解析输入的正则表达式
     private static final String IP_USER_PATTERN_REGEX = "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\+(\\w+)$";
@@ -107,16 +110,15 @@ public class TextUpdateHandler implements UpdateHandler {
                         log.info("{}📝 {} User {} (Op: {}) current state is: {}", traceLogPrefix, logIdentifier, userId, finalOperatorName, state);
 
                         // 2. 根据状态进行分发处理
-                        return switch (state) {
-                            case STATE_AWAITING_FRONTEND_WEB_IP, STATE_AWAITING_FRONTEND_ADMIN_IP ->
-                                    handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
-                            case TelegramConstants.SESSION_STATE_PROCESSING_START ->
-                                // 用户正在处理/start命令，忽略文本输入
-                                    handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
-                            default ->
-                                // 默认行为：如果不是任何等待状态，可能是普通聊天或 /start 命令
-                                    handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
-                        };
+                        if (state.equals(STATE_AWAITING_FRONTEND_WEB_IP) || state.equals(STATE_AWAITING_FRONTEND_ADMIN_IP)) {
+                            return handleAwaitingIpInput(token, chatId, userId, userText, session, finalOperatorName, traceLogPrefix);
+                        } else if (state.startsWith(WhitelistIpHandler.STATE_AWAITING_WHITELIST_IP_PREFIX)) {
+                            return handleWhitelistIpInput(token, chatId, userId, userText, state, finalOperatorName, botEntity.getBotName(), traceLogPrefix);
+                        } else if (state.equals(TelegramConstants.SESSION_STATE_PROCESSING_START)) {
+                            return handleProcessingStart(token, chatId, logIdentifier, traceLogPrefix);
+                        } else {
+                            return handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix);
+                        }
                     })
                     // 用户没有会话
                     .switchIfEmpty(handleDefaultText(token, chatId, userText, logIdentifier, traceLogPrefix))
@@ -224,4 +226,57 @@ public class TextUpdateHandler implements UpdateHandler {
     }
 
     // 原有的 getOperatorName 辅助方法已移除，移入 BotUserUtils 类中
+}
+    /**
+     * 处理白名单 IP 输入。格式: IP 用户名 或 IP+用户名
+     * state 格式: AWAITING_WHITELIST_IP:{ruleId}:{env}
+     */
+    private Mono<Void> handleWhitelistIpInput(String token, Long chatId, Long userId, String userText,
+                                                  String state, String operatorName, String botName, String traceLogPrefix) {
+        String[] parts = state.replace(WhitelistIpHandler.STATE_AWAITING_WHITELIST_IP_PREFIX, "").split(":");
+        if (parts.length < 2) {
+            log.error("{}❌ Invalid whitelist session state: {}", traceLogPrefix, state);
+            return botClientService.sendMessage(token, chatId, "⚠️ 会话状态异常，请重试", null).then();
+        }
+        String ruleId = parts[0];
+        String env = parts[1];
+
+        // Parse input: IP 用户名 (space or + separated)
+        String[] inputParts = userText.trim().split("[\\s+]+", 2);
+        if (inputParts.length < 1 || inputParts[0].isEmpty()) {
+            return botClientService.sendMessage(token, chatId, "⚠️ 格式错误，请输入: IP 用户名\n例如: 1.2.3.4 张三", null).then();
+        }
+        String ip = inputParts[0];
+        String username = inputParts.length > 1 ? inputParts[1] : "";
+
+        log.info("{}✅ Whitelist input parsed. IP: {}, Username: {}, RuleId: {}, Env: {}, Operator: {}",
+                traceLogPrefix, ip, username, ruleId, env, operatorName);
+
+        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(cached -> {
+                    try {
+                        com.backend.bot.entity.BotGroupEntity entity = objectMapper.readValue(cached, com.backend.bot.entity.BotGroupEntity.class);
+                        return Mono.just(entity.getProjectId());
+                    } catch (Exception e) {
+                        return Mono.empty();
+                    }
+                })
+                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
+                        .map(com.backend.bot.entity.BotGroupEntity::getProjectId)
+                        .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))))
+                .flatMap(projectId -> {
+                    return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env)
+                            .flatMap(result -> {
+                                return userSessionService.clearUserSession(userId)
+                                        .then(botClientService.sendMessage(token, chatId, "✅ " + result + "\n\n操作人: " + operatorName, null));
+                            });
+                })
+                .onErrorResume(e -> {
+                    log.error("{}❌ Whitelist add error: {}", traceLogPrefix, e.getMessage());
+                    return userSessionService.clearUserSession(userId)
+                            .then(botClientService.sendMessage(token, chatId, "⚠️ 加白失败: " + e.getMessage(), null));
+                })
+                .then();
+    }
 }

@@ -49,7 +49,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                 .anyMatch(handler -> {
                     boolean supported = handler.supports(callbackData);
                     if (supported) log.info("{}🔍 isMenuNavigation check: {} supports={}", logPrefix, handler.getClass().getSimpleName(), callbackData);
-                    return (handler instanceof MenuNavigationHandler || handler instanceof CachePurgeHandler) && supported;
+                    return (handler instanceof MenuNavigationHandler || handler instanceof CachePurgeHandler || handler instanceof WhitelistIpHandler) && supported;
                 });
 
         // ⚠️ 关键：flatMap 里返回 Mono<Void> 也会触发 switchIfEmpty（因为 Mono<Void> 不发射元素）
@@ -116,12 +116,19 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                 })
                 .orElseGet(() -> handleUnknownAction(token, chatId, callbackData, logIdentifier, logPrefix).contextWrite(contextView));
 
+        // Skip session clear for WhitelistIpHandler (needs to set session state)
+        final CallbackActionHandler finalHandler = actionHandlers.stream()
+                .sorted(Comparator.comparingInt(CallbackActionHandler::getOrder))
+                .filter(h -> h.supports(callbackData))
+                .findFirst().orElse(null);
+        boolean shouldClearSession = !(finalHandler instanceof WhitelistIpHandler);
+
         return deleteTimerMono
                 .doOnSuccess(v -> log.info("{}✅ [Step3] 删除定时器设置完成 | messageId={}", logPrefix, messageId))
                 .then(handlerMono)
                 .doOnSuccess(v -> log.info("{}✅ [Step4] Handler执行完成 | callbackData={}", logPrefix, callbackData))
-                .then(userSessionService.clearUserSession(userId).contextWrite(contextView))
-                .doOnSuccess(v -> log.info("{}✅ [Step5] Session已清理 | userId={}", logPrefix, userId))
+                .then(shouldClearSession ? userSessionService.clearUserSession(userId).contextWrite(contextView) : Mono.<Void>empty())
+                .doOnSuccess(v -> log.info("{}✅ [Step5] Session{} | userId={}", logPrefix, shouldClearSession ? "已清理" : "保留", userId))
                 .onErrorResume(e -> {
                     log.error("{}❌ [CallbackFlow] 处理失败 | error={}", logPrefix, e.getMessage());
                     return Mono.empty();
