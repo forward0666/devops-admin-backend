@@ -71,6 +71,7 @@ public class UserController {
 
             userMapper.update(existing);
             cacheService.clearByPrefix("bot:projectMembers:");
+            cacheService.clearByPrefix("user:" + userId);
             return ApiResponseDto.success("Profile updated successfully", UserVo.fromEntity(existing));
         } catch (Exception e) {
             log.error("Failed to update profile", e);
