@@ -37,9 +37,7 @@ public class SettingService {
 
     // Password Policy
     private static final String SEC_PASSWORD_MIN_LEN = "setting.password.min_length";
-    private static final String SEC_PASSWORD_REQUIRE_UPPER = "setting.password.require_uppercase";
-    private static final String SEC_PASSWORD_REQUIRE_NUMBER = "setting.password.require_number";
-    private static final String SEC_PASSWORD_REQUIRE_SPECIAL = "setting.password.require_special";
+    private static final String SEC_PASSWORD_REQUIRE_COMPLEX = "setting.password.require_complex";
     private static final String SEC_PASSWORD_EXPIRE_DAYS = "setting.password.expire_days";
 
     // Login Security
@@ -59,9 +57,7 @@ public class SettingService {
         DEFAULTS.put(SYS_LOGO_KEY, "");
         DEFAULTS.put(SYS_THEME_KEY, "light");
         DEFAULTS.put(SEC_PASSWORD_MIN_LEN, "8");
-        DEFAULTS.put(SEC_PASSWORD_REQUIRE_UPPER, "true");
-        DEFAULTS.put(SEC_PASSWORD_REQUIRE_NUMBER, "true");
-        DEFAULTS.put(SEC_PASSWORD_REQUIRE_SPECIAL, "true");
+        DEFAULTS.put(SEC_PASSWORD_REQUIRE_COMPLEX, "true");
         DEFAULTS.put(SEC_PASSWORD_EXPIRE_DAYS, "90");
         DEFAULTS.put(SEC_LOGIN_MAX_ATTEMPTS, "5");
         DEFAULTS.put(SEC_LOGIN_LOCKOUT_MINUTES, "30");
@@ -89,16 +85,8 @@ public class SettingService {
         return Integer.parseInt(getConfigValue(SEC_PASSWORD_MIN_LEN, DEFAULTS.get(SEC_PASSWORD_MIN_LEN)));
     }
 
-    public boolean isPasswordRequireUppercase() {
-        return "true".equalsIgnoreCase(getConfigValue(SEC_PASSWORD_REQUIRE_UPPER, DEFAULTS.get(SEC_PASSWORD_REQUIRE_UPPER)));
-    }
-
-    public boolean isPasswordRequireNumber() {
-        return "true".equalsIgnoreCase(getConfigValue(SEC_PASSWORD_REQUIRE_NUMBER, DEFAULTS.get(SEC_PASSWORD_REQUIRE_NUMBER)));
-    }
-
-    public boolean isPasswordRequireSpecial() {
-        return "true".equalsIgnoreCase(getConfigValue(SEC_PASSWORD_REQUIRE_SPECIAL, DEFAULTS.get(SEC_PASSWORD_REQUIRE_SPECIAL)));
+    public boolean isPasswordRequireComplex() {
+        return "true".equalsIgnoreCase(getConfigValue(SEC_PASSWORD_REQUIRE_COMPLEX, DEFAULTS.get(SEC_PASSWORD_REQUIRE_COMPLEX)));
     }
 
     public int getPasswordExpireDays() {
@@ -140,14 +128,16 @@ public class SettingService {
         if (password.length() < getPasswordMinLength()) {
             return "Password must be at least " + getPasswordMinLength() + " characters";
         }
-        if (isPasswordRequireUppercase() && !password.matches(".*[A-Z].*")) {
-            return "Password must contain at least one uppercase letter";
-        }
-        if (isPasswordRequireNumber() && !password.matches(".*[0-9].*")) {
-            return "Password must contain at least one number";
-        }
-        if (isPasswordRequireSpecial() && !password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
-            return "Password must contain at least one special character";
+        if (isPasswordRequireComplex()) {
+            if (!password.matches(".*[A-Z].*")) {
+                return "Password must contain at least one uppercase letter";
+            }
+            if (!password.matches(".*[0-9].*")) {
+                return "Password must contain at least one number";
+            }
+            if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
+                return "Password must contain at least one special character";
+            }
         }
         return null;
     }
