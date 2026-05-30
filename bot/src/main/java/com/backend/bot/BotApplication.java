@@ -10,6 +10,8 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ApplicationContext;
 import reactor.core.scheduler.Scheduler;
 
+import java.time.Duration;
+
 /**
  * Telegram Bot 管理系统主启动类
  * 

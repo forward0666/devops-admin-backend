@@ -7,6 +7,7 @@ import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.UserSessionService;
+import com.backend.bot.util.BotUserUtils;
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
