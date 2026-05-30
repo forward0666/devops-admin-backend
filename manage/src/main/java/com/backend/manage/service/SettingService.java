@@ -22,7 +22,7 @@ public class SettingService {
 
     @Autowired
     @Lazy
-    private com.backend.manage.service.CacheService cacheService;
+    private com.backend.utils.CacheService cacheService;
 
     // IP Access Control
     private static final String ALLOWED_KEY = "setting.ip.allowed_ips";
