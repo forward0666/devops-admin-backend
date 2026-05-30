@@ -290,7 +290,7 @@ public class TextUpdateHandler implements UpdateHandler {
                                                 Map<String, Object> res = (Map<String, Object>) respMap.get("result");
                                                 Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
                                                 interactiveMessageService.scheduleMessageDeletion(
-                                                        token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.empty()
+                                                        token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
                                                 ).subscribe();
                                             } catch (Exception e) {
                                                 log.warn("⚠️ Failed to schedule message deletion: {}", e.getMessage());
@@ -312,7 +312,7 @@ public class TextUpdateHandler implements UpdateHandler {
                                     Map<String, Object> res = (Map<String, Object>) respMap.get("result");
                                     Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
                                     interactiveMessageService.scheduleMessageDeletion(
-                                            token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.empty()
+                                            token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
                                     ).subscribe();
                                 } catch (Exception ex) {
                                     log.warn("⚠️ Failed to schedule message deletion: {}", ex.getMessage());

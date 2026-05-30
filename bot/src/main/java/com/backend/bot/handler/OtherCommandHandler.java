@@ -65,12 +65,12 @@ public class OtherCommandHandler implements UpdateHandler {
                             Long respMsgId = root.path("result").path("message_id").asLong(0);
                             if (respMsgId != 0) {
                                 // 回复消息 5s 后删除
-                                interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, respMsgId, 5, null, reactor.util.context.Context.empty()).subscribe();
+                                interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, respMsgId, 5, null, reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))).subscribe();
                             }
                         } catch (Exception ignored) {}
                         // 群聊中用户的命令消息也删除
                         if (isGroup && userMsgId != null && userId != null) {
-                            interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, userMsgId, 5, null, reactor.util.context.Context.empty()).subscribe();
+                            interactiveMessageService.scheduleMessageDeletion(token, userId, chatId, userMsgId, 5, null, reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))).subscribe();
                         }
                         return Mono.<Void>empty();
                     })

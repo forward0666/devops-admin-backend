@@ -269,7 +269,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                         com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
                         Long msgId = root.path("result").path("message_id").asLong(0);
                         if (msgId != 0) {
-                            return interactiveMessageService.scheduleMessageDeletion(token, 0L, chatId, msgId, 5, null, reactor.util.context.Context.empty());
+                            return interactiveMessageService.scheduleMessageDeletion(token, 0L, chatId, msgId, 5, null, reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY)));
                         }
                     } catch (Exception ignored) {}
                     return reactor.core.publisher.Mono.empty();

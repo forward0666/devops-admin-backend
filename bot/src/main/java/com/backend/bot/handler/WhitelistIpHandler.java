@@ -187,7 +187,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                         Map<String, Object> result = (Map<String, Object>) resp.get("result");
                         Long msgId = Long.valueOf(String.valueOf(result.get("message_id")));
                         interactiveMessageService.scheduleMessageDeletion(
-                                token, null, chatId, msgId, 60, "WhitelistIpHandler", Context.empty()
+                                token, null, chatId, msgId, 60, "WhitelistIpHandler", Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))
                         ).subscribe();
                     } catch (Exception e) {
                         log.warn("⚠️ sendPromptMsg: failed to parse msgId: {}", e.getMessage());
@@ -295,7 +295,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                         Map<String, Object> result = (Map<String, Object>) resp.get("result");
                         Long msgId = Long.valueOf(String.valueOf(result.get("message_id")));
                         interactiveMessageService.scheduleMessageDeletion(
-                                token, null, chatId, msgId, 30, "WhitelistIpHandler", Context.empty()
+                                token, null, chatId, msgId, 30, "WhitelistIpHandler", Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))
                         ).subscribe();
                     } catch (Exception e) {
                         log.warn("⚠️ sendMsg: failed to parse msgId: {}", e.getMessage());

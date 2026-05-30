@@ -382,7 +382,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         Mono<Void> send = botClientService.editMessageText(token, chatId, messageId, text, null)
                 .onErrorResume(e -> botClientService.sendMessage(token, chatId, text, null));
         if (autoDelete) {
-            send = send.doOnSuccess(v -> interactiveMessageService.scheduleMessageDeletion(token, null, chatId, messageId, 10, "[bot]", Context.empty()).subscribe());
+            send = send.doOnSuccess(v -> interactiveMessageService.scheduleMessageDeletion(token, null, chatId, messageId, 10, "[bot]", Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))).subscribe());
         }
         return send.then();
     }
