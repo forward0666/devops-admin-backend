@@ -72,7 +72,7 @@ public class BotWebhookController {
 
             if (user == null || user.id() == null) {
                 LogUtils.processWebhookUpdateAndPublishEvent(
-                        reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY)), eventPublisher, botName, botUpdate
+                        com.backend.bot.util.LogUtils.buildTraceContext(), eventPublisher, botName, botUpdate
                 );
                 return Mono.empty();
             }
@@ -136,7 +136,7 @@ public class BotWebhookController {
                                                             Long warnMsgId = root.path("result").path("message_id").asLong(0);
                                                             if (warnMsgId != 0) {
                                                                 return interactiveMessageService.scheduleMessageDeletion(
-                                                                        bl.getBotToken(), 0L, chatId, warnMsgId, 5, null, reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))
+                                                                        bl.getBotToken(), 0L, chatId, warnMsgId, 5, null, com.backend.bot.util.LogUtils.buildTraceContext()
                                                                 );
                                                             }
                                                         } catch (Exception ignored) {}
@@ -152,7 +152,7 @@ public class BotWebhookController {
                                     log.info("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.<Void>fromRunnable(() ->
                                         LogUtils.processWebhookUpdateAndPublishEvent(
-                                            reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY)), eventPublisher, botName, botUpdate)
+                                            com.backend.bot.util.LogUtils.buildTraceContext(), eventPublisher, botName, botUpdate)
                                     ).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
                     });

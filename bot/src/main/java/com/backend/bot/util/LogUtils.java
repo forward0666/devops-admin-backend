@@ -135,4 +135,15 @@ public final class LogUtils {
         // 3. 构建并返回日志前缀 (使用新的更健壮的格式)
         return buildTraceIdLogPrefix(traceId);
     }
+
+    /**
+     * 构建包含 traceId 的 Reactor Context，null 安全
+     */
+    public static reactor.util.context.Context buildTraceContext() {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        if (traceId != null) {
+            return reactor.util.context.Context.of(TRACE_ID_KEY, traceId);
+        }
+        return reactor.util.context.Context.empty();
+    }
 }

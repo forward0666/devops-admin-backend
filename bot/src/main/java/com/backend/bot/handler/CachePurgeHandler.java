@@ -241,7 +241,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                         Map<String, Object> result = (Map<String, Object>) resp.get("result");
                         Long msgId = Long.valueOf(String.valueOf(result.get("message_id")));
                         interactiveMessageService.scheduleMessageDeletion(
-                                token, null, chatId, msgId, 30, "CachePurgeHandler", Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY))
+                                token, null, chatId, msgId, 30, "CachePurgeHandler", com.backend.bot.util.LogUtils.buildTraceContext()
                         ).subscribe();
                     } catch (Exception e) {
                         log.warn("⚠️ sendMsg: failed to parse msgId: {}", e.getMessage());
