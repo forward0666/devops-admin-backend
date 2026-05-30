@@ -147,10 +147,11 @@ public class BotWebhookController {
                                                 .then(Mono.empty());
                                     }
                                     log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
-                                    return Mono.<Void>fromRunnable(() -> {
+                                    return Mono.defer(() -> {
                                         org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
                                         LogUtils.processWebhookUpdateAndPublishEvent(
                                             ctx, eventPublisher, botName, botUpdate);
+                                        return Mono.<Void>empty();
                                     }).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
                     });
