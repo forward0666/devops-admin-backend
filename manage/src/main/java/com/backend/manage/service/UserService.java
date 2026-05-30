@@ -42,7 +42,8 @@ public class UserService {
     @Autowired
     private SettingService settingService;
 
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     // ==================== 查询方法 ====================
 
