@@ -319,7 +319,6 @@ public class TextUpdateHandler implements UpdateHandler {
                                 }
                             })
                             .then();
-                            });
                 })
                 .then();
     }
