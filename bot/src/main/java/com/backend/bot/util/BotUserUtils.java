@@ -2,6 +2,7 @@ package com.backend.bot.util;
 
 import com.backend.bot.context.HandlerContext;
 import com.backend.bot.dto.BotUpdateDto;
+import com.backend.bot.dto.UserDto;
 import lombok.experimental.UtilityClass;
 import org.springframework.util.StringUtils;
 
