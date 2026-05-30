@@ -280,44 +280,48 @@ public class TextUpdateHandler implements UpdateHandler {
                     return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env, operatorName)
                             .flatMap(result -> {
                                 String text = "✅ " + result + "\n\nIP: " + ip + " | 用户: " + (username.isEmpty() ? "未填写" : username) + "\n操作人: " + operatorName + "\n\n⏳ 此消息将在 30 秒后自动销毁";
-                                // 删除用户发送的原始消息
-                                botClientService.deleteMessage(token, chatId, userMessageId).subscribe();
-                                return userSessionService.clearUserSession(userId)
+                                // 删除用户发送的原始消息 + 发送回复 + 调度删除
+                                return botClientService.deleteMessage(token, chatId, userMessageId)
+                                        .onErrorResume(e -> Mono.empty())
+                                        .then(userSessionService.clearUserSession(userId))
                                         .then(botClientService.sendMenuMessageWithResponse(token, chatId, text, null))
                                         .flatMap(resp -> {
                                             try {
                                                 Map<String, Object> respMap = objectMapper.readValue(resp, Map.class);
                                                 Map<String, Object> res = (Map<String, Object>) respMap.get("result");
                                                 Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
-                                                interactiveMessageService.scheduleMessageDeletion(
+                                                return interactiveMessageService.scheduleMessageDeletion(
                                                         token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
-                                                ).subscribe();
+                                                ).then(Mono.empty());
                                             } catch (Exception e) {
                                                 log.warn("⚠️ Failed to schedule message deletion: {}", e.getMessage());
+                                                return Mono.empty();
                                             }
-                                            return Mono.empty();
                                         });
                             });
                 })
                 .onErrorResume(e -> {
                     log.error("{}❌ Whitelist add error: {}", traceLogPrefix, e.getMessage());
                     String errText = "⚠️ 加白失败: " + e.getMessage() + "\n\n⏳ 此消息将在 30 秒后自动销毁";
-                    // 删除用户发送的原始消息
-                    botClientService.deleteMessage(token, chatId, userMessageId).subscribe();
-                    return userSessionService.clearUserSession(userId)
+                    // 删除用户发送的原始消息 + 发送回复 + 调度删除
+                    return botClientService.deleteMessage(token, chatId, userMessageId)
+                            .onErrorResume(ex -> Mono.empty())
+                            .then(userSessionService.clearUserSession(userId))
                             .then(botClientService.sendMenuMessageWithResponse(token, chatId, errText, null))
                             .flatMap(resp -> {
                                 try {
                                     Map<String, Object> respMap = objectMapper.readValue(resp, Map.class);
                                     Map<String, Object> res = (Map<String, Object>) respMap.get("result");
                                     Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
-                                    interactiveMessageService.scheduleMessageDeletion(
+                                    return interactiveMessageService.scheduleMessageDeletion(
                                             token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
-                                    ).subscribe();
+                                    ).then(Mono.empty());
                                 } catch (Exception ex) {
                                     log.warn("⚠️ Failed to schedule message deletion: {}", ex.getMessage());
+                                    return Mono.empty();
                                 }
-                                return Mono.empty();
+                            })
+                            .then();
                             });
                 })
                 .then();
