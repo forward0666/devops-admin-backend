@@ -55,7 +55,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
         if (callbackData == null) return false;
         boolean match = callbackData.startsWith("callback_data_PROJECT_PURGECACHE_")
                 || callbackData.startsWith("callback_data_PURGE_RULE_");
-        log.info("🔍 CachePurgeHandler.supports({}) = {}", callbackData, match);
         return match;
     }
 
@@ -76,7 +75,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
         String tgUsername = botUpdate.callbackQuery() != null && botUpdate.callbackQuery().from() != null
                 ? botUpdate.callbackQuery().from().username() : "bot";
 
-        log.info("🚀 CachePurgeHandler: action={}, chatId={}, botName={}, tgUsername={}", action, chatId, botName, tgUsername);
 
         return Mono.deferContextual(contextView -> {
             String prefix = LogUtils.prepareMdcAndGetPrefix(contextView);
@@ -100,7 +98,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
     private Mono<Void> handlePurgeCacheList(String prefix, String botName, Long chatId,
                                               Long messageId, String token, String env) {
-        log.info("{}🔍 CachePurge: listing rules for botName={}, env={}", prefix, botName, env);
 
         return Mono.zip(
                 getProjectId(botName, chatId),
@@ -110,7 +107,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
             String cfUrl = tuple.getT2();
             WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
             String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
-            log.info("{}🔍 CachePurge: fetching {}", prefix, uri);
 
             return webClient.get().uri(uri).retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
@@ -141,7 +137,6 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
     private Mono<Void> handlePurgeRule(String prefix, String botName, Long chatId,
                                          Long messageId, String token, String ruleId, String tgUsername, String env) {
-        log.info("{}🔍 CachePurge: purging ruleId={} for botName={}", prefix, ruleId, botName);
 
         return Mono.zip(
                 getProjectId(botName, chatId),
@@ -174,7 +169,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
                                 .toList();
                     })
                     .flatMap(domains -> {
-                        log.info("🔍 CachePurgeRule: web domains={}", domains);
+                        log.debug("🔍 CachePurgeRule: web domains={}", domains);
                         if (domains.isEmpty()) {
                             return sendMsg(token, chatId, "⚠️ 无 web 类型域名", null);
                         }

@@ -71,7 +71,6 @@ public class RedisUserSessionService implements UserSessionService {
                 String sessionKey = buildSessionKey(userId);
                 String sessionJson = objectMapper.writeValueAsString(session);
 
-                log.info("{}📝 Storing user session in Redis for userId: {}. New state: {}", logPrefix, userId, newState);
 
                 // 存储会话并设置过期时间
                 return redisTemplate.opsForValue()
@@ -153,7 +152,7 @@ public class RedisUserSessionService implements UserSessionService {
             String sessionKey = buildSessionKey(userId);
 
             // 只需要删除主会话键
-            log.info("{}🗑️ Clearing primary user session key from Redis for userId: {}", logPrefix, userId);
+            log.debug("🗑️ Clearing user session key from Redis for userId: {}", logPrefix, userId);
 
             return redisTemplate.delete(sessionKey)
                     .then()
@@ -174,7 +173,6 @@ public class RedisUserSessionService implements UserSessionService {
                 // 不取消之前的系统消息，让它们独立运行
                 long uniqueId = systemMessageCounter.incrementAndGet();
                 systemMessageDeletions.put(uniqueId, deletionTask);
-                log.info("{}⏳ Stored new system message deletion task in memory with uniqueId: {}", logPrefix, uniqueId);
                 return Mono.empty();
             } else {
                 // 确保旧任务被取消
@@ -194,7 +192,6 @@ public class RedisUserSessionService implements UserSessionService {
 
             if (userId == 0L) {
                 // 对于系统消息（userId=0），取消所有系统消息的删除任务
-                log.info("{}⚠️ Cancelling all system message deletion tasks", logPrefix);
                 systemMessageDeletions.forEach((id, disposable) -> {
                     if (disposable != null && !disposable.isDisposed()) {
                         disposable.dispose();
@@ -208,7 +205,6 @@ public class RedisUserSessionService implements UserSessionService {
                     Disposable disposable = pendingDeletions.remove(userId);
                     if (disposable != null && !disposable.isDisposed()) {
                         disposable.dispose();
-                        log.info("{}✅ Cancelled pending menu deletion task for userId: {}", logPrefix, userId);
                     } else if (disposable != null) {
                         log.debug("{}⚠️ Attempted to cancel a task that was already disposed for userId: {}", logPrefix, userId);
                     }

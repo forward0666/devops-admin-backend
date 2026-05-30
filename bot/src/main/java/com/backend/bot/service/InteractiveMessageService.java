@@ -47,10 +47,8 @@ public class InteractiveMessageService {
                     Boolean added = stringRedisTemplate.opsForZSet().add(ZSET_KEY, value, score);
                     log.info("{}✅ [Step2] Redis ZSET写入完成 | added={}, key={}, score={}", combinedLogPrefix, added, ZSET_KEY, score);
                     Long size = stringRedisTemplate.opsForZSet().size(ZSET_KEY);
-                    log.info("{}📊 [Step3] Redis ZSET当前任务数={}", combinedLogPrefix, size);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .doOnSuccess(v -> log.info("{}✅ [scheduleMessageDeletion] 完成 | messageId={}, delay={}s", combinedLogPrefix, messageId, delaySeconds))
                 .onErrorResume(e -> {
                     log.error("{}❌ [Step2] Redis ZSET写入失败 | error={}", combinedLogPrefix, e.getMessage(), e);
                     return Mono.empty();
@@ -92,7 +90,6 @@ public class InteractiveMessageService {
             for (ZSetOperations.TypedTuple<String> tuple : expired) {
                 String value = tuple.getValue();
                 if (value == null) continue;
-                log.info("📋 [ScheduledTask] 处理任务 | value长度={}, score={}", value.length(), tuple.getScore());
                 processDeletionTask(value);
             }
 

@@ -202,7 +202,6 @@ public class BotClientService {
                 .flatMap(response -> Mono.deferContextual(contextView -> {
                     String prefix = getTraceIdPrefix(contextView);
                     String logIdentifier = chatName != null && !chatName.isBlank() ? chatName : String.valueOf(chatId);
-                    log.info("{}✅ Message sent successfully and full JSON response received for Chat: {}", prefix, logIdentifier);
                     return Mono.just(response);
                 }))
                 .onErrorResume(e -> Mono.deferContextual(contextView -> {
@@ -360,7 +359,6 @@ public class BotClientService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(String.class)
-                .doOnNext(res -> log.info("deleteWebhook response: {}", res));
     }
 
     public Mono<Long> createForumTopic(String token, Long chatId, String topicName) {

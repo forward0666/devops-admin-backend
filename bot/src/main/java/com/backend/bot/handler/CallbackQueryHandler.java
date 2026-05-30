@@ -47,7 +47,6 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         boolean isMenuNavigation = actionHandlers.stream()
                 .anyMatch(handler -> {
                     boolean supported = handler.supports(callbackData);
-                    if (supported) log.info("{}🔍 isMenuNavigation check: {} supports={}", logPrefix, handler.getClass().getSimpleName(), callbackData);
                     return (handler instanceof MenuNavigationHandler || handler instanceof CachePurgeHandler || handler instanceof WhitelistIpHandler) && supported;
                 });
 

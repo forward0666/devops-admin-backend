@@ -261,7 +261,6 @@ public class BotCoreService {
      * @return Mono<Boolean> - true 如果更新成功，false 如果记录不存在
      */
     public Mono<Boolean> updateChatAuthorizationStatus(String botName, Long botConfigId, Long chatId, Integer status) {
-        log.info("📝 Updating authorization for bot {} (ID: {}), chat {} to status: {}", botName, botConfigId, chatId, status);
         
         // 1. 查询并更新数据库中的记录
         return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
@@ -307,7 +306,6 @@ public class BotCoreService {
      * @return Mono<Boolean> - true 如果添加成功，false 如果已存在
      */
     public Mono<Boolean> addAuthorizedChat(String botName, Long botConfigId, Long chatId, String chatName, String type) {
-        log.info("📝 Adding authorized chat {} for bot {} (ID: {})", chatId, botName, botConfigId);
         
         // 1. 检查是否已存在
         return authorizedChatRepository.findByBotConfigIdAndChatId(botConfigId, chatId)
@@ -350,7 +348,6 @@ public class BotCoreService {
      * @return Mono<BotConfigEntity> 更新后的实体，如果记录不存在则返回 Mono.empty()
      */
     public Mono<BotConfigEntity> updateBotStatusByName(String botName, Integer status) {
-        log.info("📝 Updating bot {} status to: {}", botName, status);
         return botRepository.findByBotName(botName)
                 .flatMap(entity -> {
                     entity.setStatus(status);

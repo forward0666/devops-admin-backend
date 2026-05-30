@@ -98,7 +98,7 @@ public class BotWebhookController {
             }
 
             final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
-            log.info("🔍 processAsync | botName={}, userId={}, chatId={}", botName, user.id(), chatId);
+            log.debug("🔍 processAsync | botName, user.id(), chatId);
 
             return botCoreService.findByBotName(botName)
                     .timeout(Duration.ofSeconds(3))
@@ -146,7 +146,7 @@ public class BotWebhookController {
                                                 })
                                                 .then(Mono.empty());
                                     }
-                                    log.info("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
+                                    log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.<Void>fromRunnable(() ->
                                         LogUtils.processWebhookUpdateAndPublishEvent(
                                             reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate)
