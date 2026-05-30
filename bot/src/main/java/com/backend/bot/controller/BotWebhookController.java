@@ -2,8 +2,6 @@ package com.backend.bot.controller;
 import com.backend.bot.service.InteractiveMessageService;
 
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.CallbackQueryDto;
-import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.service.BotCoreService;
 import com.backend.bot.service.BotClientService;
@@ -12,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -20,9 +17,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 
-import static com.backend.bot.util.BotChatUtils.extractChatId;
 
 @RestController
 @RequiredArgsConstructor

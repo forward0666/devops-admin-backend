@@ -7,10 +7,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ApplicationContext;
 import reactor.core.scheduler.Scheduler;
-import java.time.Duration; // 引入 Scheduler
 
 /**
  * Telegram Bot 管理系统主启动类

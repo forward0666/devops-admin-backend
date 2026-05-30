@@ -2,12 +2,10 @@ package com.backend.bot.handler;
 
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.UserDto; // 假设 UserDto 包含了用户信息
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.UserSessionService;
-import com.backend.bot.util.BotUserUtils; // <-- 引入 BotUserUtils
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

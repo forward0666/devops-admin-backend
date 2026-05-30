@@ -1,7 +1,6 @@
 package com.backend.bot.controller;
 
 import com.backend.bot.entity.BotAuthorizedChatEntity;
-import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.repository.BotAuthorizedChatRepository;
 import com.backend.bot.service.BotCoreService;
 import lombok.RequiredArgsConstructor;

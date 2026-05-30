@@ -1,7 +1,6 @@
 package com.backend.bot.listener;
 
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.MessageDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.event.BotUpdateEvent;
 import com.backend.bot.service.BotCoreService;

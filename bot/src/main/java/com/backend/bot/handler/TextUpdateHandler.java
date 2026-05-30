@@ -2,21 +2,18 @@ package com.backend.bot.handler;
 
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
-import com.backend.bot.dto.UserDto; // 引入 User DTO
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
 import com.backend.bot.service.InteractiveMessageService;
-import com.backend.bot.util.BotUserUtils; // 引入新增的工具类
 import com.backend.bot.util.LogUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.util.context.ContextView;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

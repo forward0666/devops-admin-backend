@@ -2,7 +2,6 @@ package com.backend.bot.util;
 
 import com.backend.bot.constants.TelegramConstants;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.client.reactive.ClientHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -11,7 +10,6 @@ import reactor.util.retry.Retry;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * Telegram API 请求构建器

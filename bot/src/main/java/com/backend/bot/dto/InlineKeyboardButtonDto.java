@@ -99,12 +99,6 @@ public class InlineKeyboardButtonDto {
     private String callbackData;
     
     // 可扩展字段（按需添加）：
-    // @JsonProperty("url") private String url;                           // URL 按钮
-    // @JsonProperty("switch_inline_query") private String switchInlineQuery; // 切换内联查询
-    // @JsonProperty("switch_inline_query_current_chat") private String switchInlineQueryCurrentChat; // 在当前聊天切换内联查询
-    // @JsonProperty("callback_game") private CallbackGameDto callbackGame; // 回调游戏
-    // @JsonProperty("login_url") private LoginUrlDto loginUrl;            // 登录 URL
-    // @JsonProperty("pay") private Boolean pay;                           // 付款按钮
     
     /**
      * 无参构造函数
