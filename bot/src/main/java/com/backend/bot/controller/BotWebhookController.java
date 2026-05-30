@@ -36,10 +36,9 @@ public class BotWebhookController {
             @RequestBody BotUpdateDto botUpdate,
             org.springframework.web.server.ServerWebExchange exchange
     ) {
-        // 从 request header 直接读取 traceId，不依赖 MDC
-        String cfRay = exchange.getRequest().getHeaders().getFirst("CF-RAY");
-        final String traceId = (cfRay != null && !cfRay.isEmpty()) ? cfRay : java.util.UUID.randomUUID().toString();
-        org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
+        // 从 request header 直接读取 traceId
+        final String traceId = network.TraceIdUtils.getTraceId(exchange);
+        network.TraceIdUtils.setTraceId(traceId);
         String updateType = botUpdate.message() != null ? "TEXT:" + botUpdate.message().text() :
                 botUpdate.callbackQuery() != null ? "CALLBACK:" + botUpdate.callbackQuery().data() : "UNKNOWN";
         Long userId = botUpdate.message() != null ? botUpdate.message().from().id() :
