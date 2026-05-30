@@ -33,6 +33,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 @SpringBootApplication(
         scanBasePackages = {
+                "com.backend.utils",
                 "com.backend.manage", // 主工程包
                 "config"
         })

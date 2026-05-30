@@ -33,6 +33,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 @SpringBootApplication(
         scanBasePackages = {
+                "com.backend.utils",
                 "com.backend.user","config"
         })
 @EnableDiscoveryClient
