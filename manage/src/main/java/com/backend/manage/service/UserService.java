@@ -457,6 +457,12 @@ public class UserService {
         userCacheService.clearUserCache(id);
         userCacheService.clearAllUserListCache();
 
+        // 清除登录 token，强制下线
+        UserEntity user = userMapper.findByIdIncludeInactive(id);
+        if (user != null && user.getUsername() != null) {
+            userCacheService.clearUserTokens(user.getUsername());
+        }
+
         if (newDeptId != null && !newDeptId.equals(oldDeptId)) {
             if (oldDeptId != null) {
                 departmentCacheService.clearDepartmentUsersCache(oldDeptId);

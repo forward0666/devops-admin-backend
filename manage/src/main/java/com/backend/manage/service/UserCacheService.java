@@ -66,4 +66,13 @@ public class UserCacheService {
         cacheService.clearByPrefix(USER_PREFIX);
         redisTemplate.delete(USERS_LIST);
     }
+
+    /**
+     * 清除用户的登录 token，强制下线
+n     */
+    public void clearUserTokens(String username) {
+        if (!cacheService.isRedisAvailable() || username == null || username.isEmpty()) return;
+        cacheService.clearByPrefix("token:validation:" + username + ":");
+        log.info("✅ Cleared login tokens for user: {}", username);
+    }
 }
