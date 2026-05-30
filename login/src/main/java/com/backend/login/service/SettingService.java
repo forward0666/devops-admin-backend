@@ -37,7 +37,7 @@ public class SettingService {
 
     // Password Policy
     private static final String SEC_PASSWORD_MIN_LEN = "setting.password.min_length";
-    private static final String SEC_PASSWORD_REQUIRE_COMPLEX = "setting.password.require_complex";
+    private static final String SEC_PASSWORD_REQUIRE_COMPLEX = "setting.password.require.complex";
     private static final String SEC_PASSWORD_EXPIRE_DAYS = "setting.password.expire_days";
 
     // Login Security
