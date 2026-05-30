@@ -33,8 +33,13 @@ public class BotWebhookController {
     @PostMapping("/callback/{botName}")
     public Mono<ResponseEntity<Map<String, String>>> onUpdateReceived(
             @PathVariable String botName,
-            @RequestBody BotUpdateDto botUpdate
+            @RequestBody BotUpdateDto botUpdate,
+            org.springframework.web.server.ServerWebExchange exchange
     ) {
+        // 从 request header 直接读取 traceId，不依赖 MDC
+        String cfRay = exchange.getRequest().getHeaders().getFirst("CF-RAY");
+        final String traceId = (cfRay != null && !cfRay.isEmpty()) ? cfRay : java.util.UUID.randomUUID().toString();
+        org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
         String updateType = botUpdate.message() != null ? "TEXT:" + botUpdate.message().text() :
                 botUpdate.callbackQuery() != null ? "CALLBACK:" + botUpdate.callbackQuery().data() : "UNKNOWN";
         Long userId = botUpdate.message() != null ? botUpdate.message().from().id() :
@@ -47,14 +52,12 @@ public class BotWebhookController {
         return Mono.just(ResponseEntity.ok(Map.of("status", "ok")))
                 .doOnNext(response -> {
                     // 异步处理，不阻塞响应
-                    processAsync(botName, botUpdate);
+                    processAsync(botName, botUpdate, traceId);
                 });
     }
-    private void processAsync(String botName, BotUpdateDto botUpdate) {
-        // 从 HTTP 线程 MDC 捕获 traceId，作为 final 变量传递
-        final String traceId = org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY);
+    private void processAsync(String botName, BotUpdateDto botUpdate, final String traceId) {
         Mono.defer(() -> {
-            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A");
+            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
             final UserDto user;
             final Long chatId;
             if (botUpdate.message() != null) {
