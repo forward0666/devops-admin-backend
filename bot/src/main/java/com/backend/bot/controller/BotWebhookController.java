@@ -74,7 +74,7 @@ public class BotWebhookController {
 
             if (user == null || user.id() == null) {
                 LogUtils.processWebhookUpdateAndPublishEvent(
-                        com.backend.bot.util.LogUtils.syncTraceContext(null), eventPublisher, botName, botUpdate
+                        reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate
                 );
                 return Mono.empty();
             }
@@ -154,7 +154,7 @@ public class BotWebhookController {
                                     log.info("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.<Void>fromRunnable(() ->
                                         LogUtils.processWebhookUpdateAndPublishEvent(
-                                            com.backend.bot.util.LogUtils.buildTraceContext(), eventPublisher, botName, botUpdate)
+                                            reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate)
                                     ).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
                     });
