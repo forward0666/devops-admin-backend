@@ -141,12 +141,14 @@ async def update_security_rule(rule_id: str, body: dict):
 
     new_rule_ids = {e["ruleId"] for e in update_fields.get("entries", []) if e.get("ruleId")}
     if new_rule_ids:
+        logger.info(f"[PUT] Checking duplicates: ruleIds={new_rule_ids}, exclude_oid={oid}")
         dup = await db[COLLECTION].find_one({
             "projectId": project_id,
             "_id": {"$ne": oid},
             "entries.ruleId": {"$in": list(new_rule_ids)}
         })
         if dup:
+            logger.warning(f"[PUT] Duplicate found: {dup.get('name')}, id={dup.get('_id')}")
             raise HTTPException(status_code=400, detail=f"Duplicate Rule ID: {', '.join(new_rule_ids)}")
 
     await db[COLLECTION].update_one({"_id": oid}, {"$set": update_fields})
