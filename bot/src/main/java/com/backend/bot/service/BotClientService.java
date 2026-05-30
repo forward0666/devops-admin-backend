@@ -358,7 +358,7 @@ public class BotClientService {
         return telegramWebClient.post()
                 .uri(url)
                 .retrieve()
-                .bodyToMono(String.class)
+                .bodyToMono(String.class);
     }
 
     public Mono<Long> createForumTopic(String token, Long chatId, String topicName) {

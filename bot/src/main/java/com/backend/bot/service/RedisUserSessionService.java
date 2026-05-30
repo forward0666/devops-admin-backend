@@ -152,7 +152,7 @@ public class RedisUserSessionService implements UserSessionService {
             String sessionKey = buildSessionKey(userId);
 
             // 只需要删除主会话键
-            log.debug("🗑️ Clearing user session key from Redis for userId: {}", logPrefix, userId);
+            log.debug("🗑️ Clearing user session for userId={}", userId);
 
             return redisTemplate.delete(sessionKey)
                     .then()

@@ -98,7 +98,7 @@ public class BotWebhookController {
             }
 
             final String blacklistKey = "bot:blacklist:" + botName + ":" + user.id();
-            log.debug("🔍 processAsync | botName, user.id(), chatId);
+            log.debug("🔍 processAsync | botName={}, userId={}, chatId={}", botName, user.id(), chatId);
 
             return botCoreService.findByBotName(botName)
                     .timeout(Duration.ofSeconds(3))
