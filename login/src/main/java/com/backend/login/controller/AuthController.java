@@ -25,6 +25,9 @@ public class AuthController {
     @Autowired
     private com.backend.login.service.OperationLogService operationLogService;
 
+    @Autowired
+    private com.backend.login.service.SettingService settingService;
+
     @PostMapping("/authLogIn")
     public ResponseEntity<ApiResponseDto<LoginVo>> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
         try {
@@ -43,6 +46,11 @@ public class AuthController {
                 request.getHeader("X-Real-IP"),
                 request.getRemoteAddr()
             );
+
+            // IP 访问控制
+            if (!settingService.isIpAllowed(clientIP)) {
+                return ResponseEntity.status(403).body(ApiResponseDto.error(403, "IP not allowed: " + clientIP));
+            }
 
             var loginResponse = authService.login(loginRequest, clientIP);
 
