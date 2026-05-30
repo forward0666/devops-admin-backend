@@ -101,7 +101,7 @@ public class WhitelistServiceImpl implements WhitelistService {
                             Map<String, Object> errBody = objectMapper.readValue(wce.getResponseBodyAsString(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
                             Object detail = errBody.get("detail");
                             if (detail != null) errMsg = String.valueOf(detail);
-                        } catch (Exception ignored) {}
+                        } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
                     }
                     log.error("❌ CF Whitelist: failed to add IP {}: {}", ip, errMsg);
                     return Mono.just("失败: " + errMsg);

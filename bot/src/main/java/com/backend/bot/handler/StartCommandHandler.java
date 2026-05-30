@@ -270,7 +270,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                         if (msgId != 0) {
                             return interactiveMessageService.scheduleMessageDeletion(token, 0L, chatId, msgId, 5, null, com.backend.bot.util.LogUtils.buildTraceContext());
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
                     return reactor.core.publisher.Mono.empty();
                 }).subscribe();
     }

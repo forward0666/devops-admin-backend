@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.*;
 
 import com.backend.manage.dto.UserRequestDto;
 import com.backend.manage.service.CacheService;
+import com.backend.manage.util.AccessValidator;
+import com.backend.manage.util.JwtUtil;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,9 @@ public class UserController {
 
     @Autowired
     private CacheService cacheService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @GetMapping
     public ApiResponseDto<List<UserVo>> getAllUsers() {
@@ -165,8 +171,9 @@ public class UserController {
         resourceIdIndex = 0,
         description = "删除用户"
     )
-    public ApiResponseDto<Void> deleteUser(@PathVariable Long id) {
+    public ApiResponseDto<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
         try {
+            AccessValidator.validate(request, jwtUtil, "sys_admin", "admin");
             boolean deleted = userService.deleteUser(id);
             if (deleted) {
                 return ApiResponseDto.success("User deleted successfully", null);
@@ -217,8 +224,9 @@ public class UserController {
         description = "管理员重置用户密码",
         logRequest = false
     )
-    public ApiResponseDto<Void> resetPassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest) {
+    public ApiResponseDto<Void> resetPassword(@PathVariable Long id, @RequestBody Map<String, String> passwordRequest, HttpServletRequest request) {
         try {
+            AccessValidator.validate(request, jwtUtil, "sys_admin", "admin");
             String newPassword = passwordRequest.get("newPassword");
 
             if (newPassword == null) {
@@ -248,8 +256,9 @@ public class UserController {
     }
 
     @PostMapping("/unlock/{id}")
-    public ApiResponseDto<Void> unlockUser(@PathVariable Long id) {
+    public ApiResponseDto<Void> unlockUser(@PathVariable Long id, HttpServletRequest request) {
         try {
+            AccessValidator.validate(request, jwtUtil, "sys_admin", "admin");
             UserEntity user = userService.getUserById(id);
             if (user == null) return ApiResponseDto.error("User not found");
             cacheService.delete("login:lock:" + user.getUsername());

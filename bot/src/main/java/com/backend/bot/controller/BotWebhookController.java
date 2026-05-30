@@ -136,7 +136,7 @@ public class BotWebhookController {
                                                                         bl.getBotToken(), 0L, chatId, warnMsgId, 5, null, com.backend.bot.util.LogUtils.buildTraceContext()
                                                                 );
                                                             }
-                                                        } catch (Exception ignored) {}
+                                                        } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
                                                         return Mono.empty();
                                                     }).onErrorResume(e -> Mono.empty());
                                                     Mono<Void> deleteMsg = msgId != null

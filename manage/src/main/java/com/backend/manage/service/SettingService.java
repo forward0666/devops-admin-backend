@@ -191,7 +191,8 @@ public class SettingService {
         String lockKey = "login:lock:" + username;
 
         // Increment fail count
-        int fails = cacheService.increment(failKey) != null ? (int)(long)cacheService.increment(failKey) : 1;
+        Long failCount = cacheService.increment(failKey);
+        int fails = failCount != null ? failCount.intValue() : 1;
         // Set TTL on fail count
         cacheService.set(failKey, fails, getLoginLockoutMinutes(), java.util.concurrent.TimeUnit.MINUTES);
 

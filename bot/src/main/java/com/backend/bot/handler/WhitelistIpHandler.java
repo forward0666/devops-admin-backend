@@ -281,7 +281,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                             try {
                                 String json = objectMapper.writeValueAsString(entity);
                                 redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
-                            } catch (Exception ignored) {}
+                            } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
                             return Mono.just(entity.getProjectId());
                         })
                         .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))));

@@ -155,7 +155,7 @@ public final class LogUtils {
         String traceId = null;
         try {
             traceId = ctx.get(TRACE_ID_KEY);
-        } catch (Exception ignored) {}
+        } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
         if (traceId == null || traceId.isEmpty()) {
             traceId = MDC.get(TRACE_ID_KEY);
         }
