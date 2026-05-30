@@ -10,13 +10,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
 import security.AuthValidationUtils;
 import webflux.WebExchangeUtils;
 
-import java.util.concurrent.Callable; // 引入 Callable 用于 Mono.fromCallable
-import java.util.concurrent.ExecutorService; // 仍然保留，但不再是核心依赖
-import java.util.concurrent.CompletableFuture; // 移除
 
 /**
  * 授权过滤器工厂

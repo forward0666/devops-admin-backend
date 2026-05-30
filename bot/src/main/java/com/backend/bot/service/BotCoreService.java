@@ -3,20 +3,15 @@ package com.backend.bot.service;
 import com.backend.bot.dto.BotRegisterDto;
 import com.backend.bot.entity.BotAuthorizedChatEntity;
 import com.backend.bot.entity.BotConfigEntity;
-import com.backend.bot.enums.BotType; // 统一使用 BotConfigEntity
-import com.backend.bot.repository.BotRepository; // 假设 BotRepository 存在
 import com.backend.bot.vo.BotVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler; // 🌟 导入 Scheduler
 import com.backend.bot.repository.BotAuthorizedChatRepository;
-import com.backend.bot.config.TelegramProperties; // <--- 新增导入
 import java.time.Duration;
 
 @Service

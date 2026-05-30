@@ -49,50 +49,6 @@ public class SecurityService {
         return List.of();
     }
 
-//    public boolean isIPAllowed(String clientIP) {
-//        try {
-//            log.info("Checking IP whitelist for client IP: {}", clientIP);
-//
-//            // Get allowed IPs from cached IP access control settings
-//            Map<String, Object> ipSettings = systemSettingsService.getIPAccessControl();
-//            String allowedIPsConfig = (String) ipSettings.getOrDefault("allowedIPs", "");
-//
-//            // If no whitelist is configured, allow all IPs (default behavior)
-//            if (allowedIPsConfig == null || allowedIPsConfig.trim().isEmpty()) {
-//                log.info("No IP whitelist configured, allowing all IPs");
-//                return true;
-//            }
-//
-//            // Parse the allowed IPs configuration
-//            List<String> allowedIPs = Arrays.stream(allowedIPsConfig.split("\n"))
-//                    .map(String::trim)
-//                    .filter(ip -> !ip.isEmpty())
-//                    .collect(Collectors.toList());
-//
-//            if (allowedIPs.isEmpty()) {
-//                log.info("Empty IP whitelist, allowing all IPs");
-//                return true;
-//            }
-//
-//            log.info("Checking against {} configured allowed IPs", allowedIPs.size());
-//
-//            // Check if client IP matches any allowed IP or IP range
-//            for (String allowedIP : allowedIPs) {
-//                if (isIPMatched(clientIP, allowedIP)) {
-//                    log.info("Client IP {} matched allowed IP/range: {}", clientIP, allowedIP);
-//                    return true;
-//                }
-//            }
-//
-//            log.warn("Client IP {} is not in the whitelist", clientIP);
-//            return false;
-//
-//        } catch (Exception e) {
-//            log.error("Error checking IP whitelist for {}: {}", clientIP, e.getMessage());
-//            // In case of error, allow access to prevent lockout (fail-open approach)
-//            return true;
-//        }
-//    }
 public boolean isIPAllowed(String clientIP) {
     try {
         Map<String, Object> ipSettings = systemSettingsService.getIPAccessControl();
@@ -122,50 +78,6 @@ public boolean isIPAllowed(String clientIP) {
      * @param clientIP The client IP address to check
      * @return true if the IP is blocked, false otherwise
      */
-//    public boolean isIPBlocked(String clientIP) {
-//        try {
-//            log.info("Checking IP blacklist for client IP: {}", clientIP);
-//
-//            // Get blocked IPs from cached IP access control settings
-//            Map<String, Object> ipSettings = systemSettingsService.getIPAccessControl();
-//            String blockedIPsConfig = (String) ipSettings.getOrDefault("blockedIPs", "");
-//
-//            // If no blacklist is configured, don't block any IPs
-//            if (blockedIPsConfig == null || blockedIPsConfig.trim().isEmpty()) {
-//                log.info("No IP blacklist configured, not blocking any IPs");
-//                return false;
-//            }
-//
-//            // Parse the blocked IPs configuration
-//            List<String> blockedIPs = Arrays.stream(blockedIPsConfig.split("\n"))
-//                    .map(String::trim)
-//                    .filter(ip -> !ip.isEmpty())
-//                    .collect(Collectors.toList());
-//
-//            if (blockedIPs.isEmpty()) {
-//                log.info("Empty IP blacklist, not blocking any IPs");
-//                return false;
-//            }
-//
-//            log.info("Checking against {} configured blocked IPs", blockedIPs.size());
-//
-//            // Check if client IP matches any blocked IP or IP range
-//            for (String blockedIP : blockedIPs) {
-//                if (isIPMatched(clientIP, blockedIP)) {
-//                    log.warn("Client IP {} matched blocked IP/range: {}", clientIP, blockedIP);
-//                    return true;
-//                }
-//            }
-//
-//            log.info("Client IP {} is not in the blacklist", clientIP);
-//            return false;
-//
-//        } catch (Exception e) {
-//            log.error("Error checking IP blacklist for {}: {}", clientIP, e.getMessage());
-//            // In case of error, don't block access
-//            return false;
-//        }
-//    }
     public boolean isIPBlocked(String clientIP) {
         try {
             Map<String, Object> ipSettings = systemSettingsService.getIPAccessControl();
