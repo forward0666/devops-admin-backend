@@ -55,6 +55,10 @@ public class BotUpdateListener {
         String botName = event.botName();
         BotUpdateDto botUpdate = event.botUpdate();
         final String traceId = event.traceId();
+        // 同步 traceId 到 MDC
+        if (traceId != null) {
+            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
+        }
 
         Long chatId = extractChatId(botUpdate).orElse(null);
         Long userId = extractUserId(botUpdate);
