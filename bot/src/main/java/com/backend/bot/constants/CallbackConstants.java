@@ -7,9 +7,7 @@ package com.backend.bot.constants;
 public class CallbackConstants {
     // --- 菜单导航常量 ---
     /** 返回主菜单的回调 */
-    public static final String MAIN_MENU_BACK = "MAIN_MENU_BACK";
     /** 主菜单的根回调（用于 MenuType 判断） */
-    public static final String MAIN_MENU_CALLBACK = "MAIN_MENU";
 
     // --- 最终业务操作常量：域名加白 ---
     public static final String FRONTEND_WEB_ACTION = "callback_data_FRONTEND_WEB_DOMAIN_ACTION";
