@@ -1,6 +1,6 @@
 package com.backend.login.service;
 
-import com.backend.login.service.CacheService;
+import com.backend.utils.CacheService;
 import com.backend.login.mapper.SettingMapper;
 import com.backend.login.entity.SettingEntity;
 import lombok.RequiredArgsConstructor;

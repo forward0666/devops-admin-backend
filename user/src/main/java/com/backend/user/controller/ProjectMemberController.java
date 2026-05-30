@@ -3,7 +3,7 @@ package com.backend.user.controller;
 import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.ProjectMemberEntity;
 import com.backend.user.service.ProjectMemberService;
-import com.backend.user.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.backend.user.vo.ProjectMemberVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

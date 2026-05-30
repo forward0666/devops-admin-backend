@@ -5,7 +5,7 @@ import com.backend.user.entity.MiddlewareEntity;
 import com.backend.user.entity.ProjectMemberEntity;
 import com.backend.user.service.MiddlewareService;
 import com.backend.user.service.ProjectMemberService;
-import com.backend.user.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.backend.user.vo.MiddlewareVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

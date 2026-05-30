@@ -4,7 +4,7 @@ import com.backend.manage.annotation.OperationLog;
 import com.backend.manage.service.DepartmentService;
 import com.backend.manage.service.OperationLogService;
 import com.backend.manage.service.UserService;
-import com.backend.manage.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;

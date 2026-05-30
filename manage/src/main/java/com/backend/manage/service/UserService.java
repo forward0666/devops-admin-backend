@@ -4,7 +4,7 @@ import com.backend.manage.entity.UserEntity;
 import com.backend.manage.mapper.UserMapper;
 import com.backend.manage.service.DepartmentCacheService;
 import com.backend.manage.service.UserCacheService;
-import com.backend.manage.service.CacheService;
+import com.backend.utils.CacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;

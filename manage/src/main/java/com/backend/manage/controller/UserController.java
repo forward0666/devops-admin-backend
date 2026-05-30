@@ -10,9 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import com.backend.manage.dto.UserRequestDto;
-import com.backend.manage.service.CacheService;
+import com.backend.utils.CacheService;
 import com.backend.manage.util.AccessValidator;
-import com.backend.manage.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;

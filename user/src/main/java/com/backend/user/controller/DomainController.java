@@ -6,7 +6,7 @@ import com.backend.user.entity.DomainEntity;
 import com.backend.user.entity.ProjectMemberEntity;
 import com.backend.user.service.DomainService;
 import com.backend.user.service.ProjectMemberService;
-import com.backend.user.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.backend.user.vo.DomainVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

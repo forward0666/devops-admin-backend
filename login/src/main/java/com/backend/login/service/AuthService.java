@@ -1,6 +1,6 @@
 package com.backend.login.service;
 
-import com.backend.login.service.CacheService;
+import com.backend.utils.CacheService;
 import com.backend.login.service.SecurityService;
 import com.backend.login.service.SettingService;
 import com.backend.login.client.SecurityServiceClient;
@@ -9,10 +9,10 @@ import com.backend.login.dto.LoginRequestDto;
 import com.backend.login.vo.LoginVo;
 import com.backend.login.entity.UserEntity;
 import com.backend.login.mapper.UserMapper;
-import com.backend.login.service.CacheService;
+import com.backend.utils.CacheService;
 import com.backend.login.service.SecurityService;
 import com.backend.login.service.SettingService;
-import com.backend.login.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

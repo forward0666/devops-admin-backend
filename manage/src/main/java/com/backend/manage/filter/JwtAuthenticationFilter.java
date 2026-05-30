@@ -1,7 +1,7 @@
 package com.backend.manage.filter;
 
-import com.backend.manage.service.CacheService;
-import com.backend.manage.util.JwtUtil;
+import com.backend.utils.CacheService;
+import com.backend.utils.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

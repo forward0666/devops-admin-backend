@@ -1,4 +1,4 @@
-package com.backend.manage.service;
+package com.backend.utils;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -10,8 +10,8 @@ import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
 /**
- * Redis缓存辅助类
- * 提供公共的Redis操作方法
+ * Redis 缓存公共服务
+ * 统一提供健康检查、前缀清理、Token 缓存、通用操作
  */
 @Slf4j
 @Service
@@ -38,7 +38,7 @@ public class CacheService {
             redisTemplate.getConnectionFactory().getConnection().ping();
             redisAvailable = true;
             log.debug("✅ Redis 连接正常");
-        } catch (Exception e) { log.debug("Redis error: {}", e.getMessage());
+        } catch (Exception e) {
             redisAvailable = false;
             log.error("❌ Redis 不可用: {}", e.getMessage(), e);
         }
@@ -63,7 +63,7 @@ public class CacheService {
             try (Cursor<byte[]> cursor = connection.keyCommands().scan(options)) {
                 while (cursor.hasNext()) {
                     byte[] key = cursor.next();
-                    connection.keyCommands().del(key); // Redis 3.2.5 只能用 DEL
+                    connection.keyCommands().del(key);
                 }
             }
             return null;
@@ -74,7 +74,6 @@ public class CacheService {
     public void clearAllCache() {
         if (!redisOk()) return;
 
-        // 清理所有业务相关的缓存
         clearByPrefix("user:");
         clearByPrefix("users:");
         clearByPrefix("role:");
@@ -90,6 +89,8 @@ public class CacheService {
         clearByPrefix("settings:");
     }
 
+    /* ================= Token 缓存 ================= */
+
     public void cacheTokenValidation(String username, String token, boolean valid, long expireSeconds) {
         if (!isRedisAvailable() || token == null) return;
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
@@ -97,11 +98,23 @@ public class CacheService {
         redisTemplate.opsForValue().set(key, valid, expireMin, java.util.concurrent.TimeUnit.MINUTES);
     }
 
+    public void cacheTokenValidation(String username, String token, boolean valid) {
+        cacheTokenValidation(username, token, valid, TOKEN_MIN * 60);
+    }
+
     public Boolean getCachedTokenValidation(String username, String token) {
         if (!isRedisAvailable() || token == null) return null;
         String key = TOKEN_PREFIX + username + ":" + DigestUtils.sha256Hex(token);
         Object v = redisTemplate.opsForValue().get(key);
         return (v instanceof Boolean b) ? b : null;
+    }
+
+    public void invalidateAllUserTokens(String username) {
+        if (!isRedisAvailable()) return;
+        var keys = redisTemplate.keys(TOKEN_PREFIX + username + ":*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
 
     /* ================= Generic Cache Operations ================= */

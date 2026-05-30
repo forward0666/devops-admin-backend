@@ -4,7 +4,7 @@ import com.backend.user.dto.ApiResponseDto;
 import com.backend.user.entity.ProjectEntity;
 import com.backend.user.service.ProjectService;
 import com.backend.user.service.ProjectMemberService;
-import com.backend.user.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.backend.user.vo.ProjectVo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

@@ -2,7 +2,7 @@ package com.backend.manage.service;
 
 import com.backend.manage.entity.DepartmentEntity;
 import com.backend.manage.entity.UserEntity;
-import com.backend.manage.service.CacheService;
+import com.backend.utils.CacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;

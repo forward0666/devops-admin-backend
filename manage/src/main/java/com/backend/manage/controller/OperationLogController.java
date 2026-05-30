@@ -3,7 +3,7 @@ package com.backend.manage.controller;
 import com.backend.manage.entity.OperationLogEntity;
 import com.backend.manage.service.OperationLogService;
 import com.backend.manage.util.AccessValidator;
-import com.backend.manage.util.JwtUtil;
+import com.backend.utils.JwtUtil;
 import com.backend.manage.util.ResponseUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
