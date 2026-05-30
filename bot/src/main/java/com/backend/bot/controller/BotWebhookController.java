@@ -51,9 +51,10 @@ public class BotWebhookController {
                 });
     }
     private void processAsync(String botName, BotUpdateDto botUpdate) {
-        Mono.deferContextual(ctx -> {
-            final String traceId = ctx.getOrDefault(com.backend.bot.util.LogUtils.TRACE_ID_KEY, "N/A");
-            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
+        // 从 HTTP 线程 MDC 捕获 traceId，作为 final 变量传递
+        final String traceId = org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY);
+        Mono.defer(() -> {
+            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A");
             final UserDto user;
             final Long chatId;
             if (botUpdate.message() != null) {
@@ -69,7 +70,7 @@ public class BotWebhookController {
 
             if (user == null || user.id() == null) {
                 LogUtils.processWebhookUpdateAndPublishEvent(
-                        ctx, eventPublisher, botName, botUpdate
+                        reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate
                 );
                 return Mono.empty();
             }
@@ -148,9 +149,9 @@ public class BotWebhookController {
                                     }
                                     log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.defer(() -> {
-                                        org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
+                                        org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A");
                                         LogUtils.processWebhookUpdateAndPublishEvent(
-                                            ctx, eventPublisher, botName, botUpdate);
+                                            reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate);
                                         return Mono.<Void>empty();
                                     }).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
