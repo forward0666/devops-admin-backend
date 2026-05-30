@@ -38,7 +38,7 @@ public class CacheService {
             redisTemplate.getConnectionFactory().getConnection().ping();
             redisAvailable = true;
             log.debug("✅ Redis 连接正常");
-        } catch (Exception e) {
+        } catch (Exception e) { log.debug("Redis error: {}", e.getMessage());
             redisAvailable = false;
             log.error("❌ Redis 不可用: {}", e.getMessage(), e);
         }

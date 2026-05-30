@@ -114,6 +114,7 @@ public class JwtService {
             var claims = getClaimsFromToken(token);
             return claims.getExpiration().before(Date.from(Instant.now()));
         } catch (Exception e) {
+            log.debug("Token validation error: {}", e.getMessage());
             return true;
         }
     }
