@@ -28,6 +28,7 @@ public class SettingService {
     // IP Access Control
     private static final String ALLOWED_KEY = "setting.ip.allowed_ips";
     private static final String BLOCKED_KEY = "setting.ip.blocked_ips";
+    private static final String WHITELIST_MODE_KEY = "setting.ip.whitelist_enabled";
 
     // System Settings
     private static final String SYS_NAME_KEY = "setting.name";
@@ -158,14 +159,38 @@ public class SettingService {
         List<String> blockedList = loadIpList(BLOCKED_KEY);
         List<String> allowedList = loadIpList(ALLOWED_KEY);
 
+        // Blocked list always enforced
         if (matchAny(clientIp, blockedList)) {
             log.warn("IP {} is blocked", clientIp);
             return false;
         }
+
+        // Check whitelist mode
+        boolean whitelistEnabled = isWhitelistModeEnabled();
+        if (!whitelistEnabled) {
+            // Whitelist mode off: only blocked list matters
+            return true;
+        }
+
+        // Whitelist mode on: must be in allowed list
         if (allowedList.isEmpty()) {
             return true;
         }
+
+        // 0.0.0.0 means allow all
+        if (allowedList.contains("0.0.0.0")) {
+            return true;
+        }
+
         return matchAny(clientIp, allowedList);
+    }
+
+    private boolean isWhitelistModeEnabled() {
+        SettingEntity config = systemConfigMapper.findByKey(WHITELIST_MODE_KEY);
+        if (config == null || !StringUtils.hasText(config.getConfigValue())) {
+            return false;
+        }
+        return "true".equalsIgnoreCase(config.getConfigValue().trim());
     }
 
     public Map<String, Object> getIPAccessControl() {
