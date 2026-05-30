@@ -39,7 +39,7 @@ public final class LogUtils {
             String botName,
             BotUpdateDto botUpdate
     ) {
-        // 从 Context 中获取 Trace ID，并同步到 MDC
+        // 从 Context 或 MDC 同步 Trace ID
         syncTraceIdToMDC(contextView);
         String traceId = MDC.get(TRACE_ID_KEY);
 
@@ -141,7 +141,26 @@ public final class LogUtils {
      */
     public static reactor.util.context.Context buildTraceContext() {
         String traceId = MDC.get(TRACE_ID_KEY);
-        if (traceId != null) {
+        if (traceId != null && !traceId.isEmpty()) {
+            return reactor.util.context.Context.of(TRACE_ID_KEY, traceId);
+        }
+        return reactor.util.context.Context.empty();
+    }
+
+    /**
+     * 从 Reactor Context 或 MDC 获取 traceId，同步到 MDC 并返回 Context
+     * 用于在 reactive 链中安全传递 traceId
+     */
+    public static reactor.util.context.Context syncTraceContext(reactor.util.context.ContextView ctx) {
+        String traceId = null;
+        try {
+            traceId = ctx.get(TRACE_ID_KEY);
+        } catch (Exception ignored) {}
+        if (traceId == null || traceId.isEmpty()) {
+            traceId = MDC.get(TRACE_ID_KEY);
+        }
+        if (traceId != null && !traceId.isEmpty()) {
+            MDC.put(TRACE_ID_KEY, traceId);
             return reactor.util.context.Context.of(TRACE_ID_KEY, traceId);
         }
         return reactor.util.context.Context.empty();

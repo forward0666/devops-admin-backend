@@ -56,6 +56,8 @@ public class BotWebhookController {
                 });
     }
     private void processAsync(String botName, BotUpdateDto botUpdate) {
+        // 从当前 HTTP 线程捕获 traceId，传递到 Reactor Context
+        final String traceId = org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY);
         Mono.defer(() -> {
             final UserDto user;
             final Long chatId;
@@ -72,7 +74,7 @@ public class BotWebhookController {
 
             if (user == null || user.id() == null) {
                 LogUtils.processWebhookUpdateAndPublishEvent(
-                        com.backend.bot.util.LogUtils.buildTraceContext(), eventPublisher, botName, botUpdate
+                        com.backend.bot.util.LogUtils.syncTraceContext(null), eventPublisher, botName, botUpdate
                 );
                 return Mono.empty();
             }
@@ -160,6 +162,7 @@ public class BotWebhookController {
         .timeout(Duration.ofSeconds(10))
         .doOnError(e -> log.error("❌ 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
         .onErrorResume(e -> Mono.empty())
+        .contextWrite(reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"))
         .doFinally(LogUtils::clearMDC)
         .subscribeOn(Schedulers.boundedElastic())
         .subscribe();
