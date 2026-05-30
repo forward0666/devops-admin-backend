@@ -51,9 +51,9 @@ public class BotWebhookController {
                 });
     }
     private void processAsync(String botName, BotUpdateDto botUpdate) {
-        // 从当前 HTTP 线程捕获 traceId，传递到 Reactor Context
-        final String traceId = org.slf4j.MDC.get(com.backend.bot.util.LogUtils.TRACE_ID_KEY);
-        Mono.defer(() -> {
+        Mono.deferContextual(ctx -> {
+            final String traceId = ctx.getOrDefault(com.backend.bot.util.LogUtils.TRACE_ID_KEY, "N/A");
+            org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
             final UserDto user;
             final Long chatId;
             if (botUpdate.message() != null) {
@@ -69,7 +69,7 @@ public class BotWebhookController {
 
             if (user == null || user.id() == null) {
                 LogUtils.processWebhookUpdateAndPublishEvent(
-                        reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate
+                        ctx, eventPublisher, botName, botUpdate
                 );
                 return Mono.empty();
             }
@@ -147,17 +147,17 @@ public class BotWebhookController {
                                                 .then(Mono.empty());
                                     }
                                     log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
-                                    return Mono.<Void>fromRunnable(() ->
+                                    return Mono.<Void>fromRunnable(() -> {
+                                        org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
                                         LogUtils.processWebhookUpdateAndPublishEvent(
-                                            reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate)
-                                    ).subscribeOn(Schedulers.boundedElastic()).then();
+                                            ctx, eventPublisher, botName, botUpdate);
+                                    }).subscribeOn(Schedulers.boundedElastic()).then();
                                 });
                     });
         })
         .timeout(Duration.ofSeconds(10))
         .doOnError(e -> log.error("❌ 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
         .onErrorResume(e -> Mono.empty())
-        .contextWrite(reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"))
         .doFinally(LogUtils::clearMDC)
         .subscribeOn(Schedulers.boundedElastic())
         .subscribe();
