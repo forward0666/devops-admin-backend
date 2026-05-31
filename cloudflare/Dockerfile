@@ -1,7 +1,8 @@
 FROM python:3.14-alpine
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
-COPY . .
+#COPY . .
+COPY cloudflare/ .
 RUN pip install -r requirements.txt
 ENV TZ=Asia/Shanghai
 RUN chown -R appuser:appuser /app
