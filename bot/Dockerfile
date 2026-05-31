@@ -1,7 +1,7 @@
 FROM amazoncorretto:21.0.9-alpine3.22
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
-ARG JAR_FILE=user/target/bot-1.0.0.jar
+ARG JAR_FILE=bot/target/bot-1.0.0.jar
 COPY ${JAR_FILE} app.jar
 #RUN sh -c 'touch app.jar'
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Dspring.config.location=classpath:/application.properties -Duser.timezone=Asia/Shanghai"
