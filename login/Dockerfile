@@ -5,7 +5,7 @@ RUN apk update && \
     apk add tzdata && \
     /bin/cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo 'Asia/Shanghai' >/etc/timezone \
     sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && apk add --update ttf-dejavu fontconfig && rm -rf /var/cache/apk/* && mkfontscale && mkfontdir && fc-cache
-ARG JAR_FILE=security/target/security-1.0.0.jar
+ARG JAR_FILE=login/target/login-1.0.0.jar
 COPY ${JAR_FILE} app.jar
 #RUN sh -c 'touch app.jar'
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Dspring.config.location=classpath:/application.properties -Duser.timezone=Asia/Shanghai"
