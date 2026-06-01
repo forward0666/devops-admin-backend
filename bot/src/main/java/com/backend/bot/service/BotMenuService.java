@@ -92,30 +92,37 @@ public class BotMenuService {
 
     public Mono<InlineKeyboardMarkupDto> findMainMenuByBotType(String botType, int menuLevel) {
         String cacheKey = "bot:menu:" + botType + ":main:" + menuLevel;
+        log.info("🔍 [MenuService] findMainMenuByBotType START | botType={}, menuLevel={}, cacheKey={}", botType, menuLevel, cacheKey);
         return redisTemplate.opsForValue().get(cacheKey)
+                .doOnNext(cached -> log.info("🔍 [MenuService] Redis cache found | key={}, valueLength={}", cacheKey, cached != null ? cached.length() : "null"))
                 .flatMap(cached -> {
                     try {
                         InlineKeyboardMarkupDto markup = objectMapper.readValue(cached, InlineKeyboardMarkupDto.class);
-                        log.debug("Cache hit for key={}", cacheKey);
+                        log.info("🔍 [MenuService] Cache deserialized OK | key={}, buttons={}", cacheKey, markup != null && markup.inlineKeyboard() != null ? markup.inlineKeyboard().size() : 0);
                         return Mono.just(markup);
                     } catch (Exception e) {
-                        log.warn("Cache deserialization failed for key={}, will query DB", cacheKey);
+                        log.warn("Cache deserialization failed for key={}, error={}", cacheKey, e.getMessage());
                         return Mono.empty();
                     }
                 })
+                .doOnSuccess(v -> log.info("🔍 [MenuService] findMainMenuByBotType SUCCESS (from cache) | botType={}", botType))
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.info("Querying menu by botType={} level={}", botType, menuLevel);
+                    log.info("🔍 [MenuService] Cache miss, querying DB | botType={}, menuLevel={}", botType, menuLevel);
                     return botMenuRepository.findByBotTypeAndMenuLevel(botType, menuLevel)
+                            .doOnNext(entity -> log.info("🔍 [MenuService] DB found entity | id={}, menuKey={}, buttons={}", entity.getId(), entity.getMenuKey(), entity.getButtons()))
                             .map(this::entityToKeyboard)
                             .doOnNext(markup -> {
+                                log.info("🔍 [MenuService] DB entity converted OK | botType={}", botType);
                                 try {
                                     String json = objectMapper.writeValueAsString(markup);
                                     redisTemplate.opsForValue().set(cacheKey, json, MENU_CACHE_TTL).subscribe();
                                 } catch (Exception e) {
                                     log.warn("Failed to cache menu key={}", cacheKey, e);
                                 }
-                            });
-                }));
+                            })
+                            .doOnSuccess(v -> log.info("🔍 [MenuService] findMainMenuByBotType SUCCESS (from DB) | botType={}", botType));
+                }))
+                .doOnError(e -> log.error("🔍 [MenuService] findMainMenuByBotType ERROR | botType={}, error={}", botType, e.getMessage()));
     }
 
     public Mono<Void> deleteCacheByBotType(String botType) {

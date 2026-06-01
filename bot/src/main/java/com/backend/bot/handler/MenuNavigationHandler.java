@@ -98,14 +98,21 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                 menuMono = botMenuService.findKeyboardByBotTypeAndMenuKey(context.botEntity().getBotType().getDbValue(), menuKey);
             }
             return menuMono
+                    .doOnNext(m -> log.info("{}🔍 [MenuNav] Got menu from service | buttons={}", traceLogPrefix, m != null && m.inlineKeyboard() != null ? m.inlineKeyboard().size() : 0))
+                    .doOnSubscribe(s -> log.info("{}🔍 [MenuNav] Subscribing to menuMono...", traceLogPrefix))
                     .flatMap(newMarkup -> {
-                        if (newMarkup == null || newMarkup.isEmpty()) return Mono.empty();
+                        if (newMarkup == null || newMarkup.isEmpty()) {
+                            log.warn("{}🔍 [MenuNav] Menu is null/empty after service call", traceLogPrefix);
+                            return Mono.empty();
+                        }
                         return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
                     })
                     .switchIfEmpty(Mono.defer(() -> {
+                        log.warn("{}🔍 [MenuNav] menuMono returned empty, checking fallback...", traceLogPrefix);
                         if (fallbackMarkup != null && !fallbackMarkup.isEmpty()) {
                             return editWithKeyboard(token, chatId, messageId, menuText, fallbackMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
                         }
+                        log.warn("{}🔍 [MenuNav] No fallback either, MAIN_MENU failed silently", traceLogPrefix);
                         return Mono.error(new UnsupportedOperationException("Not a menu navigation callback"));
                     }))
                     .onErrorResume(UnsupportedOperationException.class, e -> Mono.empty());
