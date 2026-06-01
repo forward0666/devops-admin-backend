@@ -95,6 +95,22 @@ public class BotApplication {
             log.warn("🔥 Redis warmup failed", e);
         }
 
+        // 预热 MySQL (R2DBC)
+        try {
+            org.springframework.r2dbc.core.DatabaseClient dbClient =
+                    ctx.getBean(org.springframework.r2dbc.core.DatabaseClient.class);
+            dbClient.sql("SELECT 1").fetch().first()
+                    .timeout(Duration.ofSeconds(5))
+                    .doOnNext(row -> log.info("🔥 MySQL warmup OK"))
+                    .onErrorResume(e -> {
+                        log.warn("🔥 MySQL warmup failed: {}", e.getMessage());
+                        return reactor.core.publisher.Mono.empty();
+                    })
+                    .block(Duration.ofSeconds(10));
+        } catch (Exception e) {
+            log.warn("🔥 MySQL warmup failed", e);
+        }
+
         // 预热 Scheduler 线程
         try {
             reactor.core.scheduler.Schedulers.boundedElastic().schedule(() ->

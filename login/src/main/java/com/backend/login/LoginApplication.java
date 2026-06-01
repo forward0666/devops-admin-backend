@@ -43,5 +43,34 @@ public class LoginApplication {
             log.info("🔥 ThreadPool pre-started {} core threads",
                     ((ThreadPoolExecutor) executor).getPoolSize());
         }
+
+        // ✅ MySQL 预热
+        try {
+            ctx.getBean(javax.sql.DataSource.class).getConnection().isValid(5);
+            log.info("🔥 MySQL warmup OK");
+        } catch (Exception e) {
+            log.warn("🔥 MySQL warmup failed: {}", e.getMessage());
+        }
+
+        // ✅ Redis 预热
+        try {
+            org.springframework.data.redis.core.StringRedisTemplate redis =
+                    ctx.getBean(org.springframework.data.redis.core.StringRedisTemplate.class);
+            redis.opsForValue().set("login:warmup", "ok");
+            redis.delete("login:warmup");
+            log.info("🔥 Redis warmup OK");
+        } catch (Exception e) {
+            log.warn("🔥 Redis warmup failed: {}", e.getMessage());
+        }
+
+        // ✅ MongoDB 预热
+        try {
+            org.springframework.data.mongodb.core.MongoTemplate mongoTemplate =
+                    ctx.getBean(org.springframework.data.mongodb.core.MongoTemplate.class);
+            mongoTemplate.getDb().listCollectionNames().first();
+            log.info("🔥 MongoDB warmup OK");
+        } catch (Exception e) {
+            log.warn("🔥 MongoDB warmup failed: {}", e.getMessage());
+        }
     }
 }
