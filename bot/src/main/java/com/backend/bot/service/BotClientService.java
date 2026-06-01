@@ -258,14 +258,17 @@ public class BotClientService {
     public Mono<Void> editMessageText(String token, Long chatId, Long messageId, String text, InlineKeyboardMarkupDto replyMarkup) {
         // 缓存key
         String cacheKey = chatId + ":" + messageId;
-        String lastText = editTextCache.get(cacheKey);
-        if (text != null && text.equals(lastText)) {
+        // 缓存 key 加入 replyMarkup hash，文本相同但键盘不同时仍需编辑
+        String markupKey = replyMarkup != null ? String.valueOf(replyMarkup.hashCode()) : "null";
+        String cacheKeyWithMarkup = cacheKey + ":" + markupKey;
+        String lastEntry = editTextCache.get(cacheKeyWithMarkup);
+        if (text != null && text.equals(lastEntry)) {
             return Mono.<Void>deferContextual(ctx -> {
-                log.debug("{}💬 Skipping editMessageText - text unchanged for messageId: {}", getTraceIdPrefix(ctx), messageId);
+                log.debug("{}💬 Skipping editMessageText - text+markup unchanged for messageId: {}", getTraceIdPrefix(ctx), messageId);
                 return Mono.empty();
             });
         }
-        editTextCache.put(cacheKey, text);
+        editTextCache.put(cacheKeyWithMarkup, text);
         String path = "/bot" + token + "/editMessageText";
 
         Map<String, Object> bodyMap = new HashMap<>();

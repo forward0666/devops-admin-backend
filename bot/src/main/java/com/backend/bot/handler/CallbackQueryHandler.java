@@ -90,7 +90,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         Long chatId = context.chatId();
 
         Long messageId = context.messageId();
-        int delaySeconds = callbackData.contains("_ACTION") ? 30 : TelegramConstants.MENU_DELETE_DELAY_SECONDS;
+        int delaySeconds = TelegramConstants.MENU_DELETE_DELAY_SECONDS;
         log.info("{}⏳ [Step2] 设置删除定时器 | messageId={}, delay={}s", logPrefix, messageId, delaySeconds);
         Mono<Void> deleteTimerMono = messageId != null
                 ? interactiveMessageService.scheduleMessageDeletion(

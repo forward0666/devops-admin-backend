@@ -319,7 +319,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             }
                             if (multiEnv) sb.append("\n");
                         }
-                        sb.append("共 ").append(items.size()).append(" 条");
+                        sb.append("共 ").append(items.size()).append(" 位");
                     } else if (items == null || items.isEmpty()) {
                         sb.append("暂无数据");
                     } else {
@@ -345,8 +345,9 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                                 sb.append(m.toString());
                             }
                             sb.append("\n");
+                            idx++;
                         }
-                        sb.append("\n共 ").append(idx - 1).append(" 条");
+                        sb.append("\n共 ").append(idx - 1).append(" 位");
                     }
 
                     return replyText(token, chatId, messageId, sb.toString(), true);
