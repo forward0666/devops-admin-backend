@@ -107,7 +107,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                         }
                         // Return Mono.just(newMarkup) so flatMap emits a value, preventing switchIfEmpty
                         return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix)
-                                .thenReturn(newMarkup);
+                                .thenReturn(true);
                     })
                     .switchIfEmpty(Mono.defer(() -> {
                         log.warn("{}🔍 [MenuNav] menuMono returned empty, checking fallback...", traceLogPrefix);
