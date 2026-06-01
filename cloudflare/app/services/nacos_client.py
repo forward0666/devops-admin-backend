@@ -37,12 +37,21 @@ CONFIG_MAP = {
 }
 
 
-def _resolve(value: str) -> str:
-    """Resolve ${ENV_VAR:default} -> env value or default"""
+def _resolve(value: str, cast=None) -> str:
+    """Resolve ${ENV_VAR:default} -> env value or default, handling K8s tcp:// format for ports."""
     match = re.match(r"^\$\{(.+):(.+)\}$", value)
     if match:
         env_val = os.getenv(match.group(1))
-        return env_val if env_val is not None else match.group(2)
+        resolved = env_val if env_val is not None else match.group(2)
+        if cast is int and resolved:
+            port_match = re.search(r':(\d+)/?$', resolved)
+            if port_match:
+                return port_match.group(1)
+        return resolved
+    if cast is int and value:
+        port_match = re.search(r':(\d+)/?$', value)
+        if port_match:
+            return port_match.group(1)
     return value
 
 
@@ -72,7 +81,7 @@ async def fetch_config():
 
                     if key in CONFIG_MAP:
                         attr, cast = CONFIG_MAP[key]
-                        resolved = _resolve(value.strip())
+                        resolved = _resolve(value.strip(), cast)
                         setattr(config, attr, cast(resolved))
 
                 logger.info("✅ Loaded config from Nacos: cloudflare.properties")
