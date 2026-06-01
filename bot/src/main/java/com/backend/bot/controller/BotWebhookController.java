@@ -62,7 +62,7 @@ public class BotWebhookController {
                     .flatMap(added -> {
                         if (Boolean.FALSE.equals(added)) {
                             log.debug("⚠️ Duplicate webhook skipped: botName={}, updateId={}", botName, botUpdate.updateId());
-                            return Mono.empty();
+                            return Mono.<Void>empty();
                         }
                         return doProcessAsync(botName, botUpdate, traceId);
                     })
@@ -96,7 +96,7 @@ public class BotWebhookController {
                 LogUtils.processWebhookUpdateAndPublishEvent(
                         reactor.util.context.Context.of(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId != null ? traceId : "N/A"), eventPublisher, botName, botUpdate
                 );
-                return Mono.empty();
+                return Mono.<Void>empty();
             }
 
             if (chatId != null && chatId.equals(user.id())) {
@@ -114,11 +114,11 @@ public class BotWebhookController {
                                 log.warn("🚫 Auto-blacklisted private chat user: botName={}, userId={}", botName, user.id());
                             }
                             redisTemplate.expire(privateAttemptsKey, java.time.Duration.ofMinutes(5)).subscribe();
-                            return Mono.empty();
+                            return Mono.<Void>empty();
                         })
                         .onErrorResume(e -> {
                             log.error("❌ Redis error tracking private attempts", e);
-                            return Mono.empty();
+                            return Mono.<Void>empty();
                         });
             }
 
@@ -162,14 +162,14 @@ public class BotWebhookController {
                                                                 );
                                                             }
                                                         } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
-                                                        return Mono.empty();
-                                                    }).onErrorResume(e -> Mono.empty());
+                                                        return Mono.<Void>empty();
+                                                    }).onErrorResume(e -> Mono.<Void>empty());
                                                     Mono<Void> deleteMsg = msgId != null
                                                             ? botClientService.deleteMessage(bl.getBotToken(), chatId, msgId)
-                                                            : Mono.empty();
+                                                            : Mono.<Void>empty();
                                                     return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
                                                 })
-                                                .then(Mono.empty());
+                                                .then(Mono.<Void>empty());
                                     }
                                     log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.defer(() -> {
