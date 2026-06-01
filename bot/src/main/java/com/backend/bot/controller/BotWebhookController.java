@@ -55,7 +55,29 @@ public class BotWebhookController {
                 });
     }
     private void processAsync(String botName, BotUpdateDto botUpdate, final String traceId) {
-        Mono.defer(() -> {
+        // update_id 去重，防止多 pod 重复处理 Telegram webhook 重试
+        if (botUpdate.updateId() != null) {
+            String dedupKey = "bot:webhook:dedup:" + botName + ":" + botUpdate.updateId();
+            redisTemplate.opsForValue().setIfAbsent(dedupKey, "1", Duration.ofMinutes(5))
+                    .flatMap(added -> {
+                        if (Boolean.FALSE.equals(added)) {
+                            log.debug("⚠️ Duplicate webhook skipped: botName={}, updateId={}", botName, botUpdate.updateId());
+                            return Mono.empty();
+                        }
+                        return doProcessAsync(botName, botUpdate, traceId);
+                    })
+                    .onErrorResume(e -> {
+                        log.warn("⚠️ Dedup check failed, processing anyway: botName={}, error={}", botName, e.getMessage());
+                        return doProcessAsync(botName, botUpdate, traceId);
+                    })
+                    .subscribe();
+        } else {
+            doProcessAsync(botName, botUpdate, traceId).subscribe();
+        }
+    }
+
+    private Mono<Void> doProcessAsync(String botName, BotUpdateDto botUpdate, final String traceId) {
+        return Mono.defer(() -> {
             org.slf4j.MDC.put(com.backend.bot.util.LogUtils.TRACE_ID_KEY, traceId);
             final UserDto user;
             final Long chatId;
@@ -163,8 +185,7 @@ public class BotWebhookController {
         .doOnError(e -> log.error("❌ 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
         .onErrorResume(e -> Mono.empty())
         .doFinally(LogUtils::clearMDC)
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe();
+        .subscribeOn(Schedulers.boundedElastic());
     }
     private Long extractMessageId(BotUpdateDto update) {
         if (update.message() != null) return update.message().messageId();
