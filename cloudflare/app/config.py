@@ -25,7 +25,7 @@ NACOS_GROUP = os.getenv("NACOS_GROUP", "DEFAULT_GROUP")
 # Defaults (will be overridden by Nacos config)
 SERVICE_NAME = "cloudflare"
 SERVICE_PORT = _parse_port("SERVICE_PORT", "8090")
-SERVICE_IP = os.getenv("SERVICE_IP", "127.0.0.1")
+SERVICE_IP = os.getenv("SERVICE_IP") or os.getenv("POD_IP", "127.0.0.1")
 CF_BASE_URL = os.getenv("CF_BASE_URL", "https://api.cloudflare.com/client/v4")
 
 # MySQL
