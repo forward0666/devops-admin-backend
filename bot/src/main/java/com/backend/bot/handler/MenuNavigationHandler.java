@@ -103,14 +103,17 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                     .flatMap(newMarkup -> {
                         if (newMarkup == null || newMarkup.isEmpty()) {
                             log.warn("{}🔍 [MenuNav] Menu is null/empty after service call", traceLogPrefix);
-                            return Mono.empty();
+                            return Mono.<Void>empty();
                         }
-                        return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
+                        // Return Mono.just(newMarkup) so flatMap emits a value, preventing switchIfEmpty
+                        return editWithKeyboard(token, chatId, messageId, menuText, newMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix)
+                                .thenReturn(newMarkup);
                     })
                     .switchIfEmpty(Mono.defer(() -> {
                         log.warn("{}🔍 [MenuNav] menuMono returned empty, checking fallback...", traceLogPrefix);
                         if (fallbackMarkup != null && !fallbackMarkup.isEmpty()) {
-                            return editWithKeyboard(token, chatId, messageId, menuText, fallbackMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
+                            return editWithKeyboard(token, chatId, messageId, menuText, fallbackMarkup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix)
+                                    .thenReturn(true);
                         }
                         log.warn("{}🔍 [MenuNav] No fallback either, MAIN_MENU failed silently", traceLogPrefix);
                         return Mono.error(new UnsupportedOperationException("Not a menu navigation callback"));
