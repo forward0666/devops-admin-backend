@@ -98,7 +98,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                 menuMono = botMenuService.findKeyboardByBotTypeAndMenuKey(context.botEntity().getBotType().getDbValue(), menuKey);
             }
             return menuMono
-                    .doOnNext(m -> log.info("{}🔍 [MenuNav] Got menu from service | buttons={}", traceLogPrefix, m != null && m.inlineKeyboard() != null ? m.inlineKeyboard().size() : 0))
+                    .doOnNext(m -> log.info("{}🔍 [MenuNav] Got menu from service | buttons={}", traceLogPrefix, m != null && m.getInlineKeyboard() != null ? m.getInlineKeyboard().size() : 0))
                     .doOnSubscribe(s -> log.info("{}🔍 [MenuNav] Subscribing to menuMono...", traceLogPrefix))
                     .flatMap(newMarkup -> {
                         if (newMarkup == null || newMarkup.isEmpty()) {

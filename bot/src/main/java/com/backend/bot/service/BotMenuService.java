@@ -98,7 +98,7 @@ public class BotMenuService {
                 .flatMap(cached -> {
                     try {
                         InlineKeyboardMarkupDto markup = objectMapper.readValue(cached, InlineKeyboardMarkupDto.class);
-                        log.info("🔍 [MenuService] Cache deserialized OK | key={}, buttons={}", cacheKey, markup != null && markup.inlineKeyboard() != null ? markup.inlineKeyboard().size() : 0);
+                        log.info("🔍 [MenuService] Cache deserialized OK | key={}, buttons={}", cacheKey, markup != null && markup.getInlineKeyboard() != null ? markup.getInlineKeyboard().size() : 0);
                         return Mono.just(markup);
                     } catch (Exception e) {
                         log.warn("Cache deserialization failed for key={}, error={}", cacheKey, e.getMessage());
