@@ -183,7 +183,7 @@ public class BotWebhookController {
         })
         .timeout(Duration.ofSeconds(10))
         .doOnError(e -> log.error("❌ 异步处理异常 | botName={}, error={}", botName, e.getMessage()))
-        .onErrorResume(e -> Mono.empty())
+        .onErrorResume(e -> Mono.<Void>empty())
         .doFinally(LogUtils::clearMDC)
         .subscribeOn(Schedulers.boundedElastic());
     }
