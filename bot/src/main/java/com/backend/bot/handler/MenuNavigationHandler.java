@@ -101,22 +101,13 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                     .doOnNext(m -> log.info("{}🔍 [MenuNav] Got menu from service | buttons={}", traceLogPrefix, m != null && m.getInlineKeyboard() != null ? m.getInlineKeyboard().size() : 0))
                     .doOnSubscribe(s -> log.info("{}🔍 [MenuNav] Subscribing to menuMono...", traceLogPrefix))
                     .flatMap(newMarkup -> {
-                        if (newMarkup == null || newMarkup.isEmpty()) {
-                            log.warn("{}🔍 [MenuNav] Menu is null/empty after service call", traceLogPrefix);
+                        InlineKeyboardMarkupDto resolved = (newMarkup != null && !newMarkup.isEmpty()) ? newMarkup : fallbackMarkup;
+                        if (resolved == null || resolved.isEmpty()) {
+                            log.warn("{}🔍 [MenuNav] No menu and no fallback", traceLogPrefix);
                             return Mono.<Void>empty();
                         }
-                        return Mono.just(newMarkup);
-                    })
-                    .switchIfEmpty(Mono.defer(() -> {
-                        log.warn("{}🔍 [MenuNav] menuMono returned empty, checking fallback...", traceLogPrefix);
-                        if (fallbackMarkup != null && !fallbackMarkup.isEmpty()) {
-                            return Mono.just(fallbackMarkup);
-                        }
-                        log.warn("{}🔍 [MenuNav] No fallback either, MAIN_MENU failed silently", traceLogPrefix);
-                        return Mono.<InlineKeyboardMarkupDto>error(new UnsupportedOperationException("Not a menu navigation callback"));
-                    }))
-                    .flatMap(markup -> editWithKeyboard(token, chatId, messageId, menuText, markup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix))
-                    .onErrorResume(UnsupportedOperationException.class, e -> Mono.<Void>empty());
+                        return editWithKeyboard(token, chatId, messageId, menuText, resolved, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix);
+                    });
         });
     }
 
