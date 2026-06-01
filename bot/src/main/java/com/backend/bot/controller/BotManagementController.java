@@ -47,6 +47,9 @@ public class BotManagementController {
                                 return HttpResponseUtils.created("✅ Bot 注册成功并已设置 Webhook", data);
                             });
                 })
+                .onErrorResume(IllegalArgumentException.class, e -> {
+                    return Mono.just(HttpResponseUtils.badRequest(e.getMessage()));
+                })
                 .onErrorResume(e -> {
                     log.error("❌ Bot registration failed", e);
                     return Mono.just(HttpResponseUtils.internalError("❌ Bot 注册失败: " + e.getMessage()));

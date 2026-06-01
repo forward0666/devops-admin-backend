@@ -67,28 +67,41 @@ public class BotCoreService {
      */
     public Mono<BotVo> registerNewBot(BotRegisterDto dto) {
 
-        BotConfigEntity config = new BotConfigEntity();
-        config.setBotUsername(dto.getBotUsername());
-        config.setBotToken(dto.getToken());
-        config.setBotName(dto.getBotName());
-        config.setStatus(1);
+        return Mono.zip(
+                botRepository.countByBotName(dto.getBotName()),
+                botRepository.countByBotUsername(dto.getBotUsername())
+        ).flatMap(tuple -> {
+            int nameCount = tuple.getT1();
+            int usernameCount = tuple.getT2();
+            if (nameCount > 0) {
+                return Mono.error(new IllegalArgumentException("Bot 名称已存在: " + dto.getBotName()));
+            }
+            if (usernameCount > 0) {
+                return Mono.error(new IllegalArgumentException("Bot Username 已存在: " + dto.getBotUsername()));
+            }
 
-        return botRepository.save(config)
-                .flatMap(savedConfig -> {
-                    // 2. 注册 Webhook（Cloudflare 会将 query 参数转为 header）
-                    String gatewaySecret = telegramProperties.getGatewayBotSecret();
-                    String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName();
-                    if (gatewaySecret != null && !gatewaySecret.isBlank()) {
-                        webhookUrl += "?header_X-Encrypted-Data=" + gatewaySecret;
-                    }
-                    String tgSecretToken = dto.getSecretToken() != null && !dto.getSecretToken().isBlank()
-                            ? dto.getSecretToken()
-                            : java.util.UUID.randomUUID().toString();
-                    return botClient.setWebhook(savedConfig.getBotToken(), webhookUrl, tgSecretToken)
-                            .thenReturn(savedConfig);
-                })
-                .flatMap(this::cacheBotEntity) // 3. 响应式缓存
-                .map(this::convertToVo);
+            BotConfigEntity config = new BotConfigEntity();
+            config.setBotUsername(dto.getBotUsername());
+            config.setBotToken(dto.getToken());
+            config.setBotName(dto.getBotName());
+            config.setStatus(1);
+
+            return botRepository.save(config)
+                    .flatMap(savedConfig -> {
+                        String gatewaySecret = telegramProperties.getGatewayBotSecret();
+                        String webhookUrl = telegramProperties.getWebhookDomain() + "/callback/" + savedConfig.getBotName();
+                        if (gatewaySecret != null && !gatewaySecret.isBlank()) {
+                            webhookUrl += "?header_X-Encrypted-Data=" + gatewaySecret;
+                        }
+                        String tgSecretToken = dto.getSecretToken() != null && !dto.getSecretToken().isBlank()
+                                ? dto.getSecretToken()
+                                : java.util.UUID.randomUUID().toString();
+                        return botClient.setWebhook(savedConfig.getBotToken(), webhookUrl, tgSecretToken)
+                                .thenReturn(savedConfig);
+                    })
+                    .flatMap(this::cacheBotEntity)
+                    .map(this::convertToVo);
+        });
     }
 
     /**
@@ -182,9 +195,9 @@ public class BotCoreService {
      * 根据名称删除 Bot
      */
     public Mono<Boolean> deleteByBotName(String botName) {
-        return botRepository.findByBotName(botName)
-                .flatMap(bot -> botRepository.delete(bot).then(Mono.just(true)))
-                .defaultIfEmpty(false);
+        return botRepository.deleteByBotName(botName)
+                .then(clearBotCache(botName).thenReturn(true))
+                .onErrorResume(e -> Mono.just(false));
     }
 
     /**
