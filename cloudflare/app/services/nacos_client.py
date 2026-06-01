@@ -34,6 +34,8 @@ CONFIG_MAP = {
     "mongodb.password": ("MONGODB_PASSWORD", str),
     "mongodb.database": ("MONGODB_DATABASE", str),
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
+    "gateway.secret": ("GATEWAY_SECRET", str),
+    "user.service.url": ("USER_SERVICE_URL", str),
 }
 
 
