@@ -113,7 +113,7 @@ public class MenuNavigationHandler implements CallbackActionHandler {
                             return Mono.just(fallbackMarkup);
                         }
                         log.warn("{}🔍 [MenuNav] No fallback either, MAIN_MENU failed silently", traceLogPrefix);
-                        return Mono.error(new UnsupportedOperationException("Not a menu navigation callback"));
+                        return Mono.<InlineKeyboardMarkupDto>error(new UnsupportedOperationException("Not a menu navigation callback"));
                     }))
                     .flatMap(markup -> editWithKeyboard(token, chatId, messageId, menuText, markup, userId, logIdentifier, delaySeconds, contextView, traceLogPrefix))
                     .onErrorResume(UnsupportedOperationException.class, e -> Mono.<Void>empty());
