@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Header, HTTPException
 from datetime import datetime
+import logging
 
 from app.services.db import query_one
 from app.services.mongodb import get_db
 from app.services import cf_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -15,6 +17,7 @@ def get_collection_name(account_id: int, suffix: str) -> str:
 @router.post("/sync")
 async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-Token")):
     """Fetch DNS records from Cloudflare API for all zones and sync to MongoDB"""
+    logger.info(f"[DNS Sync] Start sync for account_id={account_id}")
     account = await query_one("SELECT id, name, tags FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -34,20 +37,24 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
 
     now = datetime.utcnow()
     total_synced = 0
+    logger.info(f"[DNS Sync] Found {len(zones)} zones for account_id={account_id}")
 
     for zone in zones:
         zone_id = zone["zone_id"]
         zone_name = zone["name"]
 
         try:
-            cf_data = cf_client.list_dns(x_cf_token, zone_id)
-        except Exception:
+            cf_data = await cf_client.async_list_dns(x_cf_token, zone_id)
+        except Exception as e:
+            logger.error(f"[DNS Sync] Failed to fetch DNS for zone {zone_name} ({zone_id}): {e}")
             continue
 
         if not cf_data.get("success"):
+            logger.warning(f"[DNS Sync] CF API returned failure for zone {zone_name} ({zone_id})")
             continue
 
         records = cf_data.get("result", [])
+        logger.info(f"[DNS Sync] Zone {zone_name}: fetched {len(records)} records")
 
         for r in records:
             doc = {
@@ -78,6 +85,7 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
         "synced_at": {"$lt": now},
     })
 
+    logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}, stale_removed={stale.deleted_count}")
     return {"code": 200, "data": {"synced": total_synced, "stale_removed": stale.deleted_count}}
 
 
@@ -86,13 +94,21 @@ async def list_dns(account_id: int = None):
     """Read DNS records from MongoDB"""
     db = await get_db()
 
-    if not account_id:
-        raise HTTPException(status_code=400, detail="account_id is required")
+    if account_id:
+        collection = db[get_collection_name(account_id, "dns_records")]
+        query = {"account_id": str(account_id)}
+        rows = await collection.find(query).sort("name", 1).to_list(length=5000)
+    else:
+        # Fetch from all accounts
+        db_list = await get_db()
+        collections = await db_list.list_collection_names()
+        rows = []
+        for col_name in collections:
+            if col_name.endswith("_dns_records"):
+                col = db_list[col_name]
+                docs = await col.find({}).sort("name", 1).to_list(length=5000)
+                rows.extend(docs)
 
-    collection = db[get_collection_name(account_id, "dns_records")]
-    query = {"account_id": str(account_id)}
-
-    rows = await collection.find(query).sort("name", 1).to_list(length=5000)
     for r in rows:
         r["_id"] = str(r["_id"])
 

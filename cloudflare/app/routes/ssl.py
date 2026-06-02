@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Header, HTTPException
 from datetime import datetime
+import logging
 
 from app.services.db import query_one
 from app.services.mongodb import get_db
 from app.services import cf_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 zone_router = APIRouter()
 
@@ -40,12 +42,13 @@ async def sync_ssl(
     zone_id: str,
     x_cf_token: str = Header(..., alias="X-Cf-Token"),
 ):
+    logger.info(f"[SSL Sync] Start sync for account_id={account_id}, zone_id={zone_id}")
     """Fetch SSL setting from Cloudflare API and sync to MongoDB"""
     account = await query_one("SELECT id, name FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    cf_data = cf_client.get_ssl(x_cf_token, zone_id)
+    cf_data = await cf_client.async_get_ssl(x_cf_token, zone_id)
     if not cf_data.get("success"):
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
 
@@ -68,6 +71,7 @@ async def sync_ssl(
         upsert=True,
     )
 
+    logger.info(f"[SSL Sync] Complete for account_id={account_id}, zone_id={zone_id}: ssl_mode={doc['ssl_mode']}")
     return {"code": 200, "data": {"synced": 1}}
 
 
@@ -91,7 +95,7 @@ async def update_ssl(
 ):
     """Update SSL mode via Cloudflare API and sync to MongoDB"""
     value = (body or {}).get("value", "full")
-    cf_client.update_ssl(x_cf_token, zone_id, value)
+    await cf_client.async_update_ssl(x_cf_token, zone_id, value)
 
     now = datetime.utcnow()
     db = await get_db()

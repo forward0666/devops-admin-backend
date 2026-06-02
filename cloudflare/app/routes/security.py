@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Header, HTTPException
 from datetime import datetime
+import logging
 
 from app.services.db import query_one
 from app.services.mongodb import get_db
 from app.services import cf_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 zone_router = APIRouter()
 
@@ -41,11 +43,12 @@ async def sync_rules(
     x_cf_token: str = Header(..., alias="X-Cf-Token"),
 ):
     """Fetch security rules from Cloudflare API and sync to MongoDB"""
+    logger.info(f"[Security Sync] Start sync for account_id={account_id}, zone_id={zone_id}")
     account = await query_one("SELECT id, name FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    cf_data = cf_client.list_firewall_rules(x_cf_token, zone_id)
+    cf_data = await cf_client.async_list_firewall_rules(x_cf_token, zone_id)
     if not cf_data.get("success"):
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
 
@@ -74,6 +77,7 @@ async def sync_rules(
         )
         synced += 1
 
+    logger.info(f"[Security Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}")
     return {"code": 200, "data": {"synced": synced, "total": len(rules)}}
 
 

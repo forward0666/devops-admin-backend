@@ -89,7 +89,7 @@ async def add_whitelist_ip(body: dict):
         logger.info(f"[4] Found token for zone")
 
         try:
-            cf = cf_client.get_client(token)
+            cf = await cf_client.async_get_client(token)
             resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
             raw = resp.model_dump()
             filter_data = raw.get("filter") or {}
@@ -248,7 +248,7 @@ async def _remove_ip_from_cf(db, project_id: int, rule_id: str, ip: str):
             continue
 
         try:
-            cf = cf_client.get_client(token)
+            cf = await cf_client.async_get_client(token)
             resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
             raw = resp.model_dump()
             filter_data = raw.get("filter") or {}
@@ -298,7 +298,7 @@ async def _add_ip_to_cf(db, project_id: int, rule_id: str, ip: str):
             continue
 
         try:
-            cf = cf_client.get_client(token)
+            cf = await cf_client.async_get_client(token)
             resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
             raw = resp.model_dump()
             filter_data = raw.get("filter") or {}
@@ -369,7 +369,7 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
             logger.info(f"[4] Found token for zone")
 
             try:
-                cf = cf_client.get_client(token)
+                cf = await cf_client.async_get_client(token)
                 resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
                 raw = resp.model_dump()
                 filter_data = raw.get("filter") or {}

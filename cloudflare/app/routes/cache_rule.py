@@ -215,7 +215,7 @@ async def _do_purge(db, rule: dict, domains: list[str]) -> dict:
                     failed.append({"domain": d, "reason": f"account {zinfo['account_id']} not found"})
                 continue
             logger.info(f"Purge: zone_id={zone_id}, prefixes={zinfo['prefixes']}")
-            result = cf_client.purge_by_prefixes(token, zone_id, zinfo["prefixes"])
+            result = await cf_client.async_purge_by_prefixes(token, zone_id, zinfo["prefixes"])
             logger.info(f"Purge result: {result}")
             succeeded.extend(zone_domains.get(zone_id, []))
             zone_results.append({"zone_id": zone_id, "account_id": zinfo["account_id"], "domains": zone_domains.get(zone_id, []), "success": True})
@@ -327,7 +327,7 @@ async def purge_all_cache(body: dict):
                 for d in zinfo["domains"]:
                     failed.append({"domain": d, "reason": f"account {zinfo['account_id']} not found"})
                 continue
-            cf_client.purge_all(token, zone_id)
+            await cf_client.async_purge_all(token, zone_id)
             succeeded.extend(zinfo["domains"])
             zone_results.append({"zone_id": zone_id, "account_id": zinfo["account_id"], "domains": zinfo["domains"], "success": True})
         except Exception as e:

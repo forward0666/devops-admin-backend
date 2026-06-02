@@ -4,19 +4,15 @@ from app.services.db import query_all, query_one, execute
 router = APIRouter()
 
 
-def _parse_tags(body: dict) -> str:
-    return ",".join([t.strip() for t in body.get("tags", []) if t.strip()])
-
-
 @router.get("")
 async def list_accounts():
-    rows = await query_all("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM account ORDER BY id DESC")
+    rows = await query_all("SELECT id, name, api_key, description, status, created_at, updated_at FROM account ORDER BY id DESC")
     return {"code": 200, "data": rows}
 
 
 @router.get("/{account_id}")
 async def get_account(account_id: int):
-    row = await query_one("SELECT id, name, api_key, description, tags, status, created_at, updated_at FROM account WHERE id = %s", (account_id,))
+    row = await query_one("SELECT id, name, api_key, description, status, created_at, updated_at FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"code": 200, "data": row}
@@ -27,14 +23,13 @@ async def create_account(body: dict):
     name = body.get("name", "").strip()
     api_key = body.get("apiKey", "").strip()
     description = body.get("description", "").strip()
-    tags = _parse_tags(body)
 
     if not name or not api_key:
         raise HTTPException(status_code=400, detail="name and apiKey are required")
 
     await execute(
-        "INSERT INTO account (name, api_key, description, tags) VALUES (%s, %s, %s, %s)",
-        (name, api_key, description, tags),
+        "INSERT INTO account (name, api_key, description) VALUES (%s, %s, %s)",
+        (name, api_key, description),
     )
     return {"code": 200, "message": "ok"}
 
@@ -48,20 +43,19 @@ async def update_account(account_id: int, body: dict):
     name = body.get("name", "").strip()
     api_key = body.get("apiKey", "").strip()
     description = body.get("description", "").strip()
-    tags = _parse_tags(body)
 
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
 
     if api_key:
         await execute(
-            "UPDATE account SET name = %s, api_key = %s, description = %s, tags = %s WHERE id = %s",
-            (name, api_key, description, tags, account_id),
+            "UPDATE account SET name = %s, api_key = %s, description = %s WHERE id = %s",
+            (name, api_key, description, account_id),
         )
     else:
         await execute(
-            "UPDATE account SET name = %s, description = %s, tags = %s WHERE id = %s",
-            (name, description, tags, account_id),
+            "UPDATE account SET name = %s, description = %s WHERE id = %s",
+            (name, description, account_id),
         )
     return {"code": 200, "message": "ok"}
 
