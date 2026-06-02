@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Monitor Service API", version="1.0.0", lifespan=lifespan)
 
-app.include_router(monitor.router, prefix="/monitor/rules", tags=["Monitor Rules"])
+app.include_router(monitor.router, prefix="/rules", tags=["Monitor Rules"])
 
 
 @app.get("/health")
