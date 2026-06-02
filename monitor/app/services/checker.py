@@ -2,12 +2,31 @@ import logging
 import asyncio
 import httpx
 import time
+import socket
 from datetime import datetime
 
 from app.services.db import query_all, execute
 from app.services.mongodb import get_db
 
 logger = logging.getLogger(__name__)
+
+# Cache probe IP (monitor server's exit IP)
+_probe_ip: str = None
+
+
+def get_probe_ip() -> str:
+    """Get monitor server's exit IP (cached)"""
+    global _probe_ip
+    if _probe_ip:
+        return _probe_ip
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        _probe_ip = s.getsockname()[0]
+        s.close()
+        return _probe_ip
+    except:
+        return "unknown"
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
@@ -20,10 +39,20 @@ async def check_domain(domain: str, timeout: int = 30) -> dict:
         "status": "down",
         "status_code": None,
         "response_time_ms": None,
+        "resolved_ip": None,
         "probe_ip": None,
         "error": None,
         "checked_at": datetime.utcnow(),
     }
+
+    # Resolve domain IP first
+    try:
+        import socket
+        ips = socket.getaddrinfo(domain, 443, socket.AF_INET)
+        if ips:
+            result["resolved_ip"] = ips[0][4][0]
+    except:
+        pass
 
     url = f"https://{domain}"
     start = time.monotonic()
@@ -35,27 +64,10 @@ async def check_domain(domain: str, timeout: int = 30) -> dict:
             result["status_code"] = resp.status_code
             result["response_time_ms"] = round(elapsed, 2)
             result["status"] = "up" if resp.status_code < 500 else "error"
-            # Get resolved IP from response
-            if hasattr(resp, 'netloc_info') and resp.netloc_info:
-                result["probe_ip"] = resp.netloc_info[1] if len(resp.netloc_info) > 1 else None
-            elif resp.url:
-                # Try to get IP from connection
-                try:
-                    import socket
-                    ip = socket.getaddrinfo(domain, 443, socket.AF_INET)[0][4][0]
-                    result["probe_ip"] = ip
-                except:
-                    pass
     except httpx.ConnectError as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
         result["error"] = f"Connection failed: {e}"
-        try:
-            import socket
-            ip = socket.getaddrinfo(domain, 443, socket.AF_INET)[0][4][0]
-            result["probe_ip"] = ip
-        except:
-            pass
     except httpx.TimeoutException:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
@@ -139,9 +151,15 @@ async def run_check_for_rule(rule: dict):
                 "status": "error",
                 "status_code": None,
                 "response_time_ms": None,
+                "resolved_ip": None,
+                "probe_ip": get_probe_ip(),
                 "error": str(result)[:200],
                 "checked_at": now,
             }
+
+        # Ensure probe_ip is set
+        if not result.get("probe_ip"):
+            result["probe_ip"] = get_probe_ip()
 
         doc = {
             "rule_id": rule_id,
