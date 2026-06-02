@@ -64,6 +64,7 @@ async def sync_dns_domains():
                 "ttl": r.get("ttl", 1),
                 "priority": r.get("priority"),
                 "synced_at": now,
+                "is_public": True,
             })
 
         if docs:
@@ -75,6 +76,9 @@ async def sync_dns_domains():
     await db[COLLECTION].create_index("type")
     await db[COLLECTION].create_index([("account_id", 1), ("type", 1)])
     await db[COLLECTION].create_index("zone_name")
+
+    # 确保所有记录都有 is_public 字段
+    await db[COLLECTION].update_many({"is_public": {"$exists": False}}, {"$set": {"is_public": True}})
 
     logger.info(f"DNS domains sync complete: {total_synced} records from {len(accounts)} accounts")
 
