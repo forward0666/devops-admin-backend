@@ -20,6 +20,7 @@ async def check_domain(domain: str, timeout: int = 30) -> dict:
         "status": "down",
         "status_code": None,
         "response_time_ms": None,
+        "probe_ip": None,
         "error": None,
         "checked_at": datetime.utcnow(),
     }
@@ -34,10 +35,27 @@ async def check_domain(domain: str, timeout: int = 30) -> dict:
             result["status_code"] = resp.status_code
             result["response_time_ms"] = round(elapsed, 2)
             result["status"] = "up" if resp.status_code < 500 else "error"
+            # Get resolved IP from response
+            if hasattr(resp, 'netloc_info') and resp.netloc_info:
+                result["probe_ip"] = resp.netloc_info[1] if len(resp.netloc_info) > 1 else None
+            elif resp.url:
+                # Try to get IP from connection
+                try:
+                    import socket
+                    ip = socket.getaddrinfo(domain, 443, socket.AF_INET)[0][4][0]
+                    result["probe_ip"] = ip
+                except:
+                    pass
     except httpx.ConnectError as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
         result["error"] = f"Connection failed: {e}"
+        try:
+            import socket
+            ip = socket.getaddrinfo(domain, 443, socket.AF_INET)[0][4][0]
+            result["probe_ip"] = ip
+        except:
+            pass
     except httpx.TimeoutException:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
