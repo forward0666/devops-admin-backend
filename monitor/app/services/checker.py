@@ -20,13 +20,16 @@ def get_probe_ip() -> str:
     if _probe_ip:
         return _probe_ip
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        _probe_ip = s.getsockname()[0]
-        s.close()
+        import urllib.request
+        _probe_ip = urllib.request.urlopen('https://api.ipify.org', timeout=5).read().decode()
         return _probe_ip
     except:
-        return "unknown"
+        try:
+            import urllib.request
+            _probe_ip = urllib.request.urlopen('https://ifconfig.me', timeout=5).read().decode()
+            return _probe_ip
+        except:
+            return "unknown"
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
