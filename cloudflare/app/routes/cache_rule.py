@@ -182,7 +182,7 @@ async def _do_purge(db, rule: dict, domains: list[str]) -> dict:
         zid = info["zone_id"]
         if zid not in zone_info:
             zone_info[zid] = {"account_id": info["account_id"], "prefixes": []}
-        zone_info[zid]["prefixes"].append(f"https://{d}{url_path}")
+        zone_info[zid]["prefixes"].append(f"{d}{url_path}")
 
     # Cache tokens by account_id
     token_cache: dict[str, str] = {}
@@ -214,7 +214,9 @@ async def _do_purge(db, rule: dict, domains: list[str]) -> dict:
                 for d in zone_domains.get(zone_id, []):
                     failed.append({"domain": d, "reason": f"account {zinfo['account_id']} not found"})
                 continue
-            cf_client.purge_by_prefixes(token, zone_id, zinfo["prefixes"])
+            logger.info(f"Purge: zone_id={zone_id}, prefixes={zinfo['prefixes']}")
+            result = cf_client.purge_by_prefixes(token, zone_id, zinfo["prefixes"])
+            logger.info(f"Purge result: {result}")
             succeeded.extend(zone_domains.get(zone_id, []))
             zone_results.append({"zone_id": zone_id, "account_id": zinfo["account_id"], "domains": zone_domains.get(zone_id, []), "success": True})
         except Exception as e:
