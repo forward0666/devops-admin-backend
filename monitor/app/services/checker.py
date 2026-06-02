@@ -71,16 +71,22 @@ async def run_check_for_rule(rule: dict):
         if "all" in domains:
             # Fetch all domains from cloudflare dnsDomain collection
             try:
-                db = await get_db()
-                collections = await db.list_collection_names()
+                from motor.motor_asyncio import AsyncIOMotorClient
+                from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
+
+                uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
+                cf_client_mongo = AsyncIOMotorClient(uri)
+                cf_db = cf_client_mongo["cloudflare"]
+                collections = await cf_db.list_collection_names()
                 for col_name in collections:
                     if col_name.endswith("_dns_records"):
-                        col = db[col_name]
+                        col = cf_db[col_name]
                         docs = await col.find({}, {"name": 1}).to_list(length=10000)
                         for doc in docs:
                             name = doc.get("name", "")
                             if name and name not in domains_to_check:
                                 domains_to_check.append(name)
+                cf_client_mongo.close()
             except Exception as e:
                 logger.error(f"[Monitor] Failed to fetch all domains: {e}")
         else:
