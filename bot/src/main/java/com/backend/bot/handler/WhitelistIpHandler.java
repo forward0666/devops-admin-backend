@@ -49,7 +49,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
 
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
-                ? cloudflareServiceUrl : "http://" + cloudflareServiceName;
+                ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
     }
 
     @Override

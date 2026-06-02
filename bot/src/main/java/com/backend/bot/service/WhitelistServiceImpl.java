@@ -32,7 +32,7 @@ public class WhitelistServiceImpl implements WhitelistService {
 
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
-                ? cloudflareServiceUrl : "http://" + cloudflareServiceName;
+                ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
     }
 
     private String getRedisKey(String domainType) {

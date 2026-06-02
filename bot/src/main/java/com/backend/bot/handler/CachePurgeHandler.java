@@ -45,9 +45,20 @@ public class CachePurgeHandler implements CallbackActionHandler {
     @Value("${bot.cloudflare-service-name:cloudflare}")
     private String cloudflareServiceName;
 
+    @Value("${bot.user-service-url:}")
+    private String userServiceUrl;
+
+    @Value("${bot.user-service-name:user}")
+    private String userServiceName;
+
+    private String getUserBaseUrl() {
+        return (userServiceUrl != null && !userServiceUrl.isBlank())
+                ? userServiceUrl : "lb://" + userServiceName;
+    }
+
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
-                ? cloudflareServiceUrl : "http://" + cloudflareServiceName;
+                ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
     }
 
     @Override
@@ -145,7 +156,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
             Long projectId = tuple.getT1();
             String cfUrl = tuple.getT2();
             WebClient cfClient = webClientBuilder.baseUrl(cfUrl).build();
-            WebClient userClient = webClientBuilder.baseUrl("http://192.168.86.9:8084").build();
+            WebClient userClient = webClientBuilder.baseUrl(getUserBaseUrl()).build();
 
             String uri = "/domain/list?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
             return userClient.get().uri(uri)

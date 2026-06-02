@@ -5,6 +5,7 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
+import org.springframework.beans.factory.annotation.Value;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.LogUtils;
@@ -48,7 +49,16 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private static final String PROJECT_DOMAIN_TEST_ACTION = "PROJECT_DOMAIN_TEST_ACTION";
     private static final String PROJECT_DOMAIN_DEV_ACTION = "PROJECT_DOMAIN_DEV_ACTION";
     private static final String PROJECT_MIDDLEWARE_ACTION = "PROJECT_MIDDLEWARE_ACTION";
-    private static final String USER_SERVICE_URL = "http://192.168.86.9:8084";
+    @Value("${bot.user-service-url:}")
+    private String userServiceUrl;
+
+    @Value("${bot.user-service-name:user}")
+    private String userServiceName;
+
+    private String getUserBaseUrl() {
+        return (userServiceUrl != null && !userServiceUrl.isBlank())
+                ? userServiceUrl : "lb://" + userServiceName;
+    }
 
     @Override
     public boolean supports(String callbackData) {
@@ -113,7 +123,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             return replyNoBinding(token, chatId, messageId);
                         }
 
-                        WebClient webClient = webClientBuilder.baseUrl(USER_SERVICE_URL)
+                        WebClient webClient = webClientBuilder.baseUrl(getUserBaseUrl())
                                 .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
                                 .build();
 

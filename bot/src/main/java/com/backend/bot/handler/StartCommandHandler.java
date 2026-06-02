@@ -40,8 +40,16 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final BotGroupProjectRepository botGroupProjectRepository;
     private final WebClient.Builder webClientBuilder;
 
-    @Value("${bot.user-service-url:http://192.168.86.9:8084}")
+    @Value("${bot.user-service-url:}")
     private String userServiceUrl;
+
+    @Value("${bot.user-service-name:user}")
+    private String userServiceName;
+
+    private String getUserBaseUrl() {
+        return (userServiceUrl != null && !userServiceUrl.isBlank())
+                ? userServiceUrl : "lb://" + userServiceName;
+    }
 
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
     private static final int DELETE_DELAY_SECONDS = TelegramConstants.DEFAULT_DELETE_DELAY_SECONDS;
@@ -199,7 +207,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         return botGroupProjectRepository.findByBotNameAndChatId(context.botName(), chatId)
                 .flatMap(binding -> {
-                    WebClient webClient = webClientBuilder.baseUrl(userServiceUrl).build();
+                    WebClient webClient = webClientBuilder.baseUrl(getUserBaseUrl()).build();
                     return webClient.get()
                             .uri("/projectMember?projectId={projectId}", binding.getProjectId())
                             .header("X-Tg-Username", tgUsername)
