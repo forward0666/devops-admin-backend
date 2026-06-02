@@ -20,10 +20,9 @@ def get_probe_ip() -> str:
     if _probe_ip:
         return _probe_ip
     try:
-        import urllib.request
-        import json
-        resp = urllib.request.urlopen('https://ipinfo.io/json', timeout=10).read().decode()
-        _probe_ip = json.loads(resp).get('ip', 'fail')
+        import httpx
+        resp = httpx.get('https://ipinfo.io/json', timeout=10, verify=False)
+        _probe_ip = resp.json().get('ip', 'fail')
         return _probe_ip
     except Exception as e:
         logger.warning(f"Failed to get probe IP from ipinfo.io: {e}")
