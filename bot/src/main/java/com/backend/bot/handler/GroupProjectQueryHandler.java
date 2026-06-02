@@ -34,6 +34,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private final BotGroupRepository botGroupRepository;
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
+    private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -58,6 +59,10 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private String getUserBaseUrl() {
         return (userServiceUrl != null && !userServiceUrl.isBlank())
                 ? userServiceUrl : "lb://" + userServiceName;
+    }
+
+    private WebClient.Builder getBuilder(String url) {
+        return url.startsWith("lb://") ? lbWebClientBuilder : webClientBuilder;
     }
 
     @Override
@@ -123,7 +128,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                             return replyNoBinding(token, chatId, messageId);
                         }
 
-                        WebClient webClient = webClientBuilder.baseUrl(getUserBaseUrl())
+                        WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl())
                                 .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
                                 .build();
 

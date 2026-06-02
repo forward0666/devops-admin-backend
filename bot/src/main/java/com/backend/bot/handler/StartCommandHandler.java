@@ -38,6 +38,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final ObjectMapper objectMapper;
     private final BotMenuService botMenuService;
     private final BotGroupProjectRepository botGroupProjectRepository;
+    private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
 
     @Value("${bot.user-service-url:}")
@@ -49,6 +50,10 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private String getUserBaseUrl() {
         return (userServiceUrl != null && !userServiceUrl.isBlank())
                 ? userServiceUrl : "lb://" + userServiceName;
+    }
+
+    private WebClient.Builder getBuilder(String url) {
+        return url.startsWith("lb://") ? lbWebClientBuilder : webClientBuilder;
     }
 
     private static final String WELCOME_TEXT = TelegramConstants.WELCOME_MESSAGE;
@@ -207,7 +212,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
 
         return botGroupProjectRepository.findByBotNameAndChatId(context.botName(), chatId)
                 .flatMap(binding -> {
-                    WebClient webClient = webClientBuilder.baseUrl(getUserBaseUrl()).build();
+                    WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl()).build();
                     return webClient.get()
                             .uri("/projectMember?projectId={projectId}", binding.getProjectId())
                             .header("X-Tg-Username", tgUsername)

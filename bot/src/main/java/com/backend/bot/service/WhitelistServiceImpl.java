@@ -21,6 +21,7 @@ import java.util.Map;
 public class WhitelistServiceImpl implements WhitelistService {
 
     private final org.springframework.data.redis.core.ReactiveStringRedisTemplate redisTemplate;
+    private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
@@ -33,6 +34,10 @@ public class WhitelistServiceImpl implements WhitelistService {
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
                 ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
+    }
+
+    private WebClient.Builder getBuilder(String url) {
+        return url.startsWith("lb://") ? lbWebClientBuilder : webClientBuilder;
     }
 
     private String getRedisKey(String domainType) {
@@ -80,7 +85,7 @@ public class WhitelistServiceImpl implements WhitelistService {
 
     @Override
     public Mono<String> addCfWhitelistIp(Long projectId, String ruleId, String ip, String username, String env, String operator) {
-        WebClient webClient = webClientBuilder.baseUrl(getCloudflareBaseUrl()).build();
+        WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
         Map<String, Object> body = Map.of(
                 "projectId", projectId,
                 "ruleId", ruleId,

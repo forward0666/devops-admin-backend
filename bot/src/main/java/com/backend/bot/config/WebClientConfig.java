@@ -58,8 +58,13 @@ public class WebClientConfig {
      * 
      * @return 配置好的 WebClient 实例，专用于 Telegram API 调用
      */
-    @Bean
+    @Bean("lbWebClientBuilder")
     @LoadBalanced
+    public WebClient.Builder lbWebClientBuilder() {
+        return WebClient.builder();
+    }
+
+    @Bean("webClientBuilder")
     public WebClient.Builder webClientBuilder() {
         return WebClient.builder();
     }

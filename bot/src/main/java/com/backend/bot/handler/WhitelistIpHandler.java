@@ -35,6 +35,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     private final InteractiveMessageService interactiveMessageService;
     private final UserSessionService userSessionService;
     private final com.backend.bot.repository.BotGroupRepository botGroupRepository;
+    private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -50,6 +51,10 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
                 ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
+    }
+
+    private WebClient.Builder getBuilder(String url) {
+        return url.startsWith("lb://") ? lbWebClientBuilder : webClientBuilder;
     }
 
     @Override
@@ -124,7 +129,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
 
         return getProjectId(botName, chatId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
-            WebClient webClient = webClientBuilder.baseUrl(getCloudflareBaseUrl()).build();
+            WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/securityRules?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
             log.info("[STEP 4] Calling {}", uri);
 
@@ -203,7 +208,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
 
         return getProjectId(botName, chatId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
-            WebClient webClient = webClientBuilder.baseUrl(getCloudflareBaseUrl()).build();
+            WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/whitelist?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
             log.info("[STEP 4] Calling {}", uri);
 
@@ -246,7 +251,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
 
         return getProjectId(botName, chatId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
-            WebClient webClient = webClientBuilder.baseUrl(getCloudflareBaseUrl()).build();
+            WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/whitelist/" + recordId + "?projectId=" + projectId;
             log.info("[STEP 4] Calling DELETE {}", uri);
 

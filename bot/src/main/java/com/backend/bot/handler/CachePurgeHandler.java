@@ -35,6 +35,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private final BotClientService botClientService;
     private final BotGroupRepository botGroupRepository;
     private final InteractiveMessageService interactiveMessageService;
+    private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -59,6 +60,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
     private String getCloudflareBaseUrl() {
         return (cloudflareServiceUrl != null && !cloudflareServiceUrl.isBlank())
                 ? cloudflareServiceUrl : "lb://" + cloudflareServiceName;
+    }
+
+    private WebClient.Builder getBuilder(String url) {
+        return url.startsWith("lb://") ? lbWebClientBuilder : webClientBuilder;
     }
 
     @Override
@@ -116,7 +121,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
         ).flatMap(tuple -> {
             Long projectId = tuple.getT1();
             String cfUrl = tuple.getT2();
-            WebClient webClient = webClientBuilder.baseUrl(cfUrl).build();
+            WebClient webClient = getBuilder(cfUrl).baseUrl(cfUrl).build();
             String uri = "/cacheRule?projectId=" + projectId + (env != null ? "&env=" + env : "");
 
             return webClient.get().uri(uri).retrieve()
@@ -155,8 +160,8 @@ public class CachePurgeHandler implements CallbackActionHandler {
         ).flatMap(tuple -> {
             Long projectId = tuple.getT1();
             String cfUrl = tuple.getT2();
-            WebClient cfClient = webClientBuilder.baseUrl(cfUrl).build();
-            WebClient userClient = webClientBuilder.baseUrl(getUserBaseUrl()).build();
+            WebClient cfClient = getBuilder(cfUrl).baseUrl(cfUrl).build();
+            WebClient userClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl()).build();
 
             String uri = "/domain/list?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
             return userClient.get().uri(uri)
