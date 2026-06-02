@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Header, HTTPException
 from datetime import datetime
+import logging
 
 from app.services.db import query_one
 from app.services.mongodb import get_db
 from app.services import cf_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -16,6 +18,7 @@ def get_collection_name(account_id: int, suffix: str) -> str:
 @router.post("/sync")
 async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-Token")):
     """Fetch zones from Cloudflare API and sync to MongoDB"""
+    logger.info(f"[Zone Sync] Start sync for account_id={account_id}")
     account = await query_one("SELECT id, name, tags FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -23,11 +26,13 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     db = await get_db()
     collection = db[get_collection_name(account_id, "zones")]
 
-    cf_data = cf_client.list_zones(x_cf_token)
+    cf_data = await cf_client.async_list_zones(x_cf_token)
     if not cf_data.get("success"):
+        logger.error(f"[Zone Sync] Failed to fetch zones from CF for account_id={account_id}")
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
 
     zones = cf_data.get("result", [])
+    logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
     now = datetime.utcnow()
 
     synced = 0
@@ -52,6 +57,7 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
         )
         synced += 1
 
+    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}")
     return {"code": 200, "data": {"synced": synced, "total": len(zones)}}
 
 
@@ -63,11 +69,17 @@ async def list_zones(account_id: int = None):
     if account_id:
         collection = db[get_collection_name(account_id, "zones")]
         query = {"account_id": str(account_id)}
+        rows = await collection.find(query).sort("name", 1).to_list(length=5000)
     else:
-        # No account filter - not supported with dynamic collections
-        raise HTTPException(status_code=400, detail="account_id is required")
+        # Fetch from all accounts
+        collections = await db.list_collection_names()
+        rows = []
+        for col_name in collections:
+            if col_name.endswith("_zones"):
+                col = db[col_name]
+                docs = await col.find({}).sort("name", 1).to_list(length=5000)
+                rows.extend(docs)
 
-    rows = await collection.find(query).sort("name", 1).to_list(length=5000)
     for r in rows:
         r["_id"] = str(r["_id"])
 

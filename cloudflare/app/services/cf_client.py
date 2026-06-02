@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from cloudflare import Cloudflare
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,8 @@ def _auto_paginate(paginated_result):
     for item in paginated_result:
         yield item
 
+
+# ── Sync functions ──
 
 def list_zones(api_token: str, per_page: int = 50) -> dict:
     cf = get_client(api_token)
@@ -128,7 +131,6 @@ def purge_by_prefixes(api_token: str, zone_id: str, prefixes: list) -> dict:
 def list_cache_rules(api_token: str, zone_id: str) -> dict:
     """Fetch cache rules via Cloudflare REST API."""
     cf = get_client(api_token)
-    # Cache Rules are under /zones/{zone_id}/rulesets/phases/http_request_cache_settings
     resp = cf.rulesets.list(zone_id=zone_id)
     cache_ruleset = None
     for r in resp:
@@ -143,3 +145,66 @@ def list_cache_rules(api_token: str, zone_id: str) -> dict:
     detail = cf.rulesets.get(ruleset_id=ruleset_id, zone_id=zone_id)
     result = [rule.model_dump() for rule in (detail.rules or [])]
     return {"success": True, "result": result}
+
+
+# ── Async wrappers (non-blocking, runs sync code in thread pool) ──
+
+async def async_list_zones(api_token: str, per_page: int = 50) -> dict:
+    return await asyncio.to_thread(list_zones, api_token, per_page)
+
+async def async_get_zone(api_token: str, zone_id: str) -> dict:
+    return await asyncio.to_thread(get_zone, api_token, zone_id)
+
+async def async_list_dns(api_token: str, zone_id: str, per_page: int = 100) -> dict:
+    return await asyncio.to_thread(list_dns, api_token, zone_id, per_page)
+
+async def async_create_dns(api_token: str, zone_id: str, data: dict) -> dict:
+    return await asyncio.to_thread(create_dns, api_token, zone_id, data)
+
+async def async_update_dns(api_token: str, zone_id: str, record_id: str, data: dict) -> dict:
+    return await asyncio.to_thread(update_dns, api_token, zone_id, record_id, data)
+
+async def async_delete_dns(api_token: str, zone_id: str, record_id: str) -> dict:
+    return await asyncio.to_thread(delete_dns, api_token, zone_id, record_id)
+
+async def async_list_firewall_rules(api_token: str, zone_id: str) -> dict:
+    return await asyncio.to_thread(list_firewall_rules, api_token, zone_id)
+
+async def async_create_firewall_rule(api_token: str, zone_id: str, data: dict) -> dict:
+    return await asyncio.to_thread(create_firewall_rule, api_token, zone_id, data)
+
+async def async_get_firewall_rule(api_token: str, zone_id: str, rule_id: str) -> dict:
+    return await asyncio.to_thread(get_firewall_rule, api_token, zone_id, rule_id)
+
+async def async_update_firewall_rule(api_token: str, zone_id: str, rule_id: str, data: dict) -> dict:
+    return await asyncio.to_thread(update_firewall_rule, api_token, zone_id, rule_id, data)
+
+async def async_delete_firewall_rule(api_token: str, zone_id: str, rule_id: str) -> dict:
+    return await asyncio.to_thread(delete_firewall_rule, api_token, zone_id, rule_id)
+
+async def async_get_ssl(api_token: str, zone_id: str) -> dict:
+    return await asyncio.to_thread(get_ssl, api_token, zone_id)
+
+async def async_update_ssl(api_token: str, zone_id: str, value: str) -> dict:
+    return await asyncio.to_thread(update_ssl, api_token, zone_id, value)
+
+async def async_purge_all(api_token: str, zone_id: str) -> dict:
+    return await asyncio.to_thread(purge_all, api_token, zone_id)
+
+async def async_purge_by_urls(api_token: str, zone_id: str, files: list) -> dict:
+    return await asyncio.to_thread(purge_by_urls, api_token, zone_id, files)
+
+async def async_purge_by_tags(api_token: str, zone_id: str, tags: list) -> dict:
+    return await asyncio.to_thread(purge_by_tags, api_token, zone_id, tags)
+
+async def async_purge_by_hosts(api_token: str, zone_id: str, hosts: list) -> dict:
+    return await asyncio.to_thread(purge_by_hosts, api_token, zone_id, hosts)
+
+async def async_purge_by_prefixes(api_token: str, zone_id: str, prefixes: list) -> dict:
+    return await asyncio.to_thread(purge_by_prefixes, api_token, zone_id, prefixes)
+
+async def async_list_cache_rules(api_token: str, zone_id: str) -> dict:
+    return await asyncio.to_thread(list_cache_rules, api_token, zone_id)
+
+async def async_get_client(api_token: str) -> Cloudflare:
+    return await asyncio.to_thread(get_client, api_token)
