@@ -8,6 +8,7 @@ from app.routes import monitor
 from app.services.db import close_pool, get_pool
 from app.services.mongodb import close_db, get_db
 from app.services.nacos_client import send_heartbeat
+from app.services.checker import scheduler_loop
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,9 +28,11 @@ async def lifespan(app: FastAPI):
     # 预热数据库连接
     await get_pool()
     await get_db()
-    task = asyncio.create_task(heartbeat_loop())
+    heartbeat_task = asyncio.create_task(heartbeat_loop())
+    scheduler_task = asyncio.create_task(scheduler_loop())
     yield
-    task.cancel()
+    heartbeat_task.cancel()
+    scheduler_task.cancel()
     logger.info("🛑 Monitor Service shutting down...")
     await close_pool()
     await close_db()
