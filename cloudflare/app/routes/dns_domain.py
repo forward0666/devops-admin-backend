@@ -106,3 +106,29 @@ async def list_dns_domains(
         r["id"] = str(r.pop("_id"))
 
     return {"code": 200, "data": rows}
+
+
+@router.put("/{record_id}")
+async def update_dns_domain(record_id: str, body: dict):
+    """更新 dns_domains 记录（如 is_public 字段）"""
+    from bson import ObjectId
+    db = await get_db()
+
+    try:
+        oid = ObjectId(record_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid record ID")
+
+    update_fields = {}
+    if "is_public" in body:
+        update_fields["is_public"] = body["is_public"]
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    result = await db[COLLECTION].update_one({"_id": oid}, {"$set": update_fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    logger.info(f"Updated dns_domain {record_id}: {update_fields}")
+    return {"code": 200, "message": "ok"}
