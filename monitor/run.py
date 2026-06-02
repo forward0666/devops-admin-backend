@@ -16,7 +16,7 @@ def main():
     # 2. Register service to Nacos (uses possibly overridden values)
     asyncio.run(register_service())
 
-    # 3. Start FastAPI server
+    # 3. Start FastAPI server with multiple workers
     from app.config import SERVICE_PORT  # re-read after config override
     logger.info(f"🚀 Starting Monitor Service on port {SERVICE_PORT}")
     uvicorn.run(
@@ -24,6 +24,7 @@ def main():
         host="0.0.0.0",
         port=SERVICE_PORT,
         log_level="info",
+        workers=4,
     )
 
 

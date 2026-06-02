@@ -30,7 +30,6 @@ def get_probe_ip() -> str:
         logger.warning(f"Failed to get probe IP from ipinfo.io: {e}")
     # Fallback: get local IP
     try:
-        import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         _probe_ip = s.getsockname()[0]
@@ -38,6 +37,11 @@ def get_probe_ip() -> str:
         return _probe_ip
     except:
         return "unknown"
+
+
+async def async_get_probe_ip() -> str:
+    """Async wrapper for get_probe_ip"""
+    return await asyncio.to_thread(get_probe_ip)
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
@@ -56,10 +60,9 @@ async def check_domain(domain: str, timeout: int = 30) -> dict:
         "checked_at": datetime.utcnow(),
     }
 
-    # Resolve domain IP first
+    # Resolve domain IP (run in thread to avoid blocking)
     try:
-        import socket
-        ips = socket.getaddrinfo(domain, 443, socket.AF_INET)
+        ips = await asyncio.to_thread(socket.getaddrinfo, domain, 443, socket.AF_INET)
         if ips:
             result["resolved_ip"] = ips[0][4][0]
     except:
@@ -163,14 +166,14 @@ async def run_check_for_rule(rule: dict):
                 "status_code": None,
                 "response_time_ms": None,
                 "resolved_ip": None,
-                "probe_ip": get_probe_ip(),
+                "probe_ip": await async_get_probe_ip(),
                 "error": str(result)[:200],
                 "checked_at": now,
             }
 
         # Ensure probe_ip is set
         if not result.get("probe_ip"):
-            result["probe_ip"] = get_probe_ip()
+            result["probe_ip"] = await async_get_probe_ip()
 
         doc = {
             "rule_id": rule_id,
