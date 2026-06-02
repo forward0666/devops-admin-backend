@@ -21,15 +21,12 @@ def get_probe_ip() -> str:
         return _probe_ip
     try:
         import urllib.request
-        _probe_ip = urllib.request.urlopen('https://api.ipify.org', timeout=5).read().decode()
+        import json
+        resp = urllib.request.urlopen('https://ipinfo.io/json', timeout=5).read().decode()
+        _probe_ip = json.loads(resp).get('ip', 'unknown')
         return _probe_ip
     except:
-        try:
-            import urllib.request
-            _probe_ip = urllib.request.urlopen('https://ifconfig.me', timeout=5).read().decode()
-            return _probe_ip
-        except:
-            return "unknown"
+        return "unknown"
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
