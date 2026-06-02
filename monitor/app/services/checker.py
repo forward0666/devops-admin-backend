@@ -182,6 +182,37 @@ async def run_check_for_rule(rule: dict):
         else:
             error_count += 1
 
+    # Update dns_domains in cloudflare DB with monitor results
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
+
+        uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
+        cf_client_mongo = AsyncIOMotorClient(uri)
+        cf_db = cf_client_mongo["cloudflare"]
+        dns_col = cf_db["dns_domains"]
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                continue
+            domain_name = result.get("domain")
+            if not domain_name:
+                continue
+            update_doc = {
+                "last_status": result.get("status"),
+                "last_status_code": result.get("status_code"),
+                "last_response_time_ms": result.get("response_time_ms"),
+                "last_resolved_ip": result.get("resolved_ip"),
+                "last_probe_ip": result.get("probe_ip"),
+                "last_checked_at": now,
+            }
+            await dns_col.update_one({"name": domain_name}, {"$set": update_doc})
+
+        cf_client_mongo.close()
+        logger.info(f"[Monitor] Updated dns_domains with monitor results for rule '{rule_name}'")
+    except Exception as e:
+        logger.error(f"[Monitor] Failed to update dns_domains: {e}")
+
     # Update rule last_check and status
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"
     await execute(
