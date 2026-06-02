@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _running_tasks: dict[int, asyncio.Task] = {}
 
 
-async def check_domain(domain: str, timeout: int = 10) -> dict:
+async def check_domain(domain: str, timeout: int = 30) -> dict:
     """Check a single domain and return result"""
     result = {
         "domain": domain,
