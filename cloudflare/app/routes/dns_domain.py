@@ -112,6 +112,16 @@ async def list_dns_domains(
     return {"code": 200, "data": rows}
 
 
+@router.put("/toggleAll")
+async def toggle_all_public(body: dict):
+    """批量更新所有域名的 is_public 字段"""
+    db = await get_db()
+    is_public = body.get("is_public", False)
+    result = await db[COLLECTION].update_many({}, {"$set": {"is_public": is_public}})
+    logger.info(f"Toggled all dns_domains is_public={is_public}, matched={result.matched_count}")
+    return {"code": 200, "data": {"updated": result.matched_count}}
+
+
 @router.put("/{record_id}")
 async def update_dns_domain(record_id: str, body: dict):
     """更新 dns_domains 记录（如 is_public 字段）"""
