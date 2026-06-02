@@ -23,20 +23,11 @@ def get_probe_ip() -> str:
         import urllib.request
         import json
         resp = urllib.request.urlopen('https://ipinfo.io/json', timeout=10).read().decode()
-        _probe_ip = json.loads(resp).get('ip', 'unknown')
-        if _probe_ip and _probe_ip != 'unknown':
-            return _probe_ip
+        _probe_ip = json.loads(resp).get('ip', 'fail')
+        return _probe_ip
     except Exception as e:
         logger.warning(f"Failed to get probe IP from ipinfo.io: {e}")
-    # Fallback: get local IP
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        _probe_ip = s.getsockname()[0]
-        s.close()
-        return _probe_ip
-    except:
-        return "unknown"
+        return "fail"
 
 
 async def async_get_probe_ip() -> str:
