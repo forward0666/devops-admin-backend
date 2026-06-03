@@ -3,7 +3,7 @@ import asyncio
 import httpx
 import time
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.services.db import query_all, execute
 from app.services.mongodb import get_db
@@ -35,6 +35,23 @@ async def async_get_probe_ip() -> str:
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
+
+
+async def cleanup_old_results():
+    """Delete monitor results older than 7 days"""
+    try:
+        db = await get_db()
+        collections = await db.list_collection_names()
+        cutoff = datetime.utcnow() - timedelta(days=7)
+        total_deleted = 0
+        for col_name in collections:
+            if col_name.startswith("monitor_results_"):
+                result = await db[col_name].delete_many({"checked_at": {"$lt": cutoff}})
+                total_deleted += result.deleted_count
+        if total_deleted > 0:
+            logger.info(f"[Monitor] Cleanup: deleted {total_deleted} old results")
+    except Exception as e:
+        logger.error(f"[Monitor] Cleanup error: {e}")
 
 
 async def check_domain(domain: str, timeout: int = 15) -> dict:
@@ -256,10 +273,16 @@ async def scheduler_loop():
     from app.services.redis_lock import acquire_lock, release_lock
 
     logger.info("[Monitor] Scheduler started")
+    last_cleanup = None
     while True:
         try:
-            rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
+            # Daily cleanup: remove results older than 7 days
             now = datetime.utcnow()
+            if last_cleanup is None or (now - last_cleanup).total_seconds() > 86400:
+                await cleanup_old_results()
+                last_cleanup = now
+
+            rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
 
             for rule in rules:
                 rule_id = rule["id"]
