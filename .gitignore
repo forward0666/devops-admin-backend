@@ -33,3 +33,5 @@ Thumbs.db
 *.tmp
 *.temp
 /.idea/
+*.pyc
+__pycache__/

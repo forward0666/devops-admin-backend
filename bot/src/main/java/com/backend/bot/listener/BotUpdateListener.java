@@ -81,6 +81,10 @@ public class BotUpdateListener {
                         log.warn("⏸️ Bot {} is inactive. Ignoring update.", botName);
                         return false;
                     }
+                    if (botConfigEntity.getBotType() == com.backend.bot.enums.BotType.ALERT) {
+                        log.info("⏸️ Bot {} is ALERT type. Ignoring update.", botName);
+                        return false;
+                    }
                     return true;
                 })
                 .flatMap(botConfigEntity -> {

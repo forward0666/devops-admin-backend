@@ -69,9 +69,8 @@ public class BotConfigEntity {
      * 
      * 使用枚举类型代替字符串，提高类型安全性和代码可读性。
      * 支持的 Bot 类型：
-     * - IP_WHITE_LIST: IP 白名单管理 Bot
-     * - CUSTOMER_SERVICE: 客服 Bot
-     * - TOOL: 工具 Bot
+     * - GENERAL: 通用 Bot
+     * - ALERT: 告警 Bot
      */
     private BotType botType;
     

@@ -18,6 +18,7 @@ import reactor.core.scheduler.Scheduler;
         "com.backend.gateway", // 主工程包
         "config",
         "monitor",
+        "task",
         "filter",
         "exception"
 })
