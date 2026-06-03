@@ -1,6 +1,5 @@
 import logging
-import time
-import aioredis
+import redis.asyncio as aioredis
 from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
 
 logger = logging.getLogger(__name__)
