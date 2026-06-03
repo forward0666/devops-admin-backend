@@ -226,67 +226,63 @@ async def run_check_for_rule(rule: dict):
 async def run_single_check(rule_id: int):
     """Run a single check for a specific rule"""
     from app.services.db import query_one
-    rule = await query_one("SELECT * FROM monitor_rule WHERE id=%s AND enabled=1", (rule_id,))
-    if rule:
-        # Parse domains
-        if isinstance(rule.get("domains"), str):
-            import json
-            try:
-                rule["domains"] = json.loads(rule["domains"])
-            except:
-                rule["domains"] = []
-        await run_check_for_rule(rule)
+    from app.services.redis_lock import acquire_lock, release_lock
+
+    lock_name = f"check:{rule_id}"
+    if not await acquire_lock(lock_name):
+        logger.info(f"[Monitor] Rule {rule_id} check already running, skipping")
+        return
+
+    try:
+        rule = await query_one("SELECT * FROM monitor_rule WHERE id=%s AND enabled=1", (rule_id,))
+        if rule:
+            if isinstance(rule.get("domains"), str):
+                import json
+                try:
+                    rule["domains"] = json.loads(rule["domains"])
+                except:
+                    rule["domains"] = []
+            await run_check_for_rule(rule)
+    finally:
+        await release_lock(lock_name)
 
 
 async def scheduler_loop():
     """Background scheduler: check rules based on their interval"""
-    from app.services.redis_lock import acquire_lock, release_lock, extend_lock
+    from app.services.redis_lock import acquire_lock, release_lock
 
     logger.info("[Monitor] Scheduler started")
     while True:
         try:
-            # Try to acquire distributed lock
-            if not await acquire_lock("scheduler"):
-                await asyncio.sleep(30)
-                continue
+            rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
+            now = datetime.utcnow()
 
-            try:
-                rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
-                now = datetime.utcnow()
+            for rule in rules:
+                rule_id = rule["id"]
+                interval = rule.get("check_interval", 5)  # minutes
+                last_check = rule.get("last_check")
 
-                for rule in rules:
-                    rule_id = rule["id"]
-                    interval = rule.get("check_interval", 5)  # minutes
-                    last_check = rule.get("last_check")
+                # Parse domains
+                if isinstance(rule.get("domains"), str):
+                    import json
+                    try:
+                        rule["domains"] = json.loads(rule["domains"])
+                    except:
+                        rule["domains"] = []
 
-                    # Parse domains
-                    if isinstance(rule.get("domains"), str):
-                        import json
-                        try:
-                            rule["domains"] = json.loads(rule["domains"])
-                        except:
-                            rule["domains"] = []
-
-                    # Check if it's time to run
-                    should_run = False
-                    if last_check is None:
+                # Check if it's time to run
+                should_run = False
+                if last_check is None:
+                    should_run = True
+                else:
+                    diff = (now - last_check).total_seconds() / 60
+                    if diff >= interval:
                         should_run = True
-                    else:
-                        diff = (now - last_check).total_seconds() / 60
-                        if diff >= interval:
-                            should_run = True
 
-                    if should_run:
-                        # Run check in background
-                        if rule_id not in _running_tasks or _running_tasks[rule_id].done():
-                            _running_tasks[rule_id] = asyncio.create_task(run_check_for_rule(rule))
-
-                # Extend lock periodically
-                await extend_lock("scheduler")
-
-            finally:
-                # Release lock after cycle
-                await release_lock("scheduler")
+                if should_run:
+                    # Run check with per-rule lock
+                    if rule_id not in _running_tasks or _running_tasks[rule_id].done():
+                        _running_tasks[rule_id] = asyncio.create_task(run_single_check(rule_id))
 
         except Exception as e:
             logger.error(f"[Monitor] Scheduler error: {e}")
