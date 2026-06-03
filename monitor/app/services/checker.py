@@ -37,7 +37,7 @@ async def async_get_probe_ip() -> str:
 _running_tasks: dict[int, asyncio.Task] = {}
 
 
-async def check_domain(domain: str, timeout: int = 30) -> dict:
+async def check_domain(domain: str, timeout: int = 15) -> dict:
     """Check a single domain and return result"""
     result = {
         "domain": domain,
@@ -135,83 +135,87 @@ async def run_check_for_rule(rule: dict):
     # Update rule status to running
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
 
-    # Check all domains concurrently
-    tasks = [check_domain(d) for d in domains_to_check]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Save results to MongoDB
+    # Batch check: 200 domains per batch, 1s delay between batches
+    BATCH_SIZE = 200
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
     now = datetime.utcnow()
-
     up_count = 0
     down_count = 0
     error_count = 0
+    probe_ip = await async_get_probe_ip()
 
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            result = {
-                "domain": domains_to_check[i],
-                "status": "error",
-                "status_code": None,
-                "response_time_ms": None,
-                "resolved_ip": None,
-                "probe_ip": await async_get_probe_ip(),
-                "error": str(result)[:200],
-                "checked_at": now,
-            }
-
-        # Ensure probe_ip is set
-        if not result.get("probe_ip"):
-            result["probe_ip"] = await async_get_probe_ip()
-
-        doc = {
-            "rule_id": rule_id,
-            "rule_name": rule_name,
-            "source": source,
-            "checked_at": now,
-            **result,
-        }
-
-        await collection.insert_one(doc)
-
-        if result["status"] == "up":
-            up_count += 1
-        elif result["status"] == "down":
-            down_count += 1
-        else:
-            error_count += 1
-
-    # Update dns_domains in cloudflare DB with monitor results
+    # Get cloudflare db for updating dns_domains
+    cf_client_mongo = None
+    dns_col = None
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
         from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
-
         uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
         cf_client_mongo = AsyncIOMotorClient(uri)
-        cf_db = cf_client_mongo["cloudflare"]
-        dns_col = cf_db["dns_domains"]
+        dns_col = cf_client_mongo["cloudflare"]["dns_domains"]
+    except Exception as e:
+        logger.error(f"[Monitor] Failed to connect cloudflare DB: {e}")
 
+    for batch_start in range(0, len(domains_to_check), BATCH_SIZE):
+        batch = domains_to_check[batch_start:batch_start + BATCH_SIZE]
+        tasks = [check_domain(d) for d in batch]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Write results immediately
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                continue
-            domain_name = result.get("domain")
-            if not domain_name:
-                continue
-            update_doc = {
-                "last_status": result.get("status"),
-                "last_status_code": result.get("status_code"),
-                "last_response_time_ms": result.get("response_time_ms"),
-                "last_resolved_ip": result.get("resolved_ip"),
-                "last_probe_ip": result.get("probe_ip"),
-                "last_checked_at": now,
-            }
-            await dns_col.update_one({"name": domain_name}, {"$set": update_doc})
+                result = {
+                    "domain": batch[i],
+                    "status": "error",
+                    "status_code": None,
+                    "response_time_ms": None,
+                    "resolved_ip": None,
+                    "probe_ip": probe_ip,
+                    "error": str(result)[:200],
+                    "checked_at": now,
+                }
 
+            if not result.get("probe_ip"):
+                result["probe_ip"] = probe_ip
+
+            doc = {
+                "rule_id": rule_id,
+                "rule_name": rule_name,
+                "source": source,
+                "checked_at": now,
+                **result,
+            }
+
+            await collection.insert_one(doc)
+
+            # Update dns_domains immediately
+            if dns_col and result.get("domain"):
+                update_doc = {
+                    "last_status": result.get("status"),
+                    "last_status_code": result.get("status_code"),
+                    "last_response_time_ms": result.get("response_time_ms"),
+                    "last_resolved_ip": result.get("resolved_ip"),
+                    "last_probe_ip": result.get("probe_ip"),
+                    "last_checked_at": now,
+                }
+                await dns_col.update_one({"name": result["domain"]}, {"$set": update_doc})
+
+            if result["status"] == "up":
+                up_count += 1
+            elif result["status"] == "down":
+                down_count += 1
+            else:
+                error_count += 1
+
+        logger.info(f"[Monitor] Rule '{rule_name}' batch {batch_start//BATCH_SIZE + 1}: processed {len(batch)} domains")
+
+        # Delay between batches
+        if batch_start + BATCH_SIZE < len(domains_to_check):
+            await asyncio.sleep(1)
+
+    if cf_client_mongo:
         cf_client_mongo.close()
-        logger.info(f"[Monitor] Updated dns_domains with monitor results for rule '{rule_name}'")
-    except Exception as e:
-        logger.error(f"[Monitor] Failed to update dns_domains: {e}")
 
     # Update rule last_check and status
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"
