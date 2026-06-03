@@ -128,15 +128,18 @@ async def run_check_for_rule(rule: dict):
                 uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
                 cf_client_mongo = AsyncIOMotorClient(uri)
                 cf_db = cf_client_mongo["cloudflare"]
-                collections = await cf_db.list_collection_names()
-                for col_name in collections:
-                    if col_name.endswith("_dns_records"):
-                        col = cf_db[col_name]
-                        docs = await col.find({}, {"name": 1}).to_list(length=10000)
-                        for doc in docs:
-                            name = doc.get("name", "")
-                            if name and name not in domains_to_check:
-                                domains_to_check.append(name)
+                total_docs = await cf_db["dns_domains"].count_documents({})
+                docs = await cf_db["dns_domains"].find({}, {"name": 1}).to_list(length=10000)
+                seen_names = set()
+                for doc in docs:
+                    name = doc.get("name", "")
+                    if name and name not in domains_to_check:
+                        domains_to_check.append(name)
+                    if name:
+                        seen_names.add(name)
+                empty_count = total_docs - len(seen_names)
+                if empty_count > 0:
+                    logger.warning(f"[Monitor] {empty_count} docs in dns_domains have empty name, skipped")
                 cf_client_mongo.close()
             except Exception as e:
                 logger.error(f"[Monitor] Failed to fetch all domains: {e}")
@@ -152,8 +155,8 @@ async def run_check_for_rule(rule: dict):
     # Update rule status to running
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
 
-    # Batch check: 200 domains per batch, 1s delay between batches
-    BATCH_SIZE = 200
+    # All domains in parallel with concurrency limit
+    MAX_CONCURRENT = 500
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
     now = datetime.utcnow()
@@ -174,62 +177,74 @@ async def run_check_for_rule(rule: dict):
     except Exception as e:
         logger.error(f"[Monitor] Failed to connect cloudflare DB: {e}")
 
-    for batch_start in range(0, len(domains_to_check), BATCH_SIZE):
-        batch = domains_to_check[batch_start:batch_start + BATCH_SIZE]
-        tasks = [check_domain(d) for d in batch]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+    sem = asyncio.Semaphore(MAX_CONCURRENT)
 
-        # Write results immediately
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                result = {
-                    "domain": batch[i],
-                    "status": "error",
-                    "status_code": None,
-                    "response_time_ms": None,
-                    "resolved_ip": None,
-                    "probe_ip": probe_ip,
-                    "error": str(result)[:200],
-                    "checked_at": now,
-                }
+    async def checked(domain: str) -> dict:
+        async with sem:
+            return await check_domain(domain)
 
-            if not result.get("probe_ip"):
-                result["probe_ip"] = probe_ip
+    # Fire all checks concurrently
+    tasks = [checked(d) for d in domains_to_check]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            doc = {
-                "rule_id": rule_id,
-                "rule_name": rule_name,
-                "source": source,
+    # Bulk write results
+    from pymongo import UpdateMany
+    insert_docs = []
+    dns_updates = []
+    for i, result in enumerate(results):
+        domain = domains_to_check[i]
+        if isinstance(result, Exception):
+            result = {
+                "domain": domain,
+                "status": "error",
+                "status_code": None,
+                "response_time_ms": None,
+                "resolved_ip": None,
+                "probe_ip": probe_ip,
+                "error": str(result)[:200],
                 "checked_at": now,
-                **result,
             }
 
-            await collection.insert_one(doc)
+        if not result.get("probe_ip"):
+            result["probe_ip"] = probe_ip
 
-            # Update dns_domains immediately
-            if dns_col and result.get("domain"):
-                update_doc = {
+        insert_docs.append({
+            "rule_id": rule_id,
+            "rule_name": rule_name,
+            "source": source,
+            "checked_at": now,
+            **result,
+        })
+
+        if dns_col is not None and result.get("domain"):
+            dns_updates.append(UpdateMany(
+                {"name": result["domain"]},
+                {"$set": {
                     "last_status": result.get("status"),
                     "last_status_code": result.get("status_code"),
                     "last_response_time_ms": result.get("response_time_ms"),
                     "last_resolved_ip": result.get("resolved_ip"),
                     "last_probe_ip": result.get("probe_ip"),
                     "last_checked_at": now,
-                }
-                await dns_col.update_one({"name": result["domain"]}, {"$set": update_doc})
+                }}
+            ))
 
-            if result["status"] == "up":
-                up_count += 1
-            elif result["status"] == "down":
-                down_count += 1
-            else:
-                error_count += 1
+        if result["status"] == "up":
+            up_count += 1
+        elif result["status"] == "down":
+            down_count += 1
+        else:
+            error_count += 1
 
-        logger.info(f"[Monitor] Rule '{rule_name}' batch {batch_start//BATCH_SIZE + 1}: processed {len(batch)} domains")
+    # Batch insert
+    if insert_docs:
+        await collection.insert_many(insert_docs)
+        logger.info(f"[Monitor] Rule '{rule_name}': inserted {len(insert_docs)} results")
 
-        # Delay between batches
-        if batch_start + BATCH_SIZE < len(domains_to_check):
-            await asyncio.sleep(1)
+    # Batch update dns_domains
+    if dns_updates:
+        await dns_col.bulk_write(dns_updates)
+        logger.info(f"[Monitor] Rule '{rule_name}': updated {len(dns_updates)} dns_domains")
 
     if cf_client_mongo:
         cf_client_mongo.close()

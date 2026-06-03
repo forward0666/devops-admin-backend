@@ -66,8 +66,8 @@ async def sync_dns_domains():
         if docs:
             for doc in docs:
                 await db[COLLECTION].update_one(
-                    {"name": doc["name"]},
-                    {"$set": doc, "$setOnInsert": {"is_public": True}},
+                    {"record_id": doc["record_id"]},
+                    {"$set": doc, "$setOnInsert": {"is_public": False}},
                     upsert=True,
                 )
             total_synced += len(docs)
@@ -79,7 +79,7 @@ async def sync_dns_domains():
     await db[COLLECTION].create_index("zone_name")
 
     # 确保所有记录都有 is_public 字段
-    await db[COLLECTION].update_many({"is_public": {"$exists": False}}, {"$set": {"is_public": True}})
+    await db[COLLECTION].update_many({"is_public": {"$exists": False}}, {"$set": {"is_public": False}})
 
     logger.info(f"DNS domains sync complete: {total_synced} records from {len(accounts)} accounts")
 
