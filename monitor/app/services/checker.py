@@ -240,38 +240,53 @@ async def run_single_check(rule_id: int):
 
 async def scheduler_loop():
     """Background scheduler: check rules based on their interval"""
+    from app.services.redis_lock import acquire_lock, release_lock, extend_lock
+
     logger.info("[Monitor] Scheduler started")
     while True:
         try:
-            rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
-            now = datetime.utcnow()
+            # Try to acquire distributed lock
+            if not await acquire_lock("scheduler"):
+                await asyncio.sleep(30)
+                continue
 
-            for rule in rules:
-                rule_id = rule["id"]
-                interval = rule.get("check_interval", 5)  # minutes
-                last_check = rule.get("last_check")
+            try:
+                rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
+                now = datetime.utcnow()
 
-                # Parse domains
-                if isinstance(rule.get("domains"), str):
-                    import json
-                    try:
-                        rule["domains"] = json.loads(rule["domains"])
-                    except:
-                        rule["domains"] = []
+                for rule in rules:
+                    rule_id = rule["id"]
+                    interval = rule.get("check_interval", 5)  # minutes
+                    last_check = rule.get("last_check")
 
-                # Check if it's time to run
-                should_run = False
-                if last_check is None:
-                    should_run = True
-                else:
-                    diff = (now - last_check).total_seconds() / 60
-                    if diff >= interval:
+                    # Parse domains
+                    if isinstance(rule.get("domains"), str):
+                        import json
+                        try:
+                            rule["domains"] = json.loads(rule["domains"])
+                        except:
+                            rule["domains"] = []
+
+                    # Check if it's time to run
+                    should_run = False
+                    if last_check is None:
                         should_run = True
+                    else:
+                        diff = (now - last_check).total_seconds() / 60
+                        if diff >= interval:
+                            should_run = True
 
-                if should_run:
-                    # Run check in background
-                    if rule_id not in _running_tasks or _running_tasks[rule_id].done():
-                        _running_tasks[rule_id] = asyncio.create_task(run_check_for_rule(rule))
+                    if should_run:
+                        # Run check in background
+                        if rule_id not in _running_tasks or _running_tasks[rule_id].done():
+                            _running_tasks[rule_id] = asyncio.create_task(run_check_for_rule(rule))
+
+                # Extend lock periodically
+                await extend_lock("scheduler")
+
+            finally:
+                # Release lock after cycle
+                await release_lock("scheduler")
 
         except Exception as e:
             logger.error(f"[Monitor] Scheduler error: {e}")

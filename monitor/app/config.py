@@ -46,3 +46,11 @@ MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 # Service-to-service auth
 GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
 CLOUDFLARE_SERVICE_URL = os.getenv("CLOUDFLARE_SERVICE_URL", "http://127.0.0.1:8090")
+
+# Redis
+REDIS_HOST = os.getenv("REDIS_HOST", "192.168.86.9")
+REDIS_PORT = _parse_port("REDIS_PORT", "6379")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "root123")
+REDIS_DATABASE = _parse_port("REDIS_DATABASE", "0")
+
+
