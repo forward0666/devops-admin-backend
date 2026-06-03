@@ -77,6 +77,8 @@ async def fetch_config():
                         resolved = _resolve(value.strip(), cast)
                         setattr(config, attr, cast(resolved))
                 logger.info("✅ Loaded config from Nacos: monitor.properties")
+                for attr in ['SERVICE_NAME', 'SERVICE_PORT', 'MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_DATABASE', 'MONGODB_HOST', 'MONGODB_PORT', 'MONGODB_DATABASE', 'REDIS_HOST', 'REDIS_PORT']:
+                    logger.info(f"  {attr} = {getattr(config, attr, 'NOT SET')}")
             else:
                 logger.warning("⚠️ Nacos config not found, using defaults")
     except Exception as e:
