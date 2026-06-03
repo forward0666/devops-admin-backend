@@ -291,5 +291,5 @@ async def scheduler_loop():
         except Exception as e:
             logger.error(f"[Monitor] Scheduler error: {e}")
 
-        # Sleep 30 seconds between checks
-        await asyncio.sleep(30)
+        # Sleep 5 seconds between checks
+        await asyncio.sleep(5)
