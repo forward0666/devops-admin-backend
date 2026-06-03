@@ -23,9 +23,6 @@ async def sync_dns_domains():
     now = datetime.utcnow()
     total_synced = 0
 
-    # 清空旧数据
-    await db[COLLECTION].delete_many({})
-
     for acc in accounts:
         acc_id = acc["id"]
         coll_name = f"account_{acc_id}_dns_records"
@@ -64,11 +61,15 @@ async def sync_dns_domains():
                 "ttl": r.get("ttl", 1),
                 "priority": r.get("priority"),
                 "synced_at": now,
-                "is_public": True,
             })
 
         if docs:
-            await db[COLLECTION].insert_many(docs)
+            for doc in docs:
+                await db[COLLECTION].update_one(
+                    {"name": doc["name"]},
+                    {"$set": doc, "$setOnInsert": {"is_public": True}},
+                    upsert=True,
+                )
             total_synced += len(docs)
 
     # 建索引
