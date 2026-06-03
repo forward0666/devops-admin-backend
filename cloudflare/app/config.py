@@ -39,3 +39,9 @@ GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://192.168.86.9:8084")
 
 
+
+
+
+
+
+
