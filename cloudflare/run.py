@@ -19,7 +19,7 @@ def main():
 
     # 3. Start FastAPI server with dynamic workers based on CPU
     from app.config import SERVICE_PORT  # re-read after config override
-    workers = int(os.getenv("UVICORN_WORKERS", os.cpu_count() or 2))
+    workers = int(os.getenv("UVICORN_WORKERS", min(os.cpu_count() * 2, 8)))
     logger.info(f"🚀 Starting Cloudflare Manager on port {SERVICE_PORT} with {workers} workers")
     uvicorn.run(
         "app.main:app",
