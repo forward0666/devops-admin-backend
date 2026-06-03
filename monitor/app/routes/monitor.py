@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
@@ -128,3 +129,60 @@ async def toggle_rule(rule_id: int):
     await execute("UPDATE monitor_rule SET enabled=%s, updated_at=NOW() WHERE id=%s", (new_status, rule_id))
     logger.info(f"[Monitor] Toggled rule {rule_id}: enabled={new_status}")
     return {"code": 200, "data": {"enabled": new_status}}
+
+
+@router.post("/{rule_id}/check")
+async def manual_check(rule_id: int):
+    """Manually trigger a check for a rule"""
+    from app.services.checker import run_single_check
+    rule = await query_one("SELECT id FROM monitor_rule WHERE id = %s", (rule_id,))
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    asyncio.create_task(run_single_check(rule_id))
+    logger.info(f"[Monitor] Manual check triggered for rule {rule_id}")
+    return {"code": 200, "message": "Check triggered"}
+
+
+@router.get("/{rule_id}/results")
+async def get_results(rule_id: int, limit: int = 100):
+    """Get check results for a rule"""
+    from app.services.mongodb import get_db
+    rule = await query_one("SELECT id FROM monitor_rule WHERE id = %s", (rule_id,))
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    db = await get_db()
+    collection = db[f"monitor_results_{rule_id}"]
+    rows = await collection.find({}).sort("checked_at", -1).limit(limit).to_list(length=limit)
+    for r in rows:
+        r["_id"] = str(r["_id"])
+    return {"code": 200, "data": rows}
+
+
+@router.get("/{rule_id}/results/latest")
+async def get_latest_results(rule_id: int):
+    """Get latest check results for a rule (grouped by domain)"""
+    from app.services.mongodb import get_db
+    rule = await query_one("SELECT id FROM monitor_rule WHERE id = %s", (rule_id,))
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    db = await get_db()
+    collection = db[f"monitor_results_{rule_id}"]
+
+    # Get the latest check time
+    latest = await collection.find_one(sort=[("checked_at", -1)])
+    if not latest:
+        return {"code": 200, "data": []}
+
+    latest_time = latest["checked_at"]
+    # Get all results from the latest check (within 1 second)
+    from datetime import timedelta
+    rows = await collection.find(
+        {"checked_at": {"$gte": latest_time - timedelta(seconds=1), "$lte": latest_time}}
+    ).sort("domain", 1).to_list(length=1000)
+
+    for r in rows:
+        r["_id"] = str(r["_id"])
+    return {"code": 200, "data": rows}

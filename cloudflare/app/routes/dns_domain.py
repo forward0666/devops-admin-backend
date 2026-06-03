@@ -64,6 +64,10 @@ async def sync_dns_domains():
                 "ttl": r.get("ttl", 1),
                 "priority": r.get("priority"),
                 "synced_at": now,
+<<<<<<< HEAD
+=======
+                "is_public": True,
+>>>>>>> fix_bug
             })
 
         if docs:
@@ -76,6 +80,12 @@ async def sync_dns_domains():
     await db[COLLECTION].create_index([("account_id", 1), ("type", 1)])
     await db[COLLECTION].create_index("zone_name")
 
+<<<<<<< HEAD
+=======
+    # 确保所有记录都有 is_public 字段
+    await db[COLLECTION].update_many({"is_public": {"$exists": False}}, {"$set": {"is_public": True}})
+
+>>>>>>> fix_bug
     logger.info(f"DNS domains sync complete: {total_synced} records from {len(accounts)} accounts")
 
     return {"code": 200, "data": {"synced": total_synced, "accounts": len(accounts)}}
@@ -106,3 +116,42 @@ async def list_dns_domains(
         r["id"] = str(r.pop("_id"))
 
     return {"code": 200, "data": rows}
+<<<<<<< HEAD
+=======
+
+
+@router.put("/toggleAll")
+async def toggle_all_public(body: dict):
+    """批量更新所有域名的 is_public 字段"""
+    db = await get_db()
+    is_public = body.get("is_public", False)
+    result = await db[COLLECTION].update_many({}, {"$set": {"is_public": is_public}})
+    logger.info(f"Toggled all dns_domains is_public={is_public}, matched={result.matched_count}")
+    return {"code": 200, "data": {"updated": result.matched_count}}
+
+
+@router.put("/{record_id}")
+async def update_dns_domain(record_id: str, body: dict):
+    """更新 dns_domains 记录（如 is_public 字段）"""
+    from bson import ObjectId
+    db = await get_db()
+
+    try:
+        oid = ObjectId(record_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid record ID")
+
+    update_fields = {}
+    if "is_public" in body:
+        update_fields["is_public"] = body["is_public"]
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    result = await db[COLLECTION].update_one({"_id": oid}, {"$set": update_fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    logger.info(f"Updated dns_domain {record_id}: {update_fields}")
+    return {"code": 200, "message": "ok"}
+>>>>>>> fix_bug
