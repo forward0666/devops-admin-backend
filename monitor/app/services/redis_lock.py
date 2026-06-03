@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 _redis: aioredis.Redis = None
 
 LOCK_KEY_PREFIX = "monitor:lock:"
-LOCK_TTL = 300  # 5 minutes
+LOCK_TTL = 60  # 60 seconds, extended by extend_lock during task
 
 
 async def get_redis() -> aioredis.Redis:
