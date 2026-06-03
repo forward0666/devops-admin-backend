@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import uvicorn
 
 from app.config import SERVICE_PORT
@@ -16,14 +17,16 @@ def main():
     # 2. Register service to Nacos (uses possibly overridden values)
     asyncio.run(register_service())
 
-    # 3. Start FastAPI server
+    # 3. Start FastAPI server with dynamic workers based on CPU
     from app.config import SERVICE_PORT  # re-read after config override
-    logger.info(f"🚀 Starting Cloudflare Manager on port {SERVICE_PORT}")
+    workers = int(os.getenv("UVICORN_WORKERS", os.cpu_count() or 2))
+    logger.info(f"🚀 Starting Cloudflare Manager on port {SERVICE_PORT} with {workers} workers")
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=SERVICE_PORT,
         log_level="info",
+        workers=workers,
     )
 
 
