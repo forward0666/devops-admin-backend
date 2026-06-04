@@ -81,8 +81,10 @@ async def sync_rules(
         )
         synced += 1
 
-    logger.info(f"[Security Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}")
-    return {"code": 200, "data": {"synced": synced, "total": len(rules)}}
+    # Delete stale security rules (not updated in this sync)
+    stale = await collection.delete_many({"zone_id": zone_id, "synced_at": {"$lt": now}})
+    logger.info(f"[Security Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}, stale_removed={stale.deleted_count}")
+    return {"code": 200, "data": {"synced": synced, "total": len(rules), "stale_removed": stale.deleted_count}}
 
 
 @zone_router.get("")

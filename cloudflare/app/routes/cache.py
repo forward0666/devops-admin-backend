@@ -89,8 +89,10 @@ async def sync_cache_rules(
         )
         synced += 1
 
-    logger.info(f"[Cache Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}")
-    return {"code": 200, "data": {"synced": synced, "total": len(rules)}}
+    # Delete stale cache rules (not updated in this sync)
+    stale = await collection.delete_many({"zone_id": zone_id, "synced_at": {"$lt": now}})
+    logger.info(f"[Cache Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}, stale_removed={stale.deleted_count}")
+    return {"code": 200, "data": {"synced": synced, "total": len(rules), "stale_removed": stale.deleted_count}}
 
 
 @zone_router.post("/purge")
