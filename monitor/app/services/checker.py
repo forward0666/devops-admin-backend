@@ -378,6 +378,16 @@ async def run_check_for_rule(rule: dict):
     except Exception as e:
         logger.error(f"[Step 5] Failed to connect cloudflare DB: {e}")
 
+    # ── Step 5.5: Pre-resolve DNS (batch, higher concurrency) ──
+    dns_pre_sem = asyncio.Semaphore(DNS_CONCURRENCY * 2)
+    async def _pre_resolve(domain: str):
+        async with dns_pre_sem:
+            await resolve_domain(domain)
+    dns_start = time.monotonic()
+    await asyncio.gather(*[_pre_resolve(d) for d in domains_to_check], return_exceptions=True)
+    dns_elapsed = round(time.monotonic() - dns_start, 2)
+    logger.info(f"[Step 5.5] DNS pre-resolved {len(domains_to_check)} domains in {dns_elapsed}s")
+
     # ── Step 6: HTTP checks with semaphore (streaming) ──
     sem = asyncio.Semaphore(CHECK_CONCURRENCY)
 
