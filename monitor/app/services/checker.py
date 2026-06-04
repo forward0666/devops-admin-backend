@@ -237,7 +237,16 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
                 result["status_code"] = resp.status_code
                 result["response_time_ms"] = round(elapsed, 2)
                 # 2xx/3xx/403 = up, other 4xx/5xx = error
-                result["status"] = "up" if resp.status_code < 400 or resp.status_code == 403 else "error"
+                if resp.status_code < 300:
+                    result["status"] = "up"
+                elif resp.status_code < 400:
+                    result["status"] = "3xx"
+                elif resp.status_code == 403:
+                    result["status"] = "up"
+                elif resp.status_code < 500:
+                    result["status"] = "4xx"
+                else:
+                    result["status"] = "5xx"
                 result["_protocol"] = protocol
                 result["_dns_ms"] = dns_ms
                 return result
@@ -319,19 +328,32 @@ async def run_check_for_rule(rule: dict):
     probe_ip = await async_get_probe_ip()
     logger.info(f"[Step 3] Probe IP: {probe_ip}")
 
-    # ── Step 4: Load last_protocol from previous results ──
+    # ── Step 4: Load previous results and sort domains ──
     last_protocols: dict[str, str] = {}
+    last_status: dict[str, str] = {}
     try:
         prev_results = await collection.find(
-            {"rule_id": rule_id, "last_protocol": {"$exists": True}},
-            {"domain": 1, "last_protocol": 1},
+            {"rule_id": rule_id},
+            {"domain": 1, "last_protocol": 1, "status": 1},
         ).to_list(length=10000)
         for r in prev_results:
-            if r.get("domain") and r.get("last_protocol"):
-                last_protocols[r["domain"]] = r["last_protocol"]
-        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints")
+            d = r.get("domain")
+            if d:
+                if r.get("last_protocol"):
+                    last_protocols[d] = r["last_protocol"]
+                if r.get("status"):
+                    last_status[d] = r["status"]
+        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints, {len(last_status)} status hints")
     except Exception:
         pass
+
+    # Sort domains by previous status: up > 3xx > 4xx > 5xx > down > error
+    def _sort_key(domain: str):
+        status = last_status.get(domain, "")
+        return {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
+
+    domains_to_check.sort(key=_sort_key)
+    logger.info(f"[Step 4] Sorted by previous status")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
@@ -431,6 +453,8 @@ async def run_check_for_rule(rule: dict):
                 up_times.append(result["response_time_ms"])
         elif result["status"] == "down":
             down_count += 1
+        elif result["status"] in ("3xx", "4xx", "5xx"):
+            error_count += 1
         else:
             error_count += 1
 
