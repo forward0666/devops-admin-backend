@@ -53,4 +53,8 @@ REDIS_PORT = _parse_port("REDIS_PORT", "6379")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "root123")
 REDIS_DATABASE = _parse_port("REDIS_DATABASE", "0")
 
+# Concurrency
+HTTP_CONCURRENCY = int(os.getenv("HTTP_CONCURRENCY", "50"))
+DNS_CONCURRENCY = int(os.getenv("DNS_CONCURRENCY", "50"))
+
 
