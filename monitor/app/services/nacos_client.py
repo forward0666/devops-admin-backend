@@ -46,6 +46,7 @@ CONFIG_MAP = {
     "cloudflare.service.url": ("CLOUDFLARE_SERVICE_URL", str),
     "http.concurrency": ("HTTP_CONCURRENCY", int),
     "dns.concurrency": ("DNS_CONCURRENCY", int),
+    "http.pool.size": ("HTTP_POOL_SIZE", int),
 }
 
 

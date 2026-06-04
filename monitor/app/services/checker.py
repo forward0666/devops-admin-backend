@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # ─── Config ──────────────────────────────────────────────
 CHECK_CONCURRENCY = int(os.getenv("HTTP_CONCURRENCY", "50"))  # HTTP concurrency limit
 DNS_CONCURRENCY = int(os.getenv("DNS_CONCURRENCY", "50"))   # DNS concurrency limit
+HTTP_POOL_SIZE = int(os.getenv("HTTP_POOL_SIZE", "50"))     # httpx connection pool size
 TIMEOUT = 3.0
 DNS_CACHE_TTL = 600
 
@@ -141,8 +142,8 @@ def _make_timeout() -> httpx.Timeout:
 
 def _make_limits() -> httpx.Limits:
     return httpx.Limits(
-        max_connections=CHECK_CONCURRENCY,
-        max_keepalive_connections=CHECK_CONCURRENCY,
+        max_connections=HTTP_POOL_SIZE,
+        max_keepalive_connections=HTTP_POOL_SIZE,
     )
 
 

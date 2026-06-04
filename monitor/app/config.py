@@ -56,5 +56,6 @@ REDIS_DATABASE = _parse_port("REDIS_DATABASE", "0")
 # Concurrency
 HTTP_CONCURRENCY = int(os.getenv("HTTP_CONCURRENCY", "50"))
 DNS_CONCURRENCY = int(os.getenv("DNS_CONCURRENCY", "50"))
+HTTP_POOL_SIZE = int(os.getenv("HTTP_POOL_SIZE", "50"))
 
 
