@@ -72,7 +72,7 @@ def _get_shared_client() -> httpx.AsyncClient:
     global _shared_client
     if _shared_client is None or _shared_client.is_closed:
         _shared_client = httpx.AsyncClient(
-            timeout=15,
+            timeout=5,
             follow_redirects=False,
             limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
             verify=False,
@@ -88,7 +88,7 @@ def _close_shared_client():
         _shared_client = None
 
 
-async def check_domain(domain: str, timeout: int = 15) -> dict:
+async def check_domain(domain: str, timeout: int = 5) -> dict:
     """Check a single domain and return result"""
     result = {
         "domain": domain,
@@ -188,7 +188,7 @@ async def run_check_for_rule(rule: dict):
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
 
     # All domains in parallel with concurrency limit
-    MAX_CONCURRENT = 500
+    MAX_CONCURRENT = 1000
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
     await collection.create_index([("rule_id", 1), ("domain", 1)], unique=True, background=True)
@@ -196,6 +196,9 @@ async def run_check_for_rule(rule: dict):
     up_count = 0
     down_count = 0
     error_count = 0
+    up_times: list[float] = []
+    down_times: list[float] = []
+    error_times: list[float] = []
     probe_ip = await async_get_probe_ip()
 
     # Get cloudflare db for updating dns_domains
@@ -269,10 +272,16 @@ async def run_check_for_rule(rule: dict):
 
         if result["status"] == "up":
             up_count += 1
+            if result.get("response_time_ms"):
+                up_times.append(result["response_time_ms"])
         elif result["status"] == "down":
             down_count += 1
+            if result.get("response_time_ms"):
+                down_times.append(result["response_time_ms"])
         else:
             error_count += 1
+            if result.get("response_time_ms"):
+                error_times.append(result["response_time_ms"])
 
     # Batch upsert results
     if upsert_ops:
@@ -294,7 +303,12 @@ async def run_check_for_rule(rule: dict):
         (overall_status, now, rule_id),
     )
 
+    avg_up = round(sum(up_times) / len(up_times), 2) if up_times else 0
+    avg_down = round(sum(down_times) / len(down_times), 2) if down_times else 0
+    avg_error = round(sum(error_times) / len(error_times), 2) if error_times else 0
+    max_up = round(max(up_times), 2) if up_times else 0
     logger.info(f"[Monitor] Rule '{rule_name}' done: up={up_count}, down={down_count}, error={error_count}")
+    logger.info(f"[Monitor] Response time (ms) - up: avg={avg_up} max={max_up} | down: avg={avg_down} | error: avg={avg_error}")
 
 
 async def run_single_check(rule_id: int):
