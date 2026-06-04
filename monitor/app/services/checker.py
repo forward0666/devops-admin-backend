@@ -443,7 +443,8 @@ async def run_check_for_rule(rule: dict):
     max_up = round(max(up_times), 2) if up_times else 0
     avg_dns = round(sum(dns_times) / len(dns_times), 2) if dns_times else 0
     logger.info(f"[Done] '{rule_name}': up={up_count}, down={down_count}, error={error_count}, time={check_elapsed}s")
-    logger.info(f"[Done] Response (ms) - up: avg={avg_up} max={max_up} | DNS avg={avg_dns}")
+    logger.info(f"[Done] HTTP response (ms) - up: avg={avg_up} max={max_up}")
+    logger.info(f"[Done] DNS resolve (ms) - avg={avg_dns}")
 
 
 async def run_single_check(rule_id: int):
