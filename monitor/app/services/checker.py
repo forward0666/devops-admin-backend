@@ -318,19 +318,32 @@ async def run_check_for_rule(rule: dict):
     probe_ip = await async_get_probe_ip()
     logger.info(f"[Step 3] Probe IP: {probe_ip}")
 
-    # ── Step 4: Load last_protocol from previous results ──
+    # ── Step 4: Load previous results and sort domains ──
     last_protocols: dict[str, str] = {}
+    last_status: dict[str, str] = {}
     try:
         prev_results = await collection.find(
-            {"rule_id": rule_id, "last_protocol": {"$exists": True}},
-            {"domain": 1, "last_protocol": 1},
+            {"rule_id": rule_id},
+            {"domain": 1, "last_protocol": 1, "status": 1},
         ).to_list(length=10000)
         for r in prev_results:
-            if r.get("domain") and r.get("last_protocol"):
-                last_protocols[r["domain"]] = r["last_protocol"]
-        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints")
+            d = r.get("domain")
+            if d:
+                if r.get("last_protocol"):
+                    last_protocols[d] = r["last_protocol"]
+                if r.get("status"):
+                    last_status[d] = r["status"]
+        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints, {len(last_status)} status hints")
     except Exception:
         pass
+
+    # Sort domains: up first, then down, then error/no-data
+    # This prioritizes domains that were previously working
+    domains_up = [d for d in domains_to_check if last_status.get(d) == "up"]
+    domains_down = [d for d in domains_to_check if last_status.get(d) == "down"]
+    domains_error = [d for d in domains_to_check if last_status.get(d) not in ("up", "down")]
+    domains_to_check = domains_up + domains_down + domains_error
+    logger.info(f"[Step 4] Sort order: up={len(domains_up)}, down={len(domains_down)}, error/no-data={len(domains_error)}")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
