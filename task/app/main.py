@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from app.routes import task
-from app.services.db import get_pool, init_db, close_pool
+from app.services.db import get_pool, close_pool
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,6 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Task Service starting...")
     try:
         await get_pool()
-        await init_db()
         await start_scheduler()
     except Exception as e:
         logger.error(f"❌ Startup error (will continue): {e}")
