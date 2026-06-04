@@ -199,17 +199,18 @@ async def run_check_for_rule(rule: dict):
     num_domains = len(domains_to_check)
     MAX_CONCURRENT = min(num_domains, 2000)
 
-    logger.info(f"[Monitor] Checking {num_domains} domains for rule '{rule_name}'")
-    logger.info(f"[Monitor] Config: concurrency={MAX_CONCURRENT}, timeout=5s, method=HTTP-first")
-    logger.info(f"[Monitor] DNS cache: {len(_dns_cache)} entries")
+    logger.info(f"[Step 1] Loaded {num_domains} domains")
+    logger.info(f"[Step 2] Config: concurrency={MAX_CONCURRENT}, timeout=5s, method=HTTP-first")
+    logger.info(f"[Step 2] DNS cache: {len(_dns_cache)} entries")
     client_http = _get_shared_client(https=False)
-    logger.info(f"[Monitor] HTTP pool: max_connections=10000, keepalive=2000")
+    logger.info(f"[Step 2] HTTP pool: max_connections=10000, keepalive=2000")
     if any(d for d in domains_to_check if d):  # Only create HTTPS client if needed
         client_https = _get_shared_client(https=True)
-        logger.info(f"[Monitor] HTTPS pool: max_connections=10000, keepalive=2000, verify=False")
+        logger.info(f"[Step 2] HTTPS pool: max_connections=10000, keepalive=2000, verify=False")
 
-    # Update rule status to running
+    # Step 3: Update rule status
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
+    logger.info(f"[Step 3] Rule status set to running")
 
     # All domains in parallel with concurrency limit
     # Dynamic concurrency based on domain count
@@ -226,6 +227,7 @@ async def run_check_for_rule(rule: dict):
     down_times: list[float] = []
     error_times: list[float] = []
     probe_ip = await async_get_probe_ip()
+    logger.info(f"[Step 4] Probe IP: {probe_ip}")
 
     # Get cloudflare db for updating dns_domains
     cf_client_mongo = None
@@ -237,7 +239,7 @@ async def run_check_for_rule(rule: dict):
         cf_client_mongo = AsyncIOMotorClient(uri)
         dns_col = cf_client_mongo["cloudflare"]["dns_domains"]
     except Exception as e:
-        logger.error(f"[Monitor] Failed to connect cloudflare DB: {e}")
+        logger.error(f"[Step 5] Failed to connect cloudflare DB: {e}")
 
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -245,9 +247,14 @@ async def run_check_for_rule(rule: dict):
         async with sem:
             return await check_domain(domain)
 
+    # Step 6: Run HTTP checks
+    logger.info(f"[Step 6] Starting HTTP checks with concurrency={MAX_CONCURRENT}")
+    check_start = time.monotonic()
     # Fire all checks concurrently
     tasks = [checked(d) for d in domains_to_check]
     results = await asyncio.gather(*tasks, return_exceptions=True)
+    check_elapsed = round(time.monotonic() - check_start, 2)
+    logger.info(f"[Step 6] HTTP checks completed in {check_elapsed}s")
 
     # Bulk write results - upsert by (rule_id + domain)
     from pymongo import UpdateOne, UpdateMany
@@ -310,32 +317,37 @@ async def run_check_for_rule(rule: dict):
                 error_times.append(result["response_time_ms"])
 
     # Batch upsert results
+    # Step 7: Bulk write results to MongoDB
     if upsert_ops:
         res = await collection.bulk_write(upsert_ops)
-        logger.info(f"[Monitor] Rule '{rule_name}': upserted {len(upsert_ops)} results (matched={res.matched_count}, upserted={res.upserted_count})")
+        logger.info(f"[Step 7] Upserted {len(upsert_ops)} results (matched={res.matched_count}, upserted={res.upserted_count})")
 
     # Batch update dns_domains
+    # Step 8: Update dns_domains
     if dns_updates:
         await dns_col.bulk_write(dns_updates)
-        logger.info(f"[Monitor] Rule '{rule_name}': updated {len(dns_updates)} dns_domains")
+        logger.info(f"[Step 8] Updated {len(dns_updates)} dns_domains")
 
     if cf_client_mongo:
         cf_client_mongo.close()
 
     # Update rule last_check and status
+    # Step 9: Update rule status
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"
     await execute(
         "UPDATE monitor_rule SET status=%s, last_check=%s, updated_at=NOW() WHERE id=%s",
         (overall_status, now, rule_id),
     )
+    logger.info(f"[Step 9] Rule status updated to {overall_status}")
 
+    # Step 10: Summary
     avg_up = round(sum(up_times) / len(up_times), 2) if up_times else 0
     avg_down = round(sum(down_times) / len(down_times), 2) if down_times else 0
     avg_error = round(sum(error_times) / len(error_times), 2) if error_times else 0
     max_up = round(max(up_times), 2) if up_times else 0
-    logger.info(f"[Monitor] Rule '{rule_name}' done: up={up_count}, down={down_count}, error={error_count}")
-    logger.info(f"[Monitor] Response time (ms) - up: avg={avg_up} max={max_up} | down: avg={avg_down} | error: avg={avg_error}")
-    logger.info(f"[Monitor] DNS cache after check: {len(_dns_cache)} entries")
+    logger.info(f"[Step 10] Rule '{rule_name}' done: up={up_count}, down={down_count}, error={error_count}")
+    logger.info(f"[Step 10] Response time (ms) - up: avg={avg_up} max={max_up} | down: avg={avg_down} | error: avg={avg_error}")
+    logger.info(f"[Step 10] DNS cache after check: {len(_dns_cache)} entries")
 
 
 async def run_single_check(rule_id: int):
