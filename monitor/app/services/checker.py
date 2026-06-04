@@ -236,7 +236,15 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
                 elapsed = (time.monotonic() - start) * 1000
                 result["status_code"] = resp.status_code
                 result["response_time_ms"] = round(elapsed, 2)
-                result["status"] = "up" if resp.status_code < 400 else "error"
+                # Store detailed status for sorting
+                if resp.status_code < 300:
+                    result["status"] = "up"
+                elif resp.status_code < 400:
+                    result["status"] = "3xx"
+                elif resp.status_code < 500:
+                    result["status"] = "4xx"
+                else:
+                    result["status"] = "5xx"
                 result["_protocol"] = protocol
                 result["_dns_ms"] = dns_ms
                 return result
@@ -337,13 +345,17 @@ async def run_check_for_rule(rule: dict):
     except Exception:
         pass
 
-    # Sort domains: up first, then down, then error/no-data
-    # This prioritizes domains that were previously working
+    # Sort domains by previous status and record type
+    # Priority: 200 > 3xx > 4xx > 5xx > down > error/no-data
+    # Within each group: A record > CNAME > other
     domains_up = [d for d in domains_to_check if last_status.get(d) == "up"]
+    domains_3xx = [d for d in domains_to_check if last_status.get(d) == "3xx"]
+    domains_4xx = [d for d in domains_to_check if last_status.get(d) == "4xx"]
+    domains_5xx = [d for d in domains_to_check if last_status.get(d) == "5xx"]
     domains_down = [d for d in domains_to_check if last_status.get(d) == "down"]
-    domains_error = [d for d in domains_to_check if last_status.get(d) not in ("up", "down")]
-    domains_to_check = domains_up + domains_down + domains_error
-    logger.info(f"[Step 4] Sort order: up={len(domains_up)}, down={len(domains_down)}, error/no-data={len(domains_error)}")
+    domains_error = [d for d in domains_to_check if last_status.get(d) not in ("up", "3xx", "4xx", "5xx", "down")]
+    domains_to_check = domains_up + domains_3xx + domains_4xx + domains_5xx + domains_down + domains_error
+    logger.info(f"[Step 4] Sort order: up={len(domains_up)}, 3xx={len(domains_3xx)}, 4xx={len(domains_4xx)}, 5xx={len(domains_5xx)}, down={len(domains_down)}, error/no-data={len(domains_error)}")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
@@ -443,6 +455,8 @@ async def run_check_for_rule(rule: dict):
                 up_times.append(result["response_time_ms"])
         elif result["status"] == "down":
             down_count += 1
+        elif result["status"] in ("3xx", "4xx", "5xx"):
+            error_count += 1
         else:
             error_count += 1
 
