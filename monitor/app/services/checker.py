@@ -48,16 +48,14 @@ async def _get_redis():
     return _redis
 
 
-async def resolve_domain(domain: str) -> tuple[str | None, str]:
-    """Resolve domain: Redis cache -> aiodns -> system. Returns (ip, record_type)"""
+async def resolve_domain(domain: str) -> str | None:
+    """Resolve domain: Redis cache -> aiodns -> system"""
     # 1. Try Redis cache
     try:
         r = await _get_redis()
         cached = await r.get(f"dns:{domain}")
         if cached:
-            # Check if it's a CNAME or A record
-            record_type = "CNAME" if "." in cached and not cached.replace(".", "").isdigit() else "A"
-            return cached, record_type
+            return cached
     except Exception:
         pass
 
@@ -72,7 +70,7 @@ async def resolve_domain(domain: str) -> tuple[str | None, str]:
                 await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
             except Exception:
                 pass
-            return ip, "A"
+            return ip
     except Exception:
         pass
 
@@ -86,11 +84,11 @@ async def resolve_domain(domain: str) -> tuple[str | None, str]:
                 await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
             except Exception:
                 pass
-            return ip, "A"
+            return ip
     except Exception:
         pass
 
-    return None, "unknown"
+    return None
 
 
 # ─── Probe IP ────────────────────────────────────────────
@@ -218,7 +216,7 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
 
     # DNS resolve (with concurrency limit)
     dns_start = time.monotonic()
-    result["resolved_ip"], result["record_type"] = await resolve_domain(domain)
+    result["resolved_ip"] = await resolve_domain(domain)
     dns_ms = round((time.monotonic() - dns_start) * 1000, 2)
 
     # Determine protocol order
@@ -238,15 +236,7 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
                 elapsed = (time.monotonic() - start) * 1000
                 result["status_code"] = resp.status_code
                 result["response_time_ms"] = round(elapsed, 2)
-                # Store detailed status for sorting
-                if resp.status_code < 300:
-                    result["status"] = "up"
-                elif resp.status_code < 400:
-                    result["status"] = "3xx"
-                elif resp.status_code < 500:
-                    result["status"] = "4xx"
-                else:
-                    result["status"] = "5xx"
+                result["status"] = "up" if resp.status_code < 400 else "error"
                 result["_protocol"] = protocol
                 result["_dns_ms"] = dns_ms
                 return result
@@ -328,44 +318,19 @@ async def run_check_for_rule(rule: dict):
     probe_ip = await async_get_probe_ip()
     logger.info(f"[Step 3] Probe IP: {probe_ip}")
 
-    # ── Step 4: Load previous results and sort domains ──
+    # ── Step 4: Load last_protocol from previous results ──
     last_protocols: dict[str, str] = {}
-    last_status: dict[str, str] = {}
-    last_record_type: dict[str, str] = {}  # A or CNAME
     try:
         prev_results = await collection.find(
-            {"rule_id": rule_id},
-            {"domain": 1, "last_protocol": 1, "status": 1, "record_type": 1},
+            {"rule_id": rule_id, "last_protocol": {"$exists": True}},
+            {"domain": 1, "last_protocol": 1},
         ).to_list(length=10000)
         for r in prev_results:
-            d = r.get("domain")
-            if d:
-                if r.get("last_protocol"):
-                    last_protocols[d] = r["last_protocol"]
-                if r.get("status"):
-                    last_status[d] = r["status"]
-                if r.get("record_type"):
-                    last_record_type[d] = r["record_type"]
-        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints, {len(last_status)} status hints")
+            if r.get("domain") and r.get("last_protocol"):
+                last_protocols[r["domain"]] = r["last_protocol"]
+        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints")
     except Exception:
         pass
-
-    # Sort domains: A records first (by status), then CNAME records (by status)
-    # This prioritizes A records which are faster (no extra DNS lookup)
-    def _sort_key(domain: str):
-        # Record type: A=0, CNAME=1, unknown=2
-        rt = last_record_type.get(domain, "")
-        rt_order = 0 if rt == "A" else 1 if rt == "CNAME" else 2
-        # Status priority: up=0, 3xx=1, 4xx=2, 5xx=3, down=4, error=5
-        status = last_status.get(domain, "")
-        status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
-        return (rt_order, status_order)
-
-    domains_to_check.sort(key=_sort_key)
-    a_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "A")
-    cname_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "CNAME")
-    other_count = len(domains_to_check) - a_count - cname_count
-    logger.info(f"[Step 4] Sort: A={a_count}, CNAME={cname_count}, other={other_count}")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
@@ -438,7 +403,6 @@ async def run_check_for_rule(rule: dict):
             "source": source,
             "checked_at": now,
             "last_protocol": protocol or "http",
-            "record_type": result.get("record_type", "unknown"),
             **result,
         }
         upsert_ops.append(UpdateOne(
@@ -466,8 +430,6 @@ async def run_check_for_rule(rule: dict):
                 up_times.append(result["response_time_ms"])
         elif result["status"] == "down":
             down_count += 1
-        elif result["status"] in ("3xx", "4xx", "5xx"):
-            error_count += 1
         else:
             error_count += 1
 
