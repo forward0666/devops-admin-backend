@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 CHECK_CONCURRENCY = int(os.getenv("HTTP_CONCURRENCY", "50"))  # HTTP concurrency limit
 DNS_CONCURRENCY = int(os.getenv("DNS_CONCURRENCY", "50"))   # DNS concurrency limit
 HTTP_POOL_SIZE = int(os.getenv("HTTP_POOL_SIZE", "50"))     # httpx connection pool size
+logger.info(f"[Config] HTTP_CONCURRENCY={CHECK_CONCURRENCY}, DNS_CONCURRENCY={DNS_CONCURRENCY}, HTTP_POOL_SIZE={HTTP_POOL_SIZE}")
 TIMEOUT = 3.0
 DNS_CACHE_TTL = 600
 
