@@ -4,11 +4,39 @@ import httpx
 import time
 import socket
 from datetime import datetime
+import aiodns
 
 from app.services.db import query_all, execute
 from app.services.mongodb import get_db
 
 logger = logging.getLogger(__name__)
+
+# Fast DNS resolver (Google 8.8.8.8)
+_dns_resolver: aiodns.DNSResolver = None
+_dns_cache: dict[str, str] = {}
+
+
+def _get_dns_resolver() -> aiodns.DNSResolver:
+    global _dns_resolver
+    if _dns_resolver is None:
+        _dns_resolver = aiodns.DNSResolver(nameservers=["8.8.8.8", "8.8.4.4"], timeout=5)
+    return _dns_resolver
+
+
+async def resolve_domain(domain: str) -> str | None:
+    """Resolve domain using aiodns with cache"""
+    if domain in _dns_cache:
+        return _dns_cache[domain]
+    try:
+        resolver = _get_dns_resolver()
+        result = await resolver.query(domain, "A")
+        if result.addresses:
+            ip = result.addresses[0]
+            _dns_cache[domain] = ip
+            return ip
+    except Exception:
+        pass
+    return None
 
 # Cache probe IP (monitor server's exit IP)
 _probe_ip: str = None
@@ -37,6 +65,29 @@ async def async_get_probe_ip() -> str:
 _running_tasks: dict[int, asyncio.Task] = {}
 
 
+_shared_client: httpx.AsyncClient = None
+
+
+def _get_shared_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        _shared_client = httpx.AsyncClient(
+            timeout=15,
+            follow_redirects=False,
+            limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+            verify=False,
+        )
+    return _shared_client
+
+
+def _close_shared_client():
+    global _shared_client
+    if _shared_client and not _shared_client.is_closed:
+        import asyncio
+        asyncio.get_event_loop().create_task(_shared_client.aclose())
+        _shared_client = None
+
+
 async def check_domain(domain: str, timeout: int = 15) -> dict:
     """Check a single domain and return result"""
     result = {
@@ -50,27 +101,22 @@ async def check_domain(domain: str, timeout: int = 15) -> dict:
         "checked_at": datetime.utcnow(),
     }
 
-    # Resolve domain IP (run in thread to avoid blocking)
-    try:
-        ips = await asyncio.to_thread(socket.getaddrinfo, domain, 443, socket.AF_INET)
-        if ips:
-            result["resolved_ip"] = ips[0][4][0]
-    except:
-        pass
+    # Resolve domain IP (fast async DNS)
+    result["resolved_ip"] = await resolve_domain(domain)
 
     url = f"https://{domain}"
     start = time.monotonic()
 
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-            resp = await client.get(url)
-            elapsed = (time.monotonic() - start) * 1000
-            result["status_code"] = resp.status_code
-            result["response_time_ms"] = round(elapsed, 2)
-            if resp.status_code < 400:
-                result["status"] = "up"
-            else:
-                result["status"] = "error"
+        client = _get_shared_client()
+        resp = await client.head(url)
+        elapsed = (time.monotonic() - start) * 1000
+        result["status_code"] = resp.status_code
+        result["response_time_ms"] = round(elapsed, 2)
+        if resp.status_code < 400:
+            result["status"] = "up"
+        else:
+            result["status"] = "error"
     except httpx.ConnectError as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
