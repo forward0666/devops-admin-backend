@@ -103,12 +103,16 @@ async def start_scheduler():
     import redis.asyncio as aioredis
     from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
 
+    redis_client = None
     try:
         redis_client = aioredis.Redis(
             host=REDIS_HOST, port=REDIS_PORT,
             password=REDIS_PASSWORD, db=REDIS_DATABASE,
             decode_responses=True,
         )
+        # Test connection
+        await redis_client.ping()
+        logger.info(f"[Scheduler] 🔗 Redis connected: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DATABASE}")
         _lock_acquired = await try_redis_lock(redis_client)
         if not _lock_acquired:
             logger.info("[Scheduler] ⏭️ Another worker holds the lock, skipping")
@@ -116,11 +120,19 @@ async def start_scheduler():
             return
 
         _lock_task = asyncio.create_task(refresh_lock(redis_client))
-        await load_and_schedule_tasks()
-        scheduler.start()
-        logger.info("[Scheduler] ✅ Task scheduler started")
+        logger.info("[Scheduler] ✅ Acquired Redis lock")
     except Exception as e:
-        logger.error(f"[Scheduler] Failed to start: {e}")
+        logger.warning(f"[Scheduler] ⚠️ Redis unavailable ({e}), running scheduler without lock")
+        _lock_acquired = True
+        if redis_client:
+            try:
+                await redis_client.close()
+            except Exception:
+                pass
+
+    await load_and_schedule_tasks()
+    scheduler.start()
+    logger.info("[Scheduler] ✅ Task scheduler started")
 
 
 async def reload_scheduler():
