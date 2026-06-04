@@ -14,13 +14,19 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Task Service starting...")
-    await get_pool()
-    await init_db()
-    await start_scheduler()
+    try:
+        await get_pool()
+        await init_db()
+        await start_scheduler()
+    except Exception as e:
+        logger.error(f"❌ Startup error (will continue): {e}")
     yield
     logger.info("🛑 Task Service shutting down...")
-    await stop_scheduler()
-    await close_pool()
+    try:
+        await stop_scheduler()
+        await close_pool()
+    except Exception as e:
+        logger.error(f"❌ Shutdown error: {e}")
 
 
 app = FastAPI(title="Task Service API", version="1.0.0", lifespan=lifespan)

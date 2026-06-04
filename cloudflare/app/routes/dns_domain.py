@@ -72,6 +72,10 @@ async def sync_dns_domains():
                 )
             total_synced += len(docs)
 
+    # 删除本次同步未更新的过期记录
+    stale = await db[COLLECTION].delete_many({"synced_at": {"$lt": now}})
+    logger.info(f"DNS domains stale removed: {stale.deleted_count}")
+
     # 建索引
     await db[COLLECTION].create_index("name")
     await db[COLLECTION].create_index("type")
