@@ -117,35 +117,31 @@ async def check_domain(domain: str, timeout: int = 5) -> dict:
 
     start = time.monotonic()
 
-    # Race HTTPS and HTTP, use first response
-    async def _probe(scheme: str):
+    # Use HTTP by default (faster, no TLS overhead), fall back to HTTPS
+    for scheme in ("http", "https"):
+        url = f"{scheme}://{domain}"
         try:
             client = _get_shared_client(https=(scheme == "https"))
-            resp = await client.get(f"{scheme}://{domain}", follow_redirects=False)
-            return resp
-        except Exception:
-            return None
+            resp = await client.head(url)
+            elapsed = (time.monotonic() - start) * 1000
+            result["status_code"] = resp.status_code
+            result["response_time_ms"] = round(elapsed, 2)
+            if resp.status_code < 400:
+                result["status"] = "up"
+            else:
+                result["status"] = "error"
+            return result
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.TimeoutException):
+            continue
+        except Exception as e:
+            elapsed = (time.monotonic() - start) * 1000
+            result["response_time_ms"] = round(elapsed, 2)
+            result["error"] = str(e)[:200]
+            return result
 
-    try:
-        done, _ = await asyncio.wait(
-            [asyncio.create_task(_probe("https")), asyncio.create_task(_probe("http"))],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        for task in done:
-            resp = task.result()
-            if resp is not None:
-                elapsed = (time.monotonic() - start) * 1000
-                result["status_code"] = resp.status_code
-                result["response_time_ms"] = round(elapsed, 2)
-                result["status"] = "up" if resp.status_code < 400 else "error"
-                return result
-        elapsed = (time.monotonic() - start) * 1000
-        result["response_time_ms"] = round(elapsed, 2)
-        result["error"] = "Connection failed"
-    except Exception as e:
-        elapsed = (time.monotonic() - start) * 1000
-        result["response_time_ms"] = round(elapsed, 2)
-        result["error"] = str(e)[:200]
+    elapsed = (time.monotonic() - start) * 1000
+    result["response_time_ms"] = round(elapsed, 2)
+    result["error"] = "Connection failed"
 
     return result
 
