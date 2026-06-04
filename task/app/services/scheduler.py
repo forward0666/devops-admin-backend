@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 import time
+import uuid
 from datetime import datetime
 
 from app.services.mongodb import get_db
@@ -10,29 +12,71 @@ logger = logging.getLogger(__name__)
 
 scheduler = None
 _lock_acquired = False
-_lock_task = None
+_redis_lock_task = None
+_lock_id = str(uuid.uuid4())  # Unique per pod instance
 
-LOCK_KEY = "task:scheduler:lock"
-LOCK_TTL = 30  # seconds
+REDIS_LOCK_KEY = "task:scheduler:lock"
+REDIS_LOCK_TTL = 30
+RETRY_INTERVAL = 5  # seconds
 
 
 async def try_redis_lock(redis_client) -> bool:
-    """Try to acquire Redis lock"""
+    """Try to acquire Redis lock with unique pod ID"""
     try:
-        result = await redis_client.set(LOCK_KEY, str(int(time.time())), nx=True, ex=LOCK_TTL)
+        result = await redis_client.set(
+            REDIS_LOCK_KEY, _lock_id, nx=True, ex=REDIS_LOCK_TTL
+        )
         return result is not None
     except Exception:
         return False
 
 
-async def refresh_lock(redis_client):
-    """Background task: refresh lock TTL every 10 seconds"""
+async def release_redis_lock(redis_client):
+    """Release Redis lock only if we own it (Lua script for atomicity)"""
+    lua_script = """
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+    else
+        return 0
+    end
+    """
+    try:
+        await redis_client.eval(lua_script, 1, REDIS_LOCK_KEY, _lock_id)
+    except Exception:
+        pass
+
+
+async def refresh_redis_lock(redis_client):
+    """Refresh Redis lock TTL periodically"""
     while True:
         await asyncio.sleep(10)
         try:
-            await redis_client.expire(LOCK_KEY, LOCK_TTL)
+            current = await redis_client.get(REDIS_LOCK_KEY)
+            if current == _lock_id:
+                await redis_client.expire(REDIS_LOCK_KEY, REDIS_LOCK_TTL)
+            else:
+                logger.warning("[Scheduler] ⚠️ Lost Redis lock!")
+                break
         except Exception:
             pass
+
+
+async def retry_redis_lock(redis_client):
+    """Keep trying to acquire lock, start scheduler when successful"""
+    global _lock_acquired
+    while True:
+        await asyncio.sleep(RETRY_INTERVAL)
+        try:
+            _lock_acquired = await try_redis_lock(redis_client)
+            if _lock_acquired:
+                logger.info(f"[Scheduler] 🔒 Acquired Redis lock (id={_lock_id[:8]})")
+                asyncio.create_task(refresh_redis_lock(redis_client))
+                await load_and_schedule_tasks()
+                scheduler.start()
+                logger.info("[Scheduler] ✅ Task scheduler started")
+                return
+        except Exception as e:
+            logger.warning(f"[Scheduler] ⚠️ Retry lock error: {e}")
 
 
 async def load_and_schedule_tasks():
@@ -50,7 +94,6 @@ async def load_and_schedule_tasks():
         doc["_id"] = str(doc["_id"])
         tasks.append(doc)
 
-    # Remove existing jobs
     for job in scheduler.get_jobs():
         if job.id.startswith("task_"):
             scheduler.remove_job(job.id)
@@ -97,42 +140,33 @@ async def run_task_wrapper(task: dict):
 
 
 async def start_scheduler():
-    """Start the scheduler (only one worker acquires Redis lock)"""
-    global _lock_acquired, _lock_task
+    """Start the scheduler with Redis lock + retry"""
+    global _lock_acquired, _redis_lock_task
 
-    import redis.asyncio as aioredis
-    from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
-
-    redis_client = None
     try:
+        import redis.asyncio as aioredis
+        from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
+
         redis_client = aioredis.Redis(
             host=REDIS_HOST, port=REDIS_PORT,
             password=REDIS_PASSWORD, db=REDIS_DATABASE,
             decode_responses=True,
         )
-        # Test connection
         await redis_client.ping()
         logger.info(f"[Scheduler] 🔗 Redis connected: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DATABASE}")
+
         _lock_acquired = await try_redis_lock(redis_client)
-        if not _lock_acquired:
-            logger.info("[Scheduler] ⏭️ Another worker holds the lock, skipping")
-            await redis_client.close()
-            return
-
-        _lock_task = asyncio.create_task(refresh_lock(redis_client))
-        logger.info("[Scheduler] ✅ Acquired Redis lock")
+        if _lock_acquired:
+            logger.info(f"[Scheduler] 🔒 Acquired Redis lock (id={_lock_id[:8]})")
+            _redis_lock_task = asyncio.create_task(refresh_redis_lock(redis_client))
+            await load_and_schedule_tasks()
+            scheduler.start()
+            logger.info("[Scheduler] ✅ Task scheduler started")
+        else:
+            logger.info("[Scheduler] ⏭️ Another pod holds the lock, will retry every 5s")
+            _redis_lock_task = asyncio.create_task(retry_redis_lock(redis_client))
     except Exception as e:
-        logger.warning(f"[Scheduler] ⚠️ Redis unavailable ({e}), running scheduler without lock")
-        _lock_acquired = True
-        if redis_client:
-            try:
-                await redis_client.close()
-            except Exception:
-                pass
-
-    await load_and_schedule_tasks()
-    scheduler.start()
-    logger.info("[Scheduler] ✅ Task scheduler started")
+        logger.error(f"[Scheduler] ❌ Redis error: {e}, scheduler not started")
 
 
 async def reload_scheduler():
@@ -144,10 +178,23 @@ async def reload_scheduler():
 
 
 async def stop_scheduler():
-    """Stop the scheduler"""
-    global scheduler, _lock_task
-    if _lock_task:
-        _lock_task.cancel()
+    """Stop the scheduler and release lock"""
+    global scheduler, _redis_lock_task
+    if _redis_lock_task:
+        _redis_lock_task.cancel()
     if scheduler:
         scheduler.shutdown(wait=False)
         logger.info("[Scheduler] 🛑 Scheduler stopped")
+    try:
+        import redis.asyncio as aioredis
+        from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
+        redis_client = aioredis.Redis(
+            host=REDIS_HOST, port=REDIS_PORT,
+            password=REDIS_PASSWORD, db=REDIS_DATABASE,
+            decode_responses=True,
+        )
+        await release_redis_lock(redis_client)
+        await redis_client.close()
+        logger.info("[Scheduler] 🔓 Released Redis lock")
+    except Exception:
+        pass

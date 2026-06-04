@@ -40,10 +40,6 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     now = datetime.utcnow()
 
     synced = 0
-
-    # Clear old zones first, then insert new ones
-    await collection.delete_many({"account_id": str(account_id)})
-
     for zone in zones:
         doc = {
             "zone_id": zone["id"],
@@ -65,8 +61,11 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
         )
         synced += 1
 
-    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}")
-    return {"code": 200, "data": {"synced": synced, "total": len(zones)}}
+    # Delete stale zones (not updated in this sync)
+    stale = await collection.delete_many({"account_id": str(account_id), "synced_at": {"$lt": now}})
+
+    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}, stale_removed={stale.deleted_count}")
+    return {"code": 200, "data": {"synced": synced, "total": len(zones), "stale_removed": stale.deleted_count}}
 
 
 @router.get("")

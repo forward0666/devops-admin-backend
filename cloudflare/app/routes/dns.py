@@ -30,7 +30,7 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     zones = await zones_collection.find(
         {"account_id": str(account_id)},
         {"zone_id": 1, "name": 1}
-    ).to_list(length=200)
+    ).to_list(length=2000)
 
     if not zones:
         raise HTTPException(status_code=404, detail="No synced zones found for this account. Sync zones first.")
@@ -40,9 +40,6 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     now = datetime.utcnow()
     total_synced = 0
     logger.info(f"[DNS Sync] Found {len(zones)} zones for account_id={account_id}")
-
-    # Clear old DNS records first
-    await dns_collection.delete_many({"account_id": str(account_id)})
 
     async def sync_one_zone(zone):
         zone_id = zone["zone_id"]
@@ -87,8 +84,11 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     results = await asyncio.gather(*[sync_one_zone(z) for z in zones])
     total_synced = sum(results)
 
-    logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}")
-    return {"code": 200, "data": {"synced": total_synced}}
+    # Delete stale records (not updated in this sync)
+    stale = await dns_collection.delete_many({"account_id": str(account_id), "synced_at": {"$lt": now}})
+
+    logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}, stale_removed={stale.deleted_count}")
+    return {"code": 200, "data": {"synced": total_synced, "stale_removed": stale.deleted_count}}
 
 
 @router.get("")
