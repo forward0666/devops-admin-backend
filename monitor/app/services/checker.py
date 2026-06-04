@@ -76,7 +76,7 @@ def _get_shared_client(https: bool = True) -> httpx.AsyncClient:
             _shared_client_https = httpx.AsyncClient(
                 timeout=5,
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+                limits=httpx.Limits(max_connections=2000, max_keepalive_connections=500),
                 verify=False,
             )
         return _shared_client_https
@@ -85,7 +85,7 @@ def _get_shared_client(https: bool = True) -> httpx.AsyncClient:
             _shared_client_http = httpx.AsyncClient(
                 timeout=5,
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+                limits=httpx.Limits(max_connections=2000, max_keepalive_connections=500),
             )
         return _shared_client_http
 
@@ -201,7 +201,9 @@ async def run_check_for_rule(rule: dict):
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
 
     # All domains in parallel with concurrency limit
-    MAX_CONCURRENT = 1000
+    # Dynamic concurrency based on domain count
+    num_domains = len(domains_to_check)
+    MAX_CONCURRENT = min(num_domains, 2000)
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
     await collection.create_index([("rule_id", 1), ("domain", 1)], unique=True, background=True)
