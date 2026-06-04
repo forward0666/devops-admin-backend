@@ -216,8 +216,7 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
 
     # DNS resolve (with concurrency limit)
     dns_start = time.monotonic()
-    async with _get_dns_sem():
-        result["resolved_ip"] = await resolve_domain(domain)
+    result["resolved_ip"] = await resolve_domain(domain)
     dns_ms = round((time.monotonic() - dns_start) * 1000, 2)
 
     # Determine protocol order
@@ -345,21 +344,20 @@ async def run_check_for_rule(rule: dict):
     except Exception as e:
         logger.error(f"[Step 5] Failed to connect cloudflare DB: {e}")
 
-    # ── Step 6: HTTP checks with semaphore ──
-    sem = asyncio.Semaphore(CHECK_CONCURRENCY)
-
-    async def checked(domain: str) -> dict:
-        async with sem:
-            return await check_domain(domain, last_protocols.get(domain))
-
-    logger.info(f"[Step 6] Starting HTTP checks")
+    # ── Step 6: HTTP checks in batches ──
+    logger.info(f"[Step 6] Starting HTTP checks, batch size={CHECK_CONCURRENCY}")
     check_start = time.monotonic()
 
-    tasks = [checked(d) for d in domains_to_check]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = []
+    for i in range(0, num_domains, CHECK_CONCURRENCY):
+        batch = domains_to_check[i:i + CHECK_CONCURRENCY]
+        batch_tasks = [check_domain(d, last_protocols.get(d)) for d in batch]
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        results.extend(batch_results)
+        logger.info(f"[Step 6] Batch {i // CHECK_CONCURRENCY + 1}: {len(batch)} domains completed")
 
     check_elapsed = round(time.monotonic() - check_start, 2)
-    logger.info(f"[Step 6] HTTP checks completed in {check_elapsed}s")
+    logger.info(f"[Step 6] All HTTP checks completed in {check_elapsed}s")
 
     # ── Step 7: Process results ──
     up_count = 0
