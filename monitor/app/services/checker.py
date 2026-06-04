@@ -225,9 +225,9 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
     if last_protocol == "https":
         schemes = ("https", "http")
     else:
-        schemes = ("http", "https")
+        schemes = ("http",)
 
-    # Race HTTP/HTTPS (wait for first SUCCESS, not first complete)
+    # Single request - any response = up, only timeout/DNS failure = error
     start = time.monotonic()
     probes = [_probe(s, domain) for s in schemes]
 
