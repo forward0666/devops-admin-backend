@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 # ─── Config ──────────────────────────────────────────────
 CHECK_CONCURRENCY = 500
-CONNECT_TIMEOUT = 1.0
-READ_TIMEOUT = 2.0
-WRITE_TIMEOUT = 1.0
-POOL_TIMEOUT = 1.0
+CONNECT_TIMEOUT = 3.0
+READ_TIMEOUT = 5.0
+WRITE_TIMEOUT = 3.0
+POOL_TIMEOUT = 3.0
 DNS_CACHE_TTL = 600  # seconds
 
 
