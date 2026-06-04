@@ -52,26 +52,39 @@ async def async_get_probe_ip() -> str:
 
 
 # ─── Shared HTTP Client ─────────────────────────────────
-_client: httpx.AsyncClient = None
+_client_http: httpx.AsyncClient = None
+_client_https: httpx.AsyncClient = None
 
 
-def _get_client() -> httpx.AsyncClient:
-    """Single shared client, HTTP only (fastest)"""
-    global _client
-    if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(
-            timeout=5,
-            follow_redirects=False,
-            limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
-        )
-    return _client
+def _get_client(https: bool = False) -> httpx.AsyncClient:
+    """Shared HTTP/HTTPS client"""
+    global _client_http, _client_https
+    if https:
+        if _client_https is None or _client_https.is_closed:
+            _client_https = httpx.AsyncClient(
+                timeout=5,
+                follow_redirects=False,
+                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
+                verify=False,
+            )
+        return _client_https
+    else:
+        if _client_http is None or _client_http.is_closed:
+            _client_http = httpx.AsyncClient(
+                timeout=5,
+                follow_redirects=False,
+                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
+            )
+        return _client_http
 
 
 def _close_client():
-    global _client
-    if _client and not _client.is_closed:
-        asyncio.get_event_loop().create_task(_client.aclose())
-        _client = None
+    global _client_http, _client_https
+    for c in (_client_http, _client_https):
+        if c and not c.is_closed:
+            asyncio.get_event_loop().create_task(c.aclose())
+    _client_http = None
+    _client_https = None
 
 
 # ─── Check Single Domain ────────────────────────────────
@@ -92,15 +105,26 @@ async def check_domain(domain: str) -> dict:
     result["resolved_ip"] = await resolve_domain(domain)
 
     start = time.monotonic()
-    client = _get_client()
-
+    # HTTP first, HTTPS fallback on connection failure
     try:
-        resp = await client.head(f"http://{domain}")
+        resp = await _get_client().head(f"http://{domain}")
         elapsed = (time.monotonic() - start) * 1000
         result["status_code"] = resp.status_code
         result["response_time_ms"] = round(elapsed, 2)
         result["status"] = "up" if resp.status_code < 400 else "error"
-    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.TimeoutException):
+    except (httpx.ConnectError, httpx.ConnectTimeout):
+        # HTTP failed, try HTTPS
+        try:
+            resp = await _get_client(https=True).head(f"https://{domain}")
+            elapsed = (time.monotonic() - start) * 1000
+            result["status_code"] = resp.status_code
+            result["response_time_ms"] = round(elapsed, 2)
+            result["status"] = "up" if resp.status_code < 400 else "error"
+        except Exception as e:
+            elapsed = (time.monotonic() - start) * 1000
+            result["response_time_ms"] = round(elapsed, 2)
+            result["error"] = str(e)[:200]
+    except httpx.TimeoutException:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
         result["error"] = "Timeout"
