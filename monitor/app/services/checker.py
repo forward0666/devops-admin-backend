@@ -10,11 +10,8 @@ from app.services.mongodb import get_db
 logger = logging.getLogger(__name__)
 
 # ─── Config ──────────────────────────────────────────────
-CHECK_CONCURRENCY = 500
-CONNECT_TIMEOUT = 3.0
-READ_TIMEOUT = 5.0
-WRITE_TIMEOUT = 3.0
-POOL_TIMEOUT = 3.0
+CHECK_CONCURRENCY = 1809  # Match domain count, no artificial limit
+TIMEOUT = 5.0  # Single timeout, simple and effective
 DNS_CACHE_TTL = 600  # seconds
 
 
@@ -120,12 +117,7 @@ _client_https: httpx.AsyncClient = None
 
 
 def _make_timeout() -> httpx.Timeout:
-    return httpx.Timeout(
-        connect=CONNECT_TIMEOUT,
-        read=READ_TIMEOUT,
-        write=WRITE_TIMEOUT,
-        pool=POOL_TIMEOUT,
-    )
+    return httpx.Timeout(timeout=TIMEOUT)
 
 
 def _make_limits() -> httpx.Limits:
