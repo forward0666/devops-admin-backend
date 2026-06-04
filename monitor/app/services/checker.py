@@ -76,7 +76,7 @@ def _get_shared_client(https: bool = True) -> httpx.AsyncClient:
             _shared_client_https = httpx.AsyncClient(
                 timeout=5,
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=2000, max_keepalive_connections=500),
+                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
                 verify=False,
             )
         return _shared_client_https
@@ -85,7 +85,7 @@ def _get_shared_client(https: bool = True) -> httpx.AsyncClient:
             _shared_client_http = httpx.AsyncClient(
                 timeout=5,
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=2000, max_keepalive_connections=500),
+                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
             )
         return _shared_client_http
 
