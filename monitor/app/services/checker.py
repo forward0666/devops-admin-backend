@@ -10,8 +10,8 @@ from app.services.mongodb import get_db
 logger = logging.getLogger(__name__)
 
 # ─── Config ──────────────────────────────────────────────
-CHECK_CONCURRENCY = 100  # HTTP concurrency limit
-DNS_CONCURRENCY = 100   # DNS concurrency limit
+CHECK_CONCURRENCY = 50  # HTTP concurrency limit
+DNS_CONCURRENCY = 50   # DNS concurrency limit
 TIMEOUT = 3.0
 DNS_CACHE_TTL = 600
 
