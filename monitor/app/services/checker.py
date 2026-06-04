@@ -195,7 +195,18 @@ async def run_check_for_rule(rule: dict):
         logger.warning(f"[Monitor] Rule '{rule_name}' has no domains to check")
         return
 
-    logger.info(f"[Monitor] Checking {len(domains_to_check)} domains for rule '{rule_name}'")
+    # Dynamic concurrency based on domain count
+    num_domains = len(domains_to_check)
+    MAX_CONCURRENT = min(num_domains, 2000)
+
+    logger.info(f"[Monitor] Checking {num_domains} domains for rule '{rule_name}'")
+    logger.info(f"[Monitor] Config: concurrency={MAX_CONCURRENT}, timeout=5s, method=HTTP-first")
+    logger.info(f"[Monitor] DNS cache: {len(_dns_cache)} entries")
+    client_http = _get_shared_client(https=False)
+    logger.info(f"[Monitor] HTTP pool: max_connections=10000, keepalive=2000")
+    if any(d for d in domains_to_check if d):  # Only create HTTPS client if needed
+        client_https = _get_shared_client(https=True)
+        logger.info(f"[Monitor] HTTPS pool: max_connections=10000, keepalive=2000, verify=False")
 
     # Update rule status to running
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
@@ -324,6 +335,7 @@ async def run_check_for_rule(rule: dict):
     max_up = round(max(up_times), 2) if up_times else 0
     logger.info(f"[Monitor] Rule '{rule_name}' done: up={up_count}, down={down_count}, error={error_count}")
     logger.info(f"[Monitor] Response time (ms) - up: avg={avg_up} max={max_up} | down: avg={avg_down} | error: avg={avg_error}")
+    logger.info(f"[Monitor] DNS cache after check: {len(_dns_cache)} entries")
 
 
 async def run_single_check(rule_id: int):
