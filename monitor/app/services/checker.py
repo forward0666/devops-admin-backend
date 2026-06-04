@@ -352,18 +352,23 @@ async def run_check_for_rule(rule: dict):
     except Exception:
         pass
 
-    # Sort: A records first (by status), then CNAME (by status)
+    # Sort: A good > CNAME good > A bad > CNAME bad
+    # Good: up/3xx/4xx/5xx, Bad: down/error
     def _sort_key(domain: str):
         rt = last_record_type.get(domain, "")
         rt_order = 0 if rt == "A" else 1 if rt == "CNAME" else 2
         status = last_status.get(domain, "")
-        status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
-        return (rt_order, status_order)
+        # Good statuses first (0-3), bad statuses last (4-5)
+        if status in ("up", "3xx", "4xx", "5xx"):
+            status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3}[status]
+            group = 0  # Good group
+        else:
+            status_order = 4 if status == "down" else 5
+            group = 1  # Bad group
+        return (group, rt_order if group == 0 else rt_order + 3, status_order)
 
     domains_to_check.sort(key=_sort_key)
-    a_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "A")
-    cname_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "CNAME")
-    logger.info(f"[Step 4] Sort: A={a_count}, CNAME={cname_count}, other={len(domains_to_check) - a_count - cname_count}")
+    logger.info(f"[Step 4] Sorted: A good > CNAME good > A bad > CNAME bad")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
