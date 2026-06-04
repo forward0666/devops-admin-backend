@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # ─── Config ──────────────────────────────────────────────
 CHECK_CONCURRENCY = 50  # HTTP concurrency limit
 DNS_CONCURRENCY = 50   # DNS concurrency limit
-TIMEOUT = 5.0
+TIMEOUT = 3.0
 DNS_CACHE_TTL = 600
 
 
