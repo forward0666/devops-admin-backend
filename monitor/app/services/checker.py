@@ -65,27 +65,38 @@ async def async_get_probe_ip() -> str:
 _running_tasks: dict[int, asyncio.Task] = {}
 
 
-_shared_client: httpx.AsyncClient = None
+_shared_client_https: httpx.AsyncClient = None
+_shared_client_http: httpx.AsyncClient = None
 
 
-def _get_shared_client() -> httpx.AsyncClient:
-    global _shared_client
-    if _shared_client is None or _shared_client.is_closed:
-        _shared_client = httpx.AsyncClient(
-            timeout=5,
-            follow_redirects=False,
-            limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
-            verify=False,
-        )
-    return _shared_client
+def _get_shared_client(https: bool = True) -> httpx.AsyncClient:
+    global _shared_client_https, _shared_client_http
+    if https:
+        if _shared_client_https is None or _shared_client_https.is_closed:
+            _shared_client_https = httpx.AsyncClient(
+                timeout=5,
+                follow_redirects=False,
+                limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+                verify=False,
+            )
+        return _shared_client_https
+    else:
+        if _shared_client_http is None or _shared_client_http.is_closed:
+            _shared_client_http = httpx.AsyncClient(
+                timeout=5,
+                follow_redirects=False,
+                limits=httpx.Limits(max_connections=1000, max_keepalive_connections=200),
+            )
+        return _shared_client_http
 
 
 def _close_shared_client():
-    global _shared_client
-    if _shared_client and not _shared_client.is_closed:
-        import asyncio
-        asyncio.get_event_loop().create_task(_shared_client.aclose())
-        _shared_client = None
+    global _shared_client_https, _shared_client_http
+    for c in (_shared_client_https, _shared_client_http):
+        if c and not c.is_closed:
+            asyncio.get_event_loop().create_task(c.aclose())
+    _shared_client_https = None
+    _shared_client_http = None
 
 
 async def check_domain(domain: str, timeout: int = 5) -> dict:
@@ -104,27 +115,33 @@ async def check_domain(domain: str, timeout: int = 5) -> dict:
     # Resolve domain IP (fast async DNS)
     result["resolved_ip"] = await resolve_domain(domain)
 
-    url = f"https://{domain}"
     start = time.monotonic()
 
+    # Race HTTPS and HTTP, use first response
+    async def _probe(scheme: str):
+        try:
+            client = _get_shared_client(https=(scheme == "https"))
+            resp = await client.get(f"{scheme}://{domain}", follow_redirects=False)
+            return resp
+        except Exception:
+            return None
+
     try:
-        client = _get_shared_client()
-        resp = await client.head(url)
-        elapsed = (time.monotonic() - start) * 1000
-        result["status_code"] = resp.status_code
-        result["response_time_ms"] = round(elapsed, 2)
-        if resp.status_code < 400:
-            result["status"] = "up"
-        else:
-            result["status"] = "error"
-    except httpx.ConnectError as e:
-        elapsed = (time.monotonic() - start) * 1000
-        result["response_time_ms"] = round(elapsed, 2)
-        result["error"] = f"Connection failed: {e}"
-    except httpx.TimeoutException:
+        done, _ = await asyncio.wait(
+            [asyncio.create_task(_probe("https")), asyncio.create_task(_probe("http"))],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in done:
+            resp = task.result()
+            if resp is not None:
+                elapsed = (time.monotonic() - start) * 1000
+                result["status_code"] = resp.status_code
+                result["response_time_ms"] = round(elapsed, 2)
+                result["status"] = "up" if resp.status_code < 400 else "error"
+                return result
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
-        result["error"] = "Timeout"
+        result["error"] = "Connection failed"
     except Exception as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
