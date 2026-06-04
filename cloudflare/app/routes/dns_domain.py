@@ -137,6 +137,8 @@ async def update_dns_domain(record_id: str, body: dict):
     update_fields = {}
     if "is_public" in body:
         update_fields["is_public"] = body["is_public"]
+    if "remark" in body:
+        update_fields["remark"] = body["remark"]
 
     if not update_fields:
         raise HTTPException(status_code=400, detail="No fields to update")

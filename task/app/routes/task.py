@@ -1,12 +1,11 @@
 import logging
 from datetime import datetime
-from bson import ObjectId
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from app.services.mongodb import get_db
+from app.services.db import query_all, query_one, execute
 from app.services.scheduler import reload_scheduler
 
 logger = logging.getLogger(__name__)
@@ -36,89 +35,93 @@ class TaskUpdate(BaseModel):
 @router.get("/tasks")
 async def list_tasks():
     """List all tasks"""
-    db = await get_db()
-    tasks = []
-    async for doc in db.tasks.find().sort("created_at", -1):
-        doc["id"] = str(doc["_id"])
-        del doc["_id"]
-        tasks.append(doc)
-    return {"data": tasks, "total": len(tasks)}
+    rows = await query_all("SELECT * FROM task ORDER BY created_at DESC")
+    for row in rows:
+        if isinstance(row.get("config"), str):
+            import json
+            try:
+                row["config"] = json.loads(row["config"])
+            except Exception:
+                row["config"] = {}
+    return {"data": rows, "total": len(rows)}
 
 
 @router.post("/tasks")
 async def create_task(body: TaskCreate):
     """Create a new task"""
-    db = await get_db()
-    doc = {
-        "name": body.name,
-        "type": body.type,
-        "cron": body.cron,
-        "enabled": body.enabled,
-        "description": body.description,
-        "config": body.config,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-        "last_run_at": None,
-        "last_status": None,
-    }
-    result = await db.tasks.insert_one(doc)
+    import json
+    await execute(
+        "INSERT INTO task (name, type, cron, enabled, description, config) VALUES (%s, %s, %s, %s, %s, %s)",
+        (body.name, body.type, body.cron, int(body.enabled), body.description, json.dumps(body.config))
+    )
+    row = await query_one("SELECT * FROM task ORDER BY id DESC LIMIT 1")
     await reload_scheduler()
-    return {"id": str(result.inserted_id), "message": "Task created"}
+    return {"id": row["id"], "message": "Task created"}
 
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: str):
+async def get_task(task_id: int):
     """Get task by ID"""
-    db = await get_db()
-    doc = await db.tasks.find_one({"_id": ObjectId(task_id)})
-    if not doc:
+    row = await query_one("SELECT * FROM task WHERE id=%s", (task_id,))
+    if not row:
         raise HTTPException(status_code=404, detail="Task not found")
-    doc["id"] = str(doc["_id"])
-    del doc["_id"]
-    return doc
+    if isinstance(row.get("config"), str):
+        import json
+        try:
+            row["config"] = json.loads(row["config"])
+        except Exception:
+            row["config"] = {}
+    return row
 
 
 @router.put("/tasks/{task_id}")
-async def update_task(task_id: str, body: TaskUpdate):
+async def update_task(task_id: int, body: TaskUpdate):
     """Update a task"""
-    db = await get_db()
     update = {k: v for k, v in body.model_dump().items() if v is not None}
     if not update:
         return {"message": "Nothing to update"}
-    update["updated_at"] = datetime.utcnow()
-    result = await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Task not found")
+    sets = []
+    args = []
+    for k, v in update.items():
+        if k == "enabled":
+            sets.append(f"{k}=%s")
+            args.append(int(v))
+        elif k == "config":
+            sets.append(f"{k}=%s")
+            import json
+            args.append(json.dumps(v))
+        else:
+            sets.append(f"{k}=%s")
+            args.append(v)
+    args.append(task_id)
+    await execute(f"UPDATE task SET {', '.join(sets)} WHERE id=%s", tuple(args))
     await reload_scheduler()
     return {"message": "Task updated"}
 
 
 @router.patch("/tasks/{task_id}")
-async def patch_task(task_id: str, body: TaskUpdate):
+async def patch_task(task_id: int, body: TaskUpdate):
     """Partial update a task"""
     return await update_task(task_id, body)
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str):
+async def delete_task(task_id: int):
     """Delete a task"""
-    db = await get_db()
-    result = await db.tasks.delete_one({"_id": ObjectId(task_id)})
-    if result.deleted_count == 0:
+    count = await execute("DELETE FROM task WHERE id=%s", (task_id,))
+    if count == 0:
         raise HTTPException(status_code=404, detail="Task not found")
     await reload_scheduler()
     return {"message": "Task deleted"}
 
 
 @router.post("/tasks/{task_id}/run")
-async def run_task(task_id: str):
+async def run_task(task_id: int):
     """Manually trigger a task"""
-    db = await get_db()
-    doc = await db.tasks.find_one({"_id": ObjectId(task_id)})
-    if not doc:
+    row = await query_one("SELECT * FROM task WHERE id=%s", (task_id,))
+    if not row:
         raise HTTPException(status_code=404, detail="Task not found")
-    doc["_id"] = task_id
     import asyncio
     from app.services.executor import execute_task
-    asyncio.create_task(execute_task(doc))
-    return {"message": f"Task '{doc['name']}' triggered", "task_id": task_id}
+    asyncio.create_task(execute_task(row))
+    return {"message": f"Task '{row['name']}' triggered", "task_id": task_id}

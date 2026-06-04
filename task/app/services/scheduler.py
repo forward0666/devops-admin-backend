@@ -1,11 +1,9 @@
 import asyncio
 import logging
-import os
-import time
 import uuid
 from datetime import datetime
 
-from app.services.mongodb import get_db
+from app.services.db import query_all, execute
 from app.services.executor import execute_task
 
 logger = logging.getLogger(__name__)
@@ -80,7 +78,7 @@ async def retry_redis_lock(redis_client):
 
 
 async def load_and_schedule_tasks():
-    """Load all enabled tasks from MongoDB and schedule them"""
+    """Load all enabled tasks from MySQL and schedule them"""
     global scheduler
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
@@ -88,18 +86,22 @@ async def load_and_schedule_tasks():
     if scheduler is None:
         scheduler = AsyncIOScheduler()
 
-    db = await get_db()
-    tasks = []
-    async for doc in db.tasks.find({"enabled": True}):
-        doc["_id"] = str(doc["_id"])
-        tasks.append(doc)
+    rows = await query_all("SELECT * FROM task WHERE enabled=1")
+    # Parse JSON config
+    for row in rows:
+        if isinstance(row.get("config"), str):
+            import json
+            try:
+                row["config"] = json.loads(row["config"])
+            except Exception:
+                row["config"] = {}
 
     for job in scheduler.get_jobs():
         if job.id.startswith("task_"):
             scheduler.remove_job(job.id)
 
-    for task in tasks:
-        task_id = task["_id"]
+    for task in rows:
+        task_id = task["id"]
         cron_expr = task.get("cron", "")
         if not cron_expr:
             continue
@@ -121,7 +123,7 @@ async def load_and_schedule_tasks():
 async def run_task_wrapper(task: dict):
     """Wrapper for task execution with logging"""
     task_name = task.get("name", "unknown")
-    task_id = task.get("_id")
+    task_id = task.get("id")
     logger.info(f"[Scheduler] ▶️ Running: {task_name}")
     try:
         await execute_task(task)
@@ -129,11 +131,9 @@ async def run_task_wrapper(task: dict):
     except Exception as e:
         logger.error(f"[Scheduler] ❌ Failed: {task_name}: {e}")
         try:
-            from bson import ObjectId
-            db = await get_db()
-            await db.tasks.update_one(
-                {"_id": ObjectId(task_id)},
-                {"$set": {"last_status": "failed"}}
+            await execute(
+                "UPDATE task SET last_status='failed' WHERE id=%s",
+                (task_id,)
             )
         except Exception:
             pass

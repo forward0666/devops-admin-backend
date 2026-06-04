@@ -62,12 +62,15 @@ async def check_domain(domain: str, timeout: int = 15) -> dict:
     start = time.monotonic()
 
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             resp = await client.get(url)
             elapsed = (time.monotonic() - start) * 1000
             result["status_code"] = resp.status_code
             result["response_time_ms"] = round(elapsed, 2)
-            result["status"] = "up" if resp.status_code < 500 else "error"
+            if resp.status_code < 400:
+                result["status"] = "up"
+            else:
+                result["status"] = "error"
     except httpx.ConnectError as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
