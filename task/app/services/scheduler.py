@@ -84,9 +84,14 @@ async def load_and_schedule_tasks():
     from apscheduler.triggers.cron import CronTrigger
 
     if scheduler is None:
-        scheduler = AsyncIOScheduler()
+        from apscheduler.jobstores.memory import MemoryJobStore
+        scheduler = AsyncIOScheduler(
+            jobstores={'default': MemoryJobStore()},
+            timezone='Asia/Shanghai',
+        )
 
     rows = await query_all("SELECT * FROM task WHERE enabled=1")
+    logger.info(f"[Scheduler] Loaded {len(rows)} enabled tasks from DB")
     # Parse JSON config
     for row in rows:
         if isinstance(row.get("config"), str):
@@ -104,10 +109,12 @@ async def load_and_schedule_tasks():
         task_id = task["id"]
         cron_expr = task.get("cron", "")
         if not cron_expr:
+            logger.warning(f"[Scheduler] Task {task['name']} (id={task_id}) has no cron expression, skipped")
             continue
 
         try:
             trigger = CronTrigger.from_crontab(cron_expr)
+            next_run = trigger.get_next_fire_time(None, datetime.now())
             scheduler.add_job(
                 run_task_wrapper,
                 trigger=trigger,
@@ -115,7 +122,7 @@ async def load_and_schedule_tasks():
                 args=[task],
                 replace_existing=True,
             )
-            logger.info(f"[Scheduler] Scheduled: {task['name']} ({cron_expr})")
+            logger.info(f"[Scheduler] Scheduled: {task['name']} ({cron_expr}) next_run={next_run}")
         except Exception as e:
             logger.error(f"[Scheduler] Failed to schedule {task['name']}: {e}")
 
