@@ -197,7 +197,7 @@ async def run_check_for_rule(rule: dict):
 
     # Dynamic concurrency based on domain count
     num_domains = len(domains_to_check)
-    MAX_CONCURRENT = min(num_domains, 2000)
+    MAX_CONCURRENT = min(num_domains, 200)
 
     logger.info(f"[Step 1] Loaded {num_domains} domains")
     logger.info(f"[Step 2] Config: concurrency={MAX_CONCURRENT}, timeout=5s, method=HTTP-first")
@@ -215,7 +215,7 @@ async def run_check_for_rule(rule: dict):
     # All domains in parallel with concurrency limit
     # Dynamic concurrency based on domain count
     num_domains = len(domains_to_check)
-    MAX_CONCURRENT = min(num_domains, 2000)
+    MAX_CONCURRENT = min(num_domains, 200)
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
     await collection.create_index([("rule_id", 1), ("domain", 1)], unique=True, background=True)
@@ -247,7 +247,14 @@ async def run_check_for_rule(rule: dict):
         async with sem:
             return await check_domain(domain)
 
-    # Step 6: Run HTTP checks
+    # Step 6: DNS pre-resolution and HTTP checks
+    logger.info(f"[Step 6] Starting DNS pre-resolution for {num_domains} domains")
+    dns_start = time.monotonic()
+    dns_tasks = [resolve_domain(d) for d in domains_to_check]
+    await asyncio.gather(*dns_tasks, return_exceptions=True)
+    dns_elapsed = round(time.monotonic() - dns_start, 2)
+    logger.info(f"[Step 6] DNS pre-resolution completed in {dns_elapsed}s, cache: {len(_dns_cache)} entries")
+
     logger.info(f"[Step 6] Starting HTTP checks with concurrency={MAX_CONCURRENT}")
     check_start = time.monotonic()
     # Fire all checks concurrently
