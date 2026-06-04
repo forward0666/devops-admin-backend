@@ -26,7 +26,11 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     db = await get_db()
     collection = db[get_collection_name(account_id, "zones")]
 
-    cf_data = await cf_client.async_list_zones(x_cf_token)
+    try:
+        cf_data = await cf_client.async_list_zones(x_cf_token)
+    except Exception as e:
+        logger.error(f"[Zone Sync] CF API error for account_id={account_id}: {type(e).__name__}: {e}")
+        return {"code": 403, "message": f"CF API error: {type(e).__name__}"}
     if not cf_data.get("success"):
         logger.error(f"[Zone Sync] Failed to fetch zones from CF for account_id={account_id}")
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
@@ -36,6 +40,10 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     now = datetime.utcnow()
 
     synced = 0
+
+    # Clear old zones first, then insert new ones
+    await collection.delete_many({"account_id": str(account_id)})
+
     for zone in zones:
         doc = {
             "zone_id": zone["id"],

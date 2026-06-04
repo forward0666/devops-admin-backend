@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from app.routes import task
 from app.services.mongodb import close_db, get_db
+from app.services.scheduler import start_scheduler, stop_scheduler, reload_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("🚀 Task Service starting...")
     await get_db()
+    await start_scheduler()
     yield
     logger.info("🛑 Task Service shutting down...")
+    await stop_scheduler()
     await close_db()
 
 

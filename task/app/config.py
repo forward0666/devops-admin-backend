@@ -48,4 +48,11 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "root123")
 REDIS_DATABASE = _parse_port("REDIS_DATABASE", "0")
 
 # Service-to-service auth
-GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
+
+# Monitor service
+
+# Cloudflare service
+CLOUDFLARE_HOST = os.getenv("CLOUDFLARE_HOST", "127.0.0.1")
+CLOUDFLARE_PORT = _parse_port("CLOUDFLARE_PORT", "8090")
+CF_API_TOKEN = os.getenv("CF_API_TOKEN", "")
+

@@ -48,7 +48,11 @@ async def sync_cache_rules(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    cf_data = await cf_client.async_list_cache_rules(x_cf_token, zone_id)
+    try:
+        cf_data = await cf_client.async_list_cache_rules(x_cf_token, zone_id)
+    except Exception as e:
+        logger.error(f"[Cache Sync] CF API error for zone {zone_id}: {type(e).__name__}: {e}")
+        return {"code": 403, "message": f"CF API error: {type(e).__name__}"}
     if not cf_data.get("success"):
         raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
 

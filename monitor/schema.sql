@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS monitor_rule (
     account_id BIGINT DEFAULT NULL COMMENT 'CF account id, null for all',
     domains JSON DEFAULT NULL COMMENT 'selected domain names, ["all"] for all',
     custom_domains TEXT DEFAULT NULL COMMENT 'custom domains, one per line',
+    description VARCHAR(500) DEFAULT NULL COMMENT 'rule description',
     check_interval INT NOT NULL DEFAULT 5 COMMENT 'check interval in minutes',
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     status VARCHAR(50) DEFAULT 'pending' COMMENT 'pending|running|error',
@@ -19,3 +20,5 @@ CREATE TABLE IF NOT EXISTS monitor_rule (
     INDEX idx_enabled (enabled),
     INDEX idx_source (source)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ALTER TABLE monitor_rule ADD COLUMN description VARCHAR(500) DEFAULT NULL COMMENT 'rule description' AFTER custom_domains;

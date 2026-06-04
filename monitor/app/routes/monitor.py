@@ -13,7 +13,7 @@ router = APIRouter()
 async def list_rules():
     """List all monitor rules"""
     rows = await query_all(
-        "SELECT id, name, source, account_id, domains, custom_domains, check_interval, enabled, status, last_check, created_at, updated_at "
+        "SELECT id, name, source, account_id, domains, custom_domains, description, enabled, status, last_check, created_at, updated_at "
         "FROM monitor_rule ORDER BY id DESC"
     )
     for r in rows:
@@ -35,7 +35,7 @@ async def list_rules():
 async def get_rule(rule_id: int):
     """Get a single monitor rule"""
     row = await query_one(
-        "SELECT id, name, source, account_id, domains, custom_domains, check_interval, enabled, status, last_check, created_at, updated_at "
+        "SELECT id, name, source, account_id, domains, custom_domains, description, enabled, status, last_check, created_at, updated_at "
         "FROM monitor_rule WHERE id = %s", (rule_id,)
     )
     if not row:
@@ -58,7 +58,7 @@ async def create_rule(body: dict):
     account_id = body.get("accountId")
     domains = body.get("domains", [])
     custom_domains = body.get("customDomains", "").strip()
-    check_interval = body.get("checkInterval", 5)
+    description = body.get("description", "").strip()
     enabled = body.get("enabled", True)
 
     if not name:
@@ -68,9 +68,9 @@ async def create_rule(body: dict):
     domains_json = json.dumps(domains)
 
     await execute(
-        "INSERT INTO monitor_rule (name, source, account_id, domains, custom_domains, check_interval, enabled) "
+        "INSERT INTO monitor_rule (name, source, account_id, domains, custom_domains, description, enabled) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (name, source, account_id, domains_json, custom_domains, check_interval, enabled),
+        (name, source, account_id, domains_json, custom_domains, description, enabled),
     )
     logger.info(f"[Monitor] Created rule: {name} (source={source}, domains={domains})")
     return {"code": 200, "message": "ok"}
@@ -88,7 +88,7 @@ async def update_rule(rule_id: int, body: dict):
     account_id = body.get("accountId")
     domains = body.get("domains", [])
     custom_domains = body.get("customDomains", "").strip()
-    check_interval = body.get("checkInterval", 5)
+    description = body.get("description", "").strip()
     enabled = body.get("enabled", True)
 
     if not name:
@@ -98,9 +98,9 @@ async def update_rule(rule_id: int, body: dict):
     domains_json = json.dumps(domains)
 
     await execute(
-        "UPDATE monitor_rule SET name=%s, source=%s, account_id=%s, domains=%s, custom_domains=%s, check_interval=%s, enabled=%s, updated_at=NOW() "
+        "UPDATE monitor_rule SET name=%s, source=%s, account_id=%s, domains=%s, custom_domains=%s, description=%s, enabled=%s, updated_at=NOW() "
         "WHERE id=%s",
-        (name, source, account_id, domains_json, custom_domains, check_interval, enabled, rule_id),
+        (name, source, account_id, domains_json, custom_domains, description, enabled, rule_id),
     )
     logger.info(f"[Monitor] Updated rule {rule_id}: {name}")
     return {"code": 200, "message": "ok"}
@@ -162,7 +162,7 @@ async def get_results(rule_id: int, limit: int = 100):
 
 @router.get("/{rule_id}/results/latest")
 async def get_latest_results(rule_id: int):
-    """Get latest check results for a rule (grouped by domain)"""
+    """Get latest check results for a rule (each domain has one record)"""
     from app.services.mongodb import get_db
     rule = await query_one("SELECT id FROM monitor_rule WHERE id = %s", (rule_id,))
     if not rule:
@@ -170,19 +170,7 @@ async def get_latest_results(rule_id: int):
 
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
-
-    # Get the latest check time
-    latest = await collection.find_one(sort=[("checked_at", -1)])
-    if not latest:
-        return {"code": 200, "data": []}
-
-    latest_time = latest["checked_at"]
-    # Get all results from the latest check (within 1 second)
-    from datetime import timedelta
-    rows = await collection.find(
-        {"checked_at": {"$gte": latest_time - timedelta(seconds=1), "$lte": latest_time}}
-    ).sort("domain", 1).to_list(length=1000)
-
+    rows = await collection.find({}).sort("domain", 1).to_list(length=1000)
     for r in rows:
         r["_id"] = str(r["_id"])
     return {"code": 200, "data": rows}

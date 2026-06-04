@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.services.mongodb import get_db
+from app.services.scheduler import reload_scheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,6 +62,7 @@ async def create_task(body: TaskCreate):
         "last_status": None,
     }
     result = await db.tasks.insert_one(doc)
+    await reload_scheduler()
     return {"id": str(result.inserted_id), "message": "Task created"}
 
 
@@ -87,6 +89,7 @@ async def update_task(task_id: str, body: TaskUpdate):
     result = await db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Task not found")
+    await reload_scheduler()
     return {"message": "Task updated"}
 
 
@@ -103,6 +106,7 @@ async def delete_task(task_id: str):
     result = await db.tasks.delete_one({"_id": ObjectId(task_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Task not found")
+    await reload_scheduler()
     return {"message": "Task deleted"}
 
 
@@ -113,6 +117,8 @@ async def run_task(task_id: str):
     doc = await db.tasks.find_one({"_id": ObjectId(task_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Task not found")
-    # TODO: Implement task execution logic per type
-    logger.info(f"▶️ Task triggered manually: {doc['name']} (type={doc['type']})")
+    doc["_id"] = task_id
+    import asyncio
+    from app.services.executor import execute_task
+    asyncio.create_task(execute_task(doc))
     return {"message": f"Task '{doc['name']}' triggered", "task_id": task_id}

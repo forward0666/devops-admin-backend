@@ -41,6 +41,7 @@ def main():
         host="0.0.0.0",
         port=SERVICE_PORT,
         log_level="info",
+        access_log=False,
         workers=workers,
     )
 

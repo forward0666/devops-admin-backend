@@ -35,23 +35,28 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     if not zones:
         raise HTTPException(status_code=404, detail="No synced zones found for this account. Sync zones first.")
 
+    import asyncio
+
     now = datetime.utcnow()
     total_synced = 0
     logger.info(f"[DNS Sync] Found {len(zones)} zones for account_id={account_id}")
 
-    for zone in zones:
+    # Clear old DNS records first
+    await dns_collection.delete_many({"account_id": str(account_id)})
+
+    async def sync_one_zone(zone):
         zone_id = zone["zone_id"]
         zone_name = zone["name"]
-
+        count = 0
         try:
             cf_data = await cf_client.async_list_dns(x_cf_token, zone_id)
         except Exception as e:
             logger.error(f"[DNS Sync] Failed to fetch DNS for zone {zone_name} ({zone_id}): {e}")
-            continue
+            return 0
 
         if not cf_data.get("success"):
             logger.warning(f"[DNS Sync] CF API returned failure for zone {zone_name} ({zone_id})")
-            continue
+            return 0
 
         records = cf_data.get("result", [])
         logger.info(f"[DNS Sync] Zone {zone_name}: fetched {len(records)} records")
@@ -71,22 +76,19 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
                 "priority": r.get("priority"),
                 "synced_at": now,
             }
-
             await dns_collection.update_one(
                 {"record_id": r["id"], "account_id": str(account_id)},
                 {"$set": doc},
                 upsert=True,
             )
-            total_synced += 1
+            count += 1
+        return count
 
-    # Clean up stale records
-    stale = await dns_collection.delete_many({
-        "account_id": str(account_id),
-        "synced_at": {"$lt": now},
-    })
+    results = await asyncio.gather(*[sync_one_zone(z) for z in zones])
+    total_synced = sum(results)
 
-    logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}, stale_removed={stale.deleted_count}")
-    return {"code": 200, "data": {"synced": total_synced, "stale_removed": stale.deleted_count}}
+    logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}")
+    return {"code": 200, "data": {"synced": total_synced}}
 
 
 @router.get("")

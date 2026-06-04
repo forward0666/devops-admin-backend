@@ -1,5 +1,6 @@
 import httpx
 import logging
+import logging.config
 import os
 import re
 
@@ -10,6 +11,19 @@ from app.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"default": {"format": "%(asctime)s %(levelname)s %(message)s"}},
+    "handlers": {"default": {"class": "logging.StreamHandler", "formatter": "default"}},
+    "loggers": {
+        "httpx": {"level": logging.WARNING},
+        "httpcore": {"level": logging.WARNING},
+        "": {"handlers": ["default"], "level": logging.INFO},
+    },
+}
+logging.config.dictConfig(LOGGING)
 
 NACOS_URL = f"http://{NACOS_HOST}:{NACOS_PORT}/nacos/v1"
 

@@ -3,7 +3,7 @@ import asyncio
 import httpx
 import time
 import socket
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.services.db import query_all, execute
 from app.services.mongodb import get_db
@@ -35,23 +35,6 @@ async def async_get_probe_ip() -> str:
 
 # Track running tasks
 _running_tasks: dict[int, asyncio.Task] = {}
-
-
-async def cleanup_old_results():
-    """Delete monitor results older than 7 days"""
-    try:
-        db = await get_db()
-        collections = await db.list_collection_names()
-        cutoff = datetime.utcnow() - timedelta(days=7)
-        total_deleted = 0
-        for col_name in collections:
-            if col_name.startswith("monitor_results_"):
-                result = await db[col_name].delete_many({"checked_at": {"$lt": cutoff}})
-                total_deleted += result.deleted_count
-        if total_deleted > 0:
-            logger.info(f"[Monitor] Cleanup: deleted {total_deleted} old results")
-    except Exception as e:
-        logger.error(f"[Monitor] Cleanup error: {e}")
 
 
 async def check_domain(domain: str, timeout: int = 15) -> dict:
@@ -159,6 +142,7 @@ async def run_check_for_rule(rule: dict):
     MAX_CONCURRENT = 500
     db = await get_db()
     collection = db[f"monitor_results_{rule_id}"]
+    await collection.create_index([("rule_id", 1), ("domain", 1)], unique=True, background=True)
     now = datetime.utcnow()
     up_count = 0
     down_count = 0
@@ -187,9 +171,9 @@ async def run_check_for_rule(rule: dict):
     tasks = [checked(d) for d in domains_to_check]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Bulk write results
-    from pymongo import UpdateMany
-    insert_docs = []
+    # Bulk write results - upsert by (rule_id + domain)
+    from pymongo import UpdateOne, UpdateMany
+    upsert_ops = []
     dns_updates = []
     for i, result in enumerate(results):
         domain = domains_to_check[i]
@@ -208,13 +192,18 @@ async def run_check_for_rule(rule: dict):
         if not result.get("probe_ip"):
             result["probe_ip"] = probe_ip
 
-        insert_docs.append({
+        doc = {
             "rule_id": rule_id,
             "rule_name": rule_name,
             "source": source,
             "checked_at": now,
             **result,
-        })
+        }
+        upsert_ops.append(UpdateOne(
+            {"rule_id": rule_id, "domain": domain},
+            {"$set": doc},
+            upsert=True,
+        ))
 
         if dns_col is not None and result.get("domain"):
             dns_updates.append(UpdateMany(
@@ -236,10 +225,10 @@ async def run_check_for_rule(rule: dict):
         else:
             error_count += 1
 
-    # Batch insert
-    if insert_docs:
-        await collection.insert_many(insert_docs)
-        logger.info(f"[Monitor] Rule '{rule_name}': inserted {len(insert_docs)} results")
+    # Batch upsert results
+    if upsert_ops:
+        res = await collection.bulk_write(upsert_ops)
+        logger.info(f"[Monitor] Rule '{rule_name}': upserted {len(upsert_ops)} results (matched={res.matched_count}, upserted={res.upserted_count})")
 
     # Batch update dns_domains
     if dns_updates:
@@ -283,51 +272,4 @@ async def run_single_check(rule_id: int):
         await release_lock(lock_name)
 
 
-async def scheduler_loop():
-    """Background scheduler: check rules based on their interval"""
-    from app.services.redis_lock import acquire_lock, release_lock
 
-    logger.info("[Monitor] Scheduler started")
-    last_cleanup = None
-    while True:
-        try:
-            # Daily cleanup: remove results older than 7 days
-            now = datetime.utcnow()
-            if last_cleanup is None or (now - last_cleanup).total_seconds() > 86400:
-                await cleanup_old_results()
-                last_cleanup = now
-
-            rules = await query_all("SELECT * FROM monitor_rule WHERE enabled=1")
-
-            for rule in rules:
-                rule_id = rule["id"]
-                interval = rule.get("check_interval", 5)  # minutes
-                last_check = rule.get("last_check")
-
-                # Parse domains
-                if isinstance(rule.get("domains"), str):
-                    import json
-                    try:
-                        rule["domains"] = json.loads(rule["domains"])
-                    except:
-                        rule["domains"] = []
-
-                # Check if it's time to run
-                should_run = False
-                if last_check is None:
-                    should_run = True
-                else:
-                    diff = (now - last_check).total_seconds() / 60
-                    if diff >= interval:
-                        should_run = True
-
-                if should_run:
-                    # Run check with per-rule lock
-                    if rule_id not in _running_tasks or _running_tasks[rule_id].done():
-                        _running_tasks[rule_id] = asyncio.create_task(run_single_check(rule_id))
-
-        except Exception as e:
-            logger.error(f"[Monitor] Scheduler error: {e}")
-
-        # Sleep 5 seconds between checks
-        await asyncio.sleep(5)

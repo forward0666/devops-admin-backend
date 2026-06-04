@@ -42,11 +42,11 @@ CONFIG_MAP = {
     "mongodb.password": ("MONGODB_PASSWORD", str),
     "mongodb.database": ("MONGODB_DATABASE", str),
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
-    "gateway.secret": ("GATEWAY_SECRET", str),
     "redis.host": ("REDIS_HOST", str),
     "redis.port": ("REDIS_PORT", int),
     "redis.password": ("REDIS_PASSWORD", str),
     "redis.database": ("REDIS_DATABASE", int),
+    "cf.api.token": ("CF_API_TOKEN", str),
 }
 
 
@@ -147,3 +147,26 @@ async def send_heartbeat():
                 logger.warning(f"⚠️ Nacos heartbeat failed: {resp.status_code}")
     except Exception as e:
         logger.warning(f"⚠️ Nacos heartbeat error: {e}")
+
+
+async def get_service_instance(service_name: str) -> dict:
+    """Get a healthy service instance from Nacos"""
+    import random
+    params = {
+        "serviceName": service_name,
+        "namespaceId": NACOS_NAMESPACE,
+        "healthyOnly": "true",
+        "username": NACOS_USERNAME,
+        "password": NACOS_PASSWORD,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{NACOS_URL}/ns/instance/list", params=params)
+            if resp.status_code == 200:
+                data = resp.json()
+                hosts = data.get("hosts", [])
+                if hosts:
+                    return random.choice(hosts)
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to get instance for {service_name}: {e}")
+    return None
