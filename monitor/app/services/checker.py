@@ -189,8 +189,8 @@ async def _probe(scheme: str, domain: str) -> tuple[httpx.Response | None, float
     try:
         resp = await client.head(url)
         elapsed = (time.monotonic() - start) * 1000
-        # HEAD 被拒绝，降级 GET
-        if resp.status_code in (405, 403, 444):
+        # HEAD 被拒绝，降级 GET（403 不降级，已算 up）
+        if resp.status_code in (405, 444):
             try:
                 resp = await client.get(url)
                 elapsed = (time.monotonic() - start) * 1000
