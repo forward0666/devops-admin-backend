@@ -10,9 +10,10 @@ from app.services.mongodb import get_db
 logger = logging.getLogger(__name__)
 
 # ─── Config ──────────────────────────────────────────────
-CHECK_CONCURRENCY = 1809  # Match domain count, no artificial limit
-TIMEOUT = 5.0  # Single timeout, simple and effective
-DNS_CACHE_TTL = 600  # seconds
+CHECK_CONCURRENCY = 200  # HTTP concurrency limit
+DNS_CONCURRENCY = 100   # DNS concurrency limit
+TIMEOUT = 5.0
+DNS_CACHE_TTL = 600
 
 
 # ─── aiodns Resolver ────────────────────────────────────
@@ -111,7 +112,23 @@ async def async_get_probe_ip() -> str:
     return await asyncio.to_thread(get_probe_ip)
 
 
-# ─── Shared HTTP/HTTPS Clients ──────────────────────────
+# ─── Concurrency Semaphores ─────────────────────────────
+_http_sem = None
+_dns_sem = None
+
+
+def _get_http_sem():
+    global _http_sem
+    if _http_sem is None:
+        _http_sem = asyncio.Semaphore(CHECK_CONCURRENCY)
+    return _http_sem
+
+
+def _get_dns_sem():
+    global _dns_sem
+    if _dns_sem is None:
+        _dns_sem = asyncio.Semaphore(DNS_CONCURRENCY)
+    return _dns_sem
 _client_http: httpx.AsyncClient = None
 _client_https: httpx.AsyncClient = None
 
@@ -197,9 +214,10 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
         "checked_at": datetime.utcnow(),
     }
 
-    # DNS resolve
+    # DNS resolve (with concurrency limit)
     dns_start = time.monotonic()
-    result["resolved_ip"] = await resolve_domain(domain)
+    async with _get_dns_sem():
+        result["resolved_ip"] = await resolve_domain(domain)
     dns_ms = round((time.monotonic() - dns_start) * 1000, 2)
 
     # Determine protocol order
@@ -287,7 +305,7 @@ async def run_check_for_rule(rule: dict):
         return
 
     num_domains = len(domains_to_check)
-    logger.info(f"[Step 1] Loaded {num_domains} domains, concurrency={CHECK_CONCURRENCY}")
+    logger.info(f"[Step 1] Loaded {num_domains} domains, HTTP concurrency={CHECK_CONCURRENCY}, DNS concurrency={DNS_CONCURRENCY}")
 
     # ── Step 2: Init ──
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
