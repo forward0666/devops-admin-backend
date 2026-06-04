@@ -83,7 +83,7 @@ async def fetch_config():
 
                     if key in CONFIG_MAP:
                         attr, cast = CONFIG_MAP[key]
-                        resolved = _resolve(value.strip(), cast)
+                        resolved = _resolve(value.strip().split("#")[0].strip(), cast)
                         setattr(config, attr, cast(resolved))
 
                 logger.info("✅ Loaded config from Nacos: cloudflare.properties")

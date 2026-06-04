@@ -91,7 +91,7 @@ async def fetch_config():
                     key = key.strip()
                     if key in CONFIG_MAP:
                         attr, cast = CONFIG_MAP[key]
-                        resolved = _resolve(value.strip(), cast)
+                        resolved = _resolve(value.strip().split("#")[0].strip(), cast)
                         setattr(config, attr, cast(resolved))
                 logger.info("✅ Loaded config from Nacos: task.properties")
             else:

@@ -91,7 +91,7 @@ async def fetch_config():
                     key = key.strip()
                     if key in CONFIG_MAP:
                         attr, cast = CONFIG_MAP[key]
-                        resolved = _resolve(value.strip(), cast)
+                        resolved = _resolve(value.strip().split("#")[0].strip(), cast)
                         setattr(config, attr, cast(resolved))
                 logger.info("✅ Loaded config from Nacos: monitor.properties")
                 for attr in ['SERVICE_NAME', 'SERVICE_PORT', 'MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_DATABASE', 'MONGODB_HOST', 'MONGODB_PORT', 'MONGODB_DATABASE', 'REDIS_HOST', 'REDIS_PORT']:
