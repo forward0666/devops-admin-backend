@@ -2,7 +2,6 @@ import logging
 import asyncio
 import httpx
 import time
-import socket
 from datetime import datetime
 
 from app.services.db import query_all, execute
@@ -10,23 +9,87 @@ from app.services.mongodb import get_db
 
 logger = logging.getLogger(__name__)
 
-# ─── DNS Cache (simple dict, no external lib) ───────────
-_dns_cache: dict[str, str] = {}
+# ─── Config ──────────────────────────────────────────────
+CHECK_CONCURRENCY = 500
+CONNECT_TIMEOUT = 1.0
+READ_TIMEOUT = 2.0
+WRITE_TIMEOUT = 1.0
+POOL_TIMEOUT = 1.0
+DNS_CACHE_TTL = 600  # seconds
+
+
+# ─── aiodns Resolver ────────────────────────────────────
+_dns_resolver = None
+
+
+def _get_dns_resolver():
+    global _dns_resolver
+    if _dns_resolver is None:
+        import aiodns
+        _dns_resolver = aiodns.DNSResolver(
+            nameservers=["8.8.8.8", "8.8.4.4"],
+            timeout=CONNECT_TIMEOUT,
+        )
+    return _dns_resolver
+
+
+# ─── Redis DNS Cache ────────────────────────────────────
+_redis = None
+
+
+async def _get_redis():
+    global _redis
+    if _redis is None:
+        import redis.asyncio as aioredis
+        from app.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DATABASE
+        _redis = aioredis.Redis(
+            host=REDIS_HOST, port=REDIS_PORT,
+            password=REDIS_PASSWORD, db=REDIS_DATABASE,
+            decode_responses=True,
+        )
+    return _redis
 
 
 async def resolve_domain(domain: str) -> str | None:
-    """Resolve domain using system DNS with cache"""
-    if domain in _dns_cache:
-        return _dns_cache[domain]
+    """Resolve domain: Redis cache -> aiodns -> system"""
+    # 1. Try Redis cache
+    try:
+        r = await _get_redis()
+        cached = await r.get(f"dns:{domain}")
+        if cached:
+            return cached
+    except Exception:
+        pass
+
+    # 2. Try aiodns
+    try:
+        resolver = _get_dns_resolver()
+        result = await resolver.query(domain, "A")
+        if result.addresses:
+            ip = result.addresses[0]
+            # Write back to Redis
+            try:
+                await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
+            except Exception:
+                pass
+            return ip
+    except Exception:
+        pass
+
+    # 3. Fallback to system DNS
     try:
         loop = asyncio.get_event_loop()
         infos = await loop.getaddrinfo(domain, None, family=socket.AF_INET)
         if infos:
             ip = infos[0][4][0]
-            _dns_cache[domain] = ip
+            try:
+                await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
+            except Exception:
+                pass
             return ip
     except Exception:
         pass
+
     return None
 
 
@@ -51,34 +114,49 @@ async def async_get_probe_ip() -> str:
     return await asyncio.to_thread(get_probe_ip)
 
 
-# ─── Shared HTTP Client ─────────────────────────────────
+# ─── Shared HTTP/HTTPS Clients ──────────────────────────
 _client_http: httpx.AsyncClient = None
 _client_https: httpx.AsyncClient = None
 
 
+def _make_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=CONNECT_TIMEOUT,
+        read=READ_TIMEOUT,
+        write=WRITE_TIMEOUT,
+        pool=POOL_TIMEOUT,
+    )
+
+
+def _make_limits() -> httpx.Limits:
+    return httpx.Limits(
+        max_connections=2000,
+        max_keepalive_connections=500,
+    )
+
+
 def _get_client(https: bool = False) -> httpx.AsyncClient:
-    """Shared HTTP/HTTPS client"""
     global _client_http, _client_https
     if https:
         if _client_https is None or _client_https.is_closed:
             _client_https = httpx.AsyncClient(
-                timeout=5,
+                timeout=_make_timeout(),
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
+                limits=_make_limits(),
                 verify=False,
             )
         return _client_https
     else:
         if _client_http is None or _client_http.is_closed:
             _client_http = httpx.AsyncClient(
-                timeout=5,
+                timeout=_make_timeout(),
                 follow_redirects=False,
-                limits=httpx.Limits(max_connections=10000, max_keepalive_connections=2000),
+                limits=_make_limits(),
             )
         return _client_http
 
 
-def _close_client():
+def _close_clients():
     global _client_http, _client_https
     for c in (_client_http, _client_https):
         if c and not c.is_closed:
@@ -88,8 +166,34 @@ def _close_client():
 
 
 # ─── Check Single Domain ────────────────────────────────
-async def check_domain(domain: str) -> dict:
-    """Check a single domain via HTTP (no TLS overhead)"""
+import socket
+
+
+async def _probe(scheme: str, domain: str) -> tuple[httpx.Response | None, float]:
+    """Send HEAD, fallback to GET on 405/403/444"""
+    start = time.monotonic()
+    client = _get_client(https=(scheme == "https"))
+    url = f"{scheme}://{domain}"
+
+    try:
+        resp = await client.head(url)
+        elapsed = (time.monotonic() - start) * 1000
+        # HEAD 被拒绝，降级 GET
+        if resp.status_code in (405, 403, 444):
+            try:
+                resp = await client.get(url)
+                elapsed = (time.monotonic() - start) * 1000
+            except Exception:
+                pass
+        return resp, elapsed
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.TimeoutException):
+        return None, (time.monotonic() - start) * 1000
+    except Exception:
+        return None, (time.monotonic() - start) * 1000
+
+
+async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
+    """Check domain with HTTP/HTTPS concurrent race"""
     result = {
         "domain": domain,
         "status": "down",
@@ -101,37 +205,57 @@ async def check_domain(domain: str) -> dict:
         "checked_at": datetime.utcnow(),
     }
 
-    # DNS resolve (from cache or system)
+    # DNS resolve
+    dns_start = time.monotonic()
     result["resolved_ip"] = await resolve_domain(domain)
+    dns_ms = round((time.monotonic() - dns_start) * 1000, 2)
 
+    # Determine protocol order
+    if last_protocol == "https":
+        schemes = ("https", "http")
+    else:
+        schemes = ("http", "https")
+
+    # Race HTTP/HTTPS
     start = time.monotonic()
-    # HTTP first, HTTPS fallback on connection failure
+    tasks = {
+        asyncio.create_task(_probe(s, domain)): s
+        for s in schemes
+    }
+
     try:
-        resp = await _get_client().head(f"http://{domain}")
+        done, pending = await asyncio.wait(
+            tasks.keys(),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        # Cancel pending
+        for t in pending:
+            t.cancel()
+
+        # Use first successful result
+        for t in done:
+            resp, probe_elapsed = t.result()
+            if resp is not None:
+                elapsed = (time.monotonic() - start) * 1000
+                result["status_code"] = resp.status_code
+                result["response_time_ms"] = round(elapsed, 2)
+                result["status"] = "up" if resp.status_code < 400 else "error"
+                result["_protocol"] = tasks[t]
+                result["_dns_ms"] = dns_ms
+                return result
+
+        # Both failed
         elapsed = (time.monotonic() - start) * 1000
-        result["status_code"] = resp.status_code
         result["response_time_ms"] = round(elapsed, 2)
-        result["status"] = "up" if resp.status_code < 400 else "error"
-    except (httpx.ConnectError, httpx.ConnectTimeout):
-        # HTTP failed, try HTTPS
-        try:
-            resp = await _get_client(https=True).head(f"https://{domain}")
-            elapsed = (time.monotonic() - start) * 1000
-            result["status_code"] = resp.status_code
-            result["response_time_ms"] = round(elapsed, 2)
-            result["status"] = "up" if resp.status_code < 400 else "error"
-        except Exception as e:
-            elapsed = (time.monotonic() - start) * 1000
-            result["response_time_ms"] = round(elapsed, 2)
-            result["error"] = str(e)[:200]
-    except httpx.TimeoutException:
-        elapsed = (time.monotonic() - start) * 1000
-        result["response_time_ms"] = round(elapsed, 2)
-        result["error"] = "Timeout"
+        result["error"] = "Connection failed"
+        result["_dns_ms"] = dns_ms
+
     except Exception as e:
         elapsed = (time.monotonic() - start) * 1000
         result["response_time_ms"] = round(elapsed, 2)
         result["error"] = str(e)[:200]
+        result["_dns_ms"] = dns_ms
 
     return result
 
@@ -184,7 +308,7 @@ async def run_check_for_rule(rule: dict):
         return
 
     num_domains = len(domains_to_check)
-    logger.info(f"[Step 1] Loaded {num_domains} domains")
+    logger.info(f"[Step 1] Loaded {num_domains} domains, concurrency={CHECK_CONCURRENCY}")
 
     # ── Step 2: Init ──
     await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
@@ -198,7 +322,21 @@ async def run_check_for_rule(rule: dict):
     probe_ip = await async_get_probe_ip()
     logger.info(f"[Step 3] Probe IP: {probe_ip}")
 
-    # ── Step 4: Connect Cloudflare DB ──
+    # ── Step 4: Load last_protocol from previous results ──
+    last_protocols: dict[str, str] = {}
+    try:
+        prev_results = await collection.find(
+            {"rule_id": rule_id, "last_protocol": {"$exists": True}},
+            {"domain": 1, "last_protocol": 1},
+        ).to_list(length=10000)
+        for r in prev_results:
+            if r.get("domain") and r.get("last_protocol"):
+                last_protocols[r["domain"]] = r["last_protocol"]
+        logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints")
+    except Exception:
+        pass
+
+    # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
     dns_col = None
     try:
@@ -208,25 +346,31 @@ async def run_check_for_rule(rule: dict):
         cf_client_mongo = AsyncIOMotorClient(uri)
         dns_col = cf_client_mongo["cloudflare"]["dns_domains"]
     except Exception as e:
-        logger.error(f"[Step 4] Failed to connect cloudflare DB: {e}")
+        logger.error(f"[Step 5] Failed to connect cloudflare DB: {e}")
 
-    # ── Step 5: HTTP checks (all at once, no semaphore) ──
-    logger.info(f"[Step 5] Starting HTTP checks for {num_domains} domains")
+    # ── Step 6: HTTP checks with semaphore ──
+    sem = asyncio.Semaphore(CHECK_CONCURRENCY)
+
+    async def checked(domain: str) -> dict:
+        async with sem:
+            return await check_domain(domain, last_protocols.get(domain))
+
+    logger.info(f"[Step 6] Starting HTTP checks")
     check_start = time.monotonic()
 
-    tasks = [check_domain(d) for d in domains_to_check]
+    tasks = [checked(d) for d in domains_to_check]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     check_elapsed = round(time.monotonic() - check_start, 2)
-    logger.info(f"[Step 5] HTTP checks completed in {check_elapsed}s")
+    logger.info(f"[Step 6] HTTP checks completed in {check_elapsed}s")
 
-    # ── Step 6: Process results ──
+    # ── Step 7: Process results ──
     up_count = 0
     down_count = 0
     error_count = 0
     up_times: list[float] = []
-    down_times: list[float] = []
-    error_times: list[float] = []
+    dns_times: list[float] = []
+    protocol_stats = {"http": 0, "https": 0}
 
     from pymongo import UpdateOne, UpdateMany
     upsert_ops = []
@@ -249,11 +393,20 @@ async def run_check_for_rule(rule: dict):
         if not result.get("probe_ip"):
             result["probe_ip"] = probe_ip
 
+        # Track protocol
+        protocol = result.pop("_protocol", None)
+        dns_ms = result.pop("_dns_ms", 0)
+        if dns_ms:
+            dns_times.append(dns_ms)
+        if protocol:
+            protocol_stats[protocol] = protocol_stats.get(protocol, 0) + 1
+
         doc = {
             "rule_id": rule_id,
             "rule_name": rule_name,
             "source": source,
             "checked_at": now,
+            "last_protocol": protocol or "http",
             **result,
         }
         upsert_ops.append(UpdateOne(
@@ -281,28 +434,25 @@ async def run_check_for_rule(rule: dict):
                 up_times.append(result["response_time_ms"])
         elif result["status"] == "down":
             down_count += 1
-            if result.get("response_time_ms"):
-                down_times.append(result["response_time_ms"])
         else:
             error_count += 1
-            if result.get("response_time_ms"):
-                error_times.append(result["response_time_ms"])
 
-    logger.info(f"[Step 6] Processed: up={up_count}, down={down_count}, error={error_count}")
+    logger.info(f"[Step 7] up={up_count}, down={down_count}, error={error_count}")
+    logger.info(f"[Step 7] Protocol: http={protocol_stats.get('http',0)}, https={protocol_stats.get('https',0)}")
 
-    # ── Step 7: Bulk write to MongoDB ──
+    # ── Step 8: Bulk write ──
     if upsert_ops:
-        res = await collection.bulk_write(upsert_ops)
-        logger.info(f"[Step 7] Upserted {len(upsert_ops)} results")
+        await collection.bulk_write(upsert_ops)
+        logger.info(f"[Step 8] Upserted {len(upsert_ops)} results")
 
     if dns_updates:
         await dns_col.bulk_write(dns_updates)
-        logger.info(f"[Step 7] Updated {len(dns_updates)} dns_domains")
+        logger.info(f"[Step 8] Updated {len(dns_updates)} dns_domains")
 
     if cf_client_mongo:
         cf_client_mongo.close()
 
-    # ── Step 8: Update rule status ──
+    # ── Step 9: Update rule status ──
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"
     await execute(
         "UPDATE monitor_rule SET status=%s, last_check=%s, updated_at=NOW() WHERE id=%s",
@@ -312,8 +462,9 @@ async def run_check_for_rule(rule: dict):
     # ── Summary ──
     avg_up = round(sum(up_times) / len(up_times), 2) if up_times else 0
     max_up = round(max(up_times), 2) if up_times else 0
+    avg_dns = round(sum(dns_times) / len(dns_times), 2) if dns_times else 0
     logger.info(f"[Done] '{rule_name}': up={up_count}, down={down_count}, error={error_count}, time={check_elapsed}s")
-    logger.info(f"[Done] Response (ms) - up: avg={avg_up} max={max_up}")
+    logger.info(f"[Done] Response (ms) - up: avg={avg_up} max={max_up} | DNS avg={avg_dns}")
 
 
 async def run_single_check(rule_id: int):
