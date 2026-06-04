@@ -269,6 +269,12 @@ TASK_EXECUTORS = {
 
 async def execute_task(task: dict):
     """Execute a task by its type"""
+    import json
+    if isinstance(task.get("config"), str):
+        try:
+            task["config"] = json.loads(task["config"])
+        except Exception:
+            task["config"] = {}
     task_type = task.get("type", "")
     executor = TASK_EXECUTORS.get(task_type)
     if executor:

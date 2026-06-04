@@ -121,7 +121,12 @@ async def run_task(task_id: int):
     row = await query_one("SELECT * FROM task WHERE id=%s", (task_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
-    import asyncio
+    import json, asyncio
+    if isinstance(row.get("config"), str):
+        try:
+            row["config"] = json.loads(row["config"])
+        except Exception:
+            row["config"] = {}
     from app.services.executor import execute_task
     asyncio.create_task(execute_task(row))
     return {"message": f"Task '{row['name']}' triggered", "task_id": task_id}
