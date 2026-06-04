@@ -139,8 +139,8 @@ def _make_timeout() -> httpx.Timeout:
 
 def _make_limits() -> httpx.Limits:
     return httpx.Limits(
-        max_connections=2000,
-        max_keepalive_connections=500,
+        max_connections=CHECK_CONCURRENCY,
+        max_keepalive_connections=CHECK_CONCURRENCY,
     )
 
 
