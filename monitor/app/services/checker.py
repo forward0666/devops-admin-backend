@@ -333,10 +333,11 @@ async def run_check_for_rule(rule: dict):
     # ── Step 4: Load previous results and sort domains ──
     last_protocols: dict[str, str] = {}
     last_status: dict[str, str] = {}
+    last_record_type: dict[str, str] = {}
     try:
         prev_results = await collection.find(
             {"rule_id": rule_id},
-            {"domain": 1, "last_protocol": 1, "status": 1},
+            {"domain": 1, "last_protocol": 1, "status": 1, "record_type": 1},
         ).to_list(length=10000)
         for r in prev_results:
             d = r.get("domain")
@@ -345,17 +346,34 @@ async def run_check_for_rule(rule: dict):
                     last_protocols[d] = r["last_protocol"]
                 if r.get("status"):
                     last_status[d] = r["status"]
+                if r.get("record_type"):
+                    last_record_type[d] = r["record_type"]
         logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints, {len(last_status)} status hints")
     except Exception:
         pass
 
-    # Sort by previous status: up > 3xx > 4xx > 5xx > down > error
+    # Sort: A good > CNAME all > A bad
     def _sort_key(domain: str):
+        rt = last_record_type.get(domain, "")
         status = last_status.get(domain, "")
-        return {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "timeout": 4}.get(status, 5)
+        is_good = status in ("up", "3xx", "4xx", "5xx")
+
+        if rt == "A" and is_good:
+            group = 0
+            status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3}[status]
+        elif rt == "CNAME":
+            group = 1
+            status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "timeout": 4}.get(status, 5)
+        elif rt == "A" and not is_good:
+            group = 2
+            status_order = 4 if status == "timeout" else 5
+        else:
+            group = 3
+            status_order = 0
+        return (group, status_order)
 
     domains_to_check.sort(key=_sort_key)
-    logger.info(f"[Step 4] Sorted by status: up > 3xx > 4xx > 5xx > down > error")
+    logger.info(f"[Step 4] Sorted: A good > CNAME all > A bad")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
