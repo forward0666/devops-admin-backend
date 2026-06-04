@@ -238,15 +238,8 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
                 elapsed = (time.monotonic() - start) * 1000
                 result["status_code"] = resp.status_code
                 result["response_time_ms"] = round(elapsed, 2)
-                # 2xx/3xx/403 = up, other 4xx/5xx = error
-                if resp.status_code < 400:
-                    result["status"] = "up"
-                elif resp.status_code == 403:
-                    result["status"] = "up"
-                elif resp.status_code < 500:
-                    result["status"] = "4xx"
-                else:
-                    result["status"] = "5xx"
+                        # Any response = up, only timeout/DNS failure = error
+                result["status"] = "up"
                 result["_protocol"] = protocol
                 result["_dns_ms"] = dns_ms
                 return result
