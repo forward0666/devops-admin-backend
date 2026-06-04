@@ -169,7 +169,7 @@ def _close_clients():
 import socket
 
 
-async def _probe(scheme: str, domain: str) -> tuple[httpx.Response | None, float]:
+async def _probe(scheme: str, domain: str) -> tuple[httpx.Response | None, float, str]:
     """Send HEAD, fallback to GET on 405/403/444"""
     start = time.monotonic()
     client = _get_client(https=(scheme == "https"))
@@ -185,11 +185,11 @@ async def _probe(scheme: str, domain: str) -> tuple[httpx.Response | None, float
                 elapsed = (time.monotonic() - start) * 1000
             except Exception:
                 pass
-        return resp, elapsed
+        return resp, elapsed, scheme
     except (httpx.ConnectError, httpx.ConnectTimeout, httpx.TimeoutException):
-        return None, (time.monotonic() - start) * 1000
+        return None, (time.monotonic() - start) * 1000, scheme
     except Exception:
-        return None, (time.monotonic() - start) * 1000
+        return None, (time.monotonic() - start) * 1000, scheme
 
 
 async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
@@ -216,32 +216,19 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
     else:
         schemes = ("http", "https")
 
-    # Race HTTP/HTTPS
+    # Race HTTP/HTTPS (wait for first SUCCESS, not first complete)
     start = time.monotonic()
-    tasks = {
-        asyncio.create_task(_probe(s, domain)): s
-        for s in schemes
-    }
+    probes = [_probe(s, domain) for s in schemes]
 
     try:
-        done, pending = await asyncio.wait(
-            tasks.keys(),
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-
-        # Cancel pending
-        for t in pending:
-            t.cancel()
-
-        # Use first successful result
-        for t in done:
-            resp, probe_elapsed = t.result()
+        for coro in asyncio.as_completed(probes):
+            resp, probe_elapsed, protocol = await coro
             if resp is not None:
                 elapsed = (time.monotonic() - start) * 1000
                 result["status_code"] = resp.status_code
                 result["response_time_ms"] = round(elapsed, 2)
                 result["status"] = "up" if resp.status_code < 400 else "error"
-                result["_protocol"] = tasks[t]
+                result["_protocol"] = protocol
                 result["_dns_ms"] = dns_ms
                 return result
 
