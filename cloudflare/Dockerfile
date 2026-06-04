@@ -1,6 +1,8 @@
 FROM python:3.14-alpine
+RUN apk add --no-cache jemalloc-dev
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 #COPY . .
 COPY cloudflare/ .
 RUN pip install -r requirements.txt
