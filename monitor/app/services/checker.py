@@ -25,7 +25,7 @@ def _get_dns_resolver():
     if _dns_resolver is None:
         import aiodns
         _dns_resolver = aiodns.DNSResolver(
-            nameservers=["1.1.1.1", "8.8.8.8"],
+            nameservers=["8.8.8.8", "8.8.4.4"],
             timeout=CONNECT_TIMEOUT,
         )
     return _dns_resolver
