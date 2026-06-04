@@ -207,7 +207,7 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
     """Check domain with HTTP/HTTPS concurrent race"""
     result = {
         "domain": domain,
-        "status": "down",
+        "status": "timeout",
         "status_code": None,
         "response_time_ms": None,
         "resolved_ip": None,
@@ -352,7 +352,7 @@ async def run_check_for_rule(rule: dict):
     # Sort by previous status: up > 3xx > 4xx > 5xx > down > error
     def _sort_key(domain: str):
         status = last_status.get(domain, "")
-        return {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
+        return {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "timeout": 4}.get(status, 5)
 
     domains_to_check.sort(key=_sort_key)
     logger.info(f"[Step 4] Sorted by status: up > 3xx > 4xx > 5xx > down > error")
@@ -454,7 +454,7 @@ async def run_check_for_rule(rule: dict):
             up_count += 1
             if result.get("response_time_ms"):
                 up_times.append(result["response_time_ms"])
-        elif result["status"] == "down":
+        elif result["status"] == "timeout":
             down_count += 1
         elif result["status"] in ("3xx", "4xx", "5xx"):
             error_count += 1
