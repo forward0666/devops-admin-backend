@@ -48,14 +48,16 @@ async def _get_redis():
     return _redis
 
 
-async def resolve_domain(domain: str) -> str | None:
-    """Resolve domain: Redis cache -> aiodns -> system"""
+async def resolve_domain(domain: str) -> tuple[str | None, str]:
+    """Resolve domain: Redis cache -> aiodns -> system. Returns (ip, record_type)"""
     # 1. Try Redis cache
     try:
         r = await _get_redis()
         cached = await r.get(f"dns:{domain}")
         if cached:
-            return cached
+            # Check if it's a CNAME or A record
+            record_type = "CNAME" if "." in cached and not cached.replace(".", "").isdigit() else "A"
+            return cached, record_type
     except Exception:
         pass
 
@@ -70,7 +72,7 @@ async def resolve_domain(domain: str) -> str | None:
                 await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
             except Exception:
                 pass
-            return ip
+            return ip, "A"
     except Exception:
         pass
 
@@ -84,11 +86,11 @@ async def resolve_domain(domain: str) -> str | None:
                 await r.setex(f"dns:{domain}", DNS_CACHE_TTL, ip)
             except Exception:
                 pass
-            return ip
+            return ip, "A"
     except Exception:
         pass
 
-    return None
+    return None, "unknown"
 
 
 # ─── Probe IP ────────────────────────────────────────────
@@ -216,7 +218,7 @@ async def check_domain(domain: str, last_protocol: str | None = None) -> dict:
 
     # DNS resolve (with concurrency limit)
     dns_start = time.monotonic()
-    result["resolved_ip"] = await resolve_domain(domain)
+    result["resolved_ip"], result["record_type"] = await resolve_domain(domain)
     dns_ms = round((time.monotonic() - dns_start) * 1000, 2)
 
     # Determine protocol order
@@ -331,10 +333,11 @@ async def run_check_for_rule(rule: dict):
     # ── Step 4: Load previous results and sort domains ──
     last_protocols: dict[str, str] = {}
     last_status: dict[str, str] = {}
+    last_record_type: dict[str, str] = {}
     try:
         prev_results = await collection.find(
             {"rule_id": rule_id},
-            {"domain": 1, "last_protocol": 1, "status": 1},
+            {"domain": 1, "last_protocol": 1, "status": 1, "record_type": 1},
         ).to_list(length=10000)
         for r in prev_results:
             d = r.get("domain")
@@ -343,17 +346,24 @@ async def run_check_for_rule(rule: dict):
                     last_protocols[d] = r["last_protocol"]
                 if r.get("status"):
                     last_status[d] = r["status"]
+                if r.get("record_type"):
+                    last_record_type[d] = r["record_type"]
         logger.info(f"[Step 4] Loaded {len(last_protocols)} protocol hints, {len(last_status)} status hints")
     except Exception:
         pass
 
-    # Sort domains by previous status: up > 3xx > 4xx > 5xx > down > error
+    # Sort: A records first (by status), then CNAME (by status)
     def _sort_key(domain: str):
+        rt = last_record_type.get(domain, "")
+        rt_order = 0 if rt == "A" else 1 if rt == "CNAME" else 2
         status = last_status.get(domain, "")
-        return {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
+        status_order = {"up": 0, "3xx": 1, "4xx": 2, "5xx": 3, "down": 4}.get(status, 5)
+        return (rt_order, status_order)
 
     domains_to_check.sort(key=_sort_key)
-    logger.info(f"[Step 4] Sorted by previous status")
+    a_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "A")
+    cname_count = sum(1 for d in domains_to_check if last_record_type.get(d) == "CNAME")
+    logger.info(f"[Step 4] Sort: A={a_count}, CNAME={cname_count}, other={len(domains_to_check) - a_count - cname_count}")
 
     # ── Step 5: Connect Cloudflare DB ──
     cf_client_mongo = None
@@ -426,6 +436,7 @@ async def run_check_for_rule(rule: dict):
             "source": source,
             "checked_at": now,
             "last_protocol": protocol or "http",
+            "record_type": result.get("record_type", "unknown"),
             **result,
         }
         upsert_ops.append(UpdateOne(
