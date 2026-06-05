@@ -1,7 +1,8 @@
 import logging
 import asyncio
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
 from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, security_rules, whitelist, dns_domain
@@ -27,6 +28,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Cloudflare Manager API", version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed = round((time.monotonic() - start) * 1000, 2)
+    client = request.client.host if request.client else "unknown"
+    logger.info(f"{request.method} {request.url.path} [{response.status_code}] {elapsed}ms client={client}")
+    return response
+
 
 app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
 app.include_router(zones.router, prefix="/zones", tags=["Zones"])
