@@ -67,7 +67,7 @@ async def sync_dns_domains():
             for doc in docs:
                 await db[COLLECTION].update_one(
                     {"record_id": doc["record_id"]},
-                    {"$set": doc, "$setOnInsert": {"is_public": False}},
+                    {"$set": doc, "$setOnInsert": {"is_public": False, "is_ignored": False}},
                     upsert=True,
                 )
             total_synced += len(docs)
@@ -141,6 +141,8 @@ async def update_dns_domain(record_id: str, body: dict):
     update_fields = {}
     if "is_public" in body:
         update_fields["is_public"] = body["is_public"]
+    if "is_ignored" in body:
+        update_fields["is_ignored"] = body["is_ignored"]
     if "remark" in body:
         update_fields["remark"] = body["remark"]
 
