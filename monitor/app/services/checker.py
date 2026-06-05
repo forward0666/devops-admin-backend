@@ -287,8 +287,8 @@ async def run_check_for_rule(rule: dict):
                 uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
                 cf_client_mongo = AsyncIOMotorClient(uri)
                 cf_db = cf_client_mongo["cloudflare"]
-                total_docs = await cf_db["dns_domains"].count_documents({})
-                docs = await cf_db["dns_domains"].find({}, {"name": 1}).to_list(length=10000)
+                total_docs = await cf_db["dns_domains"].count_documents({"is_ignored": {"$ne": True}})
+                docs = await cf_db["dns_domains"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
                 seen_names = set()
                 for doc in docs:
                     name = doc.get("name", "")

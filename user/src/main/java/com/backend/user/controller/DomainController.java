@@ -119,6 +119,20 @@ public class DomainController {
         }
     }
 
+    @PostMapping("/bulkDelete")
+    public ApiResponseDto<Integer> bulkDelete(@RequestBody Map<String, Object> body) {
+        try {
+            Long projectId = Long.parseLong(body.get("projectId").toString());
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) body.get("ids");
+            int deleted = domainService.bulkDelete(projectId, ids);
+            return ApiResponseDto.success("Deleted " + deleted + " domains", deleted);
+        } catch (Exception e) {
+            log.error("Failed to bulk delete domains", e);
+            return ApiResponseDto.error("Failed to bulk delete domains");
+        }
+    }
+
     @PostMapping("/import")
     public ApiResponseDto<Integer> importDomains(@RequestBody Map<String, Object> body) {
         try {

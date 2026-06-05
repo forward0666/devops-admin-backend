@@ -82,8 +82,9 @@ async def sync_dns_domains():
     await db[COLLECTION].create_index([("account_id", 1), ("type", 1)])
     await db[COLLECTION].create_index("zone_name")
 
-    # 确保所有记录都有 is_public 字段
+    # 确保所有记录都有 is_public 和 is_ignored 字段
     await db[COLLECTION].update_many({"is_public": {"$exists": False}}, {"$set": {"is_public": False}})
+    await db[COLLECTION].update_many({"is_ignored": {"$exists": False}}, {"$set": {"is_ignored": False}})
 
     logger.info(f"DNS domains sync complete: {total_synced} records from {len(accounts)} accounts")
 
@@ -95,6 +96,7 @@ async def list_dns_domains(
     account_id: int = None,
     type: str = None,
     keyword: str = None,
+    is_ignored: bool = None,
 ):
     """查询 dns_domains 集合"""
     db = await get_db()
@@ -103,6 +105,8 @@ async def list_dns_domains(
         query["account_id"] = str(account_id)
     if type:
         query["type"] = type
+    if is_ignored is not None:
+        query["is_ignored"] = is_ignored
     if keyword:
         query["$or"] = [
             {"name": {"$regex": keyword, "$options": "i"}},

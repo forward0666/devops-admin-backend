@@ -88,6 +88,11 @@ public class DomainMapper {
         mongoTemplate.remove(query, DomainEntity.class, getCollection("findById"));
     }
 
+    public int deleteByIdsAndProjectId(List<String> ids, Long projectId) {
+        Query query = Query.query(Criteria.where("_id").in(ids).and("projectId").is(projectId));
+        return (int) mongoTemplate.remove(query, DEFAULT_COLLECTION).getDeletedCount();
+    }
+
     public void insertAll(List<DomainEntity> entities) {
         // 按 projectId+domain 去重
         Map<String, DomainEntity> uniqueMap = new java.util.LinkedHashMap<>();
@@ -96,6 +101,19 @@ public class DomainMapper {
             uniqueMap.putIfAbsent(key, e);
         }
         mongoTemplate.insertAll(new java.util.ArrayList<>(uniqueMap.values()));
+    }
+
+    public void upsertAll(Long projectId, List<DomainEntity> entities) {
+        for (DomainEntity e : entities) {
+            Query query = Query.query(Criteria.where("projectId").is(projectId).and("domain").is(e.getDomain()));
+            Update update = new Update()
+                .set("type", e.getType())
+                .set("env", e.getEnv())
+                .set("remark", e.getRemark() != null ? e.getRemark() : "")
+                .set("cdn", e.getCdn() != null ? e.getCdn() : "")
+                .set("updatedAt", e.getUpdatedAt());
+            mongoTemplate.upsert(query, update, DEFAULT_COLLECTION);
+        }
     }
 
     public DomainEntity findByProjectIdAndDomain(Long projectId, String domain) {

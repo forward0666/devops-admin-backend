@@ -82,21 +82,20 @@ public class DomainService {
         return count;
     }
 
+    public int bulkDelete(Long projectId, List<String> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        int count = domainMapper.deleteByIdsAndProjectId(ids, projectId);
+        evictDomainCache(projectId);
+        return count;
+    }
+
     public void importDomains(Long projectId, List<DomainEntity> domains) {
-        List<String> domainNames = domains.stream().map(DomainEntity::getDomain).toList();
-        List<DomainEntity> existing = domainMapper.findByProjectIdAndDomains(projectId, domainNames);
-        if (!existing.isEmpty()) {
-            String duplicates = existing.stream().map(DomainEntity::getDomain).collect(java.util.stream.Collectors.joining(", "));
-            throw new RuntimeException("域名已存在: " + duplicates);
-        }
         LocalDateTime now = LocalDateTime.now();
         for (DomainEntity d : domains) {
-            d.setId(null);
             d.setProjectId(projectId);
-            d.setCreatedAt(now);
             d.setUpdatedAt(now);
         }
-        domainMapper.insertAll(domains);
+        domainMapper.upsertAll(projectId, domains);
         evictDomainCache(projectId);
     }
 
