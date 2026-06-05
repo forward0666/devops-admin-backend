@@ -20,6 +20,7 @@ async def get_pool():
             autocommit=True,
             minsize=1,
             maxsize=10,
+            pool_recycle=1800,
         )
         logger.info(f"✅ MySQL connected: {MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}")
     return _pool
