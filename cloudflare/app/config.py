@@ -19,6 +19,7 @@ MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "root123")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "cloudflare")
+MYSQL_POOL_RECYCLE = int(os.getenv("MYSQL_POOL_RECYCLE", "1800"))
 
 # Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "192.168.86.9")

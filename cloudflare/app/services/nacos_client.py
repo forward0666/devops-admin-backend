@@ -24,6 +24,7 @@ CONFIG_MAP = {
     "mysql.user": ("MYSQL_USER", str),
     "mysql.password": ("MYSQL_PASSWORD", str),
     "mysql.database": ("MYSQL_DATABASE", str),
+    "mysql.pool.recycle": ("MYSQL_POOL_RECYCLE", int),
     "redis.host": ("REDIS_HOST", str),
     "redis.port": ("REDIS_PORT", int),
     "redis.password": ("REDIS_PASSWORD", str),

@@ -3,7 +3,7 @@ import logging
 import os
 import asyncio
 
-from app.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+from app.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, MYSQL_POOL_RECYCLE
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ async def get_pool():
             maxsize=10,
             autocommit=True,
             charset='utf8mb4',
-            pool_recycle=1800,
+            pool_recycle=MYSQL_POOL_RECYCLE,
         )
         logger.info(f"✅ MySQL pool connected: {MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}")
     return _pool
