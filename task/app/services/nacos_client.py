@@ -36,6 +36,7 @@ CONFIG_MAP = {
     "mysql.user": ("MYSQL_USER", str),
     "mysql.password": ("MYSQL_PASSWORD", str),
     "mysql.database": ("MYSQL_DATABASE", str),
+    "mysql.pool.recycle": ("MYSQL_POOL_RECYCLE", int),
     "mongodb.host": ("MONGODB_HOST", str),
     "mongodb.port": ("MONGODB_PORT", int),
     "mongodb.user": ("MONGODB_USER", str),

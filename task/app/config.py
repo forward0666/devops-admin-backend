@@ -32,6 +32,7 @@ MYSQL_PORT = _parse_port("MYSQL_PORT", "3306")
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "root123")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "task")
+MYSQL_POOL_RECYCLE = int(os.getenv("MYSQL_POOL_RECYCLE", "1800"))
 
 # MongoDB
 MONGODB_HOST = os.getenv("MONGODB_HOST", "192.168.86.9")
