@@ -85,7 +85,7 @@ public class UserApplication {
         // ✅ MongoDB 预热
         try {
             org.springframework.data.mongodb.core.MongoTemplate mongoTemplate =
-                    ctx.getBean(org.springframework.data.mongodb.core.MongoTemplate.class);
+                    ctx.getBean("projectMongoTemplate", org.springframework.data.mongodb.core.MongoTemplate.class);
             mongoTemplate.getDb().listCollectionNames().first();
             log.info("🔥 MongoDB warmup OK");
         } catch (Exception e) {
