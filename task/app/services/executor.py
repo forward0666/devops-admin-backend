@@ -257,6 +257,32 @@ async def run_sync_cache(task: dict):
     logger.info(f"[Task] ✅ sync_cache '{task_name}' completed in {elapsed}s")
 
 
+async def run_sync_domain(task: dict):
+    """Sync Cloudflare domains (dns_records -> dns_domains)"""
+    start_time = time.monotonic()
+    task_id = task.get("id")
+    task_name = task.get("name", "")
+
+    cf_url = await get_service_url("cloudflare")
+    url = f"{cf_url}/dnsDomain/sync"
+    logger.info(f"[Task] sync_domain: POST {url}")
+
+    async with httpx.AsyncClient(timeout=300) as client:
+        try:
+            resp = await client.post(url)
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                logger.info(f"[Task] sync_domain '{task_name}': synced={data.get('synced', 0)}")
+            else:
+                logger.warning(f"[Task] sync_domain '{task_name}': returned {resp.status_code}")
+        except Exception as e:
+            logger.error(f"[Task] sync_domain '{task_name}': failed: {e}")
+
+    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    elapsed = round(time.monotonic() - start_time, 2)
+    logger.info(f"[Task] ✅ sync_domain '{task_name}' completed in {elapsed}s")
+
+
 # Registry: task type -> executor
 TASK_EXECUTORS = {
     "check_domain": run_check_domain,
@@ -264,6 +290,7 @@ TASK_EXECUTORS = {
     "sync_dns": run_sync_dns,
     "sync_security": run_sync_security,
     "sync_cache": run_sync_cache,
+    "sync_domain": run_sync_domain,
 }
 
 
