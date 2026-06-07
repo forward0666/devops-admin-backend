@@ -98,7 +98,7 @@ async def update_rule(rule_id: int, body: dict):
     domains_json = json.dumps(domains)
 
     await execute(
-        "UPDATE monitor_rule SET name=%s, source=%s, account_id=%s, domains=%s, custom_domains=%s, description=%s, enabled=%s, updated_at=NOW() "
+        "UPDATE monitor_rule SET name=%s, source=%s, account_id=%s, domains=%s, custom_domains=%s, description=%s, enabled=%s, updated_at=UTC_TIMESTAMP() "
         "WHERE id=%s",
         (name, source, account_id, domains_json, custom_domains, description, enabled, rule_id),
     )
@@ -126,7 +126,7 @@ async def toggle_rule(rule_id: int):
         raise HTTPException(status_code=404, detail="Rule not found")
 
     new_status = not existing["enabled"]
-    await execute("UPDATE monitor_rule SET enabled=%s, updated_at=NOW() WHERE id=%s", (new_status, rule_id))
+    await execute("UPDATE monitor_rule SET enabled=%s, updated_at=UTC_TIMESTAMP() WHERE id=%s", (new_status, rule_id))
     logger.info(f"[Monitor] Toggled rule {rule_id}: enabled={new_status}")
     return {"code": 200, "data": {"enabled": new_status}}
 

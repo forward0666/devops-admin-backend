@@ -52,7 +52,7 @@ async def create_task(body: TaskCreate):
     """Create a new task"""
     import json
     await execute(
-        "INSERT INTO task (name, type, cron, enabled, description, config) VALUES (%s, %s, %s, %s, %s, %s)",
+        "INSERT INTO task (name, type, cron, enabled, description, config, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
         (body.name, body.type, body.cron, int(body.enabled), body.description, json.dumps(body.config))
     )
     row = await query_one("SELECT * FROM task ORDER BY id DESC LIMIT 1")

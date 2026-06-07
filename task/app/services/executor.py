@@ -76,7 +76,7 @@ async def run_check_domain(task: dict):
             except Exception as e:
                 logger.error(f"[Task] check_domain '{task_name}': failed to trigger rule {rule_id}: {e}")
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ check_domain '{task_name}' completed in {elapsed}s")
 
@@ -117,7 +117,7 @@ async def run_sync_zone(task: dict):
 
         await asyncio.gather(*[sync_one(aid) for aid in account_ids])
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_zone '{task_name}' completed in {elapsed}s")
 
@@ -158,7 +158,7 @@ async def run_sync_dns(task: dict):
 
         await asyncio.gather(*[sync_one(aid) for aid in account_ids])
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_dns '{task_name}' completed in {elapsed}s")
 
@@ -205,7 +205,7 @@ async def run_sync_security(task: dict):
 
         await asyncio.gather(*[sync_one_acc(aid) for aid in account_ids])
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_security '{task_name}' completed in {elapsed}s")
 
@@ -252,7 +252,7 @@ async def run_sync_cache(task: dict):
 
         await asyncio.gather(*[sync_one_acc(aid) for aid in account_ids])
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_cache '{task_name}' completed in {elapsed}s")
 
@@ -287,7 +287,7 @@ async def run_sync_rule(task: dict):
                 logger.error(f"[Task] sync_rule '{task_name}': failed for rule {rule_id}: {type(e).__name__}: {e}")
 
     status = "success" if failed == 0 else f"failed {failed}/{len(sync_rule_ids)}"
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", (status, task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", (status, task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_rule '{task_name}' completed in {elapsed}s, status={status}")
 
@@ -313,7 +313,7 @@ async def run_sync_domain(task: dict):
         except Exception as e:
             logger.error(f"[Task] sync_domain '{task_name}': failed: {e}")
 
-    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", ("success", task_id))
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
     elapsed = round(time.monotonic() - start_time, 2)
     logger.info(f"[Task] ✅ sync_domain '{task_name}' completed in {elapsed}s")
 

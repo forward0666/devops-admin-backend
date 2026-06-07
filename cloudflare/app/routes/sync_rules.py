@@ -46,7 +46,7 @@ async def create_sync_rule(body: dict):
 
     import json
     await execute(
-        f"INSERT INTO `{TABLE}` (account_id, name, description, source_zone_id, target_zone_ids, rule_types) VALUES (%s, %s, %s, %s, %s, %s)",
+        f"INSERT INTO `{TABLE}` (account_id, name, description, source_zone_id, target_zone_ids, rule_types, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
         (account_id, name, description, source_zone_id, json.dumps(target_zone_ids), json.dumps(rule_types))
     )
     row = await query_one(f"SELECT * FROM `{TABLE}` WHERE account_id = %s AND name = %s ORDER BY id DESC LIMIT 1", (account_id, name))
@@ -163,7 +163,7 @@ async def update_sync_rule(rule_id: int, body: dict):
         raise HTTPException(status_code=400, detail="Name is required")
 
     row_count = await execute(
-        f"UPDATE `{TABLE}` SET name=%s, description=%s, source_zone_id=%s, target_zone_ids=%s, rule_types=%s, updated_at=NOW() WHERE id=%s",
+        f"UPDATE `{TABLE}` SET name=%s, description=%s, source_zone_id=%s, target_zone_ids=%s, rule_types=%s, updated_at=UTC_TIMESTAMP() WHERE id=%s",
         (name, description, source_zone_id, json.dumps(target_zone_ids), json.dumps(rule_types), rule_id)
     )
     if row_count == 0:
@@ -753,7 +753,7 @@ async def push_sync_rule(rule_id: int):
             })
 
     # Update last_synced_at
-    await execute(f"UPDATE `{TABLE}` SET last_synced_at=NOW() WHERE id=%s", (rule_id,))
+    await execute(f"UPDATE `{TABLE}` SET last_synced_at=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
 
     return {
         "code": 200,

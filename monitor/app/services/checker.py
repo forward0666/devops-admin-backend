@@ -313,7 +313,7 @@ async def run_check_for_rule(rule: dict):
     logger.info(f"[Step 1] Loaded {num_domains} domains, HTTP concurrency={CHECK_CONCURRENCY}, DNS concurrency={DNS_CONCURRENCY}")
 
     # ── Step 2: Init ──
-    await execute("UPDATE monitor_rule SET status='running', updated_at=NOW() WHERE id=%s", (rule_id,))
+    await execute("UPDATE monitor_rule SET status='running', updated_at=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
     logger.info(f"[Step 2] Rule status set to running")
 
     db = await get_db()
@@ -501,7 +501,7 @@ async def run_check_for_rule(rule: dict):
     # ── Step 9: Update rule status ──
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"
     await execute(
-        "UPDATE monitor_rule SET status=%s, last_check=%s, updated_at=NOW() WHERE id=%s",
+        "UPDATE monitor_rule SET status=%s, last_check=%s, updated_at=UTC_TIMESTAMP() WHERE id=%s",
         (overall_status, now, rule_id),
     )
 
