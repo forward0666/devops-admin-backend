@@ -43,6 +43,7 @@ async def list_tasks():
                 row["config"] = json.loads(row["config"])
             except Exception:
                 row["config"] = {}
+        row["enabled"] = bool(row.get("enabled"))
     return {"data": rows, "total": len(rows)}
 
 

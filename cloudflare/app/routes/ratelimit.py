@@ -12,20 +12,20 @@ zone_router = APIRouter()
 
 
 def get_collection_name(account_id: int, zone_id: str) -> str:
-    return f"account_{account_id}_zone_{zone_id}_security"
+    return f"account_{account_id}_zone_{zone_id}_ratelimit"
 
 
 # --- Top-level routes (no zone_id) ---
 
 @router.get("")
 async def list_all_rules(account_id: int):
-    """Read all security rules for an account from MongoDB"""
+    """Read all rate limit rules for an account from MongoDB"""
     db = await get_db()
     all_rules = []
     collection_prefix = f"account_{account_id}_zone_"
     collections = await db.list_collection_names()
     for coll_name in collections:
-        if coll_name.startswith(collection_prefix) and coll_name.endswith("_security"):
+        if coll_name.startswith(collection_prefix) and coll_name.endswith("_ratelimit"):
             coll = db[coll_name]
             rows = await coll.find({"account_id": str(account_id)}).to_list(length=5000)
             for r in rows:
@@ -42,19 +42,21 @@ async def sync_rules(
     zone_id: str,
     x_cf_token: str = Header(..., alias="X-Cf-Token"),
 ):
-    """Fetch security rules from Cloudflare API and sync to MongoDB"""
-    logger.info(f"[Security Sync] Start sync for account_id={account_id}, zone_id={zone_id}")
+    """Fetch rate limit rules from Cloudflare API and sync to MongoDB"""
+    logger.info(f"[RateLimit Sync] Start sync for account_id={account_id}, zone_id={zone_id}")
     account = await query_one("SELECT id, name FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
     try:
-        cf_data = await cf_client.async_list_firewall_rules(x_cf_token, zone_id)
+        cf_data = await cf_client.async_list_ratelimit_rules(x_cf_token, zone_id)
     except Exception as e:
-        logger.error(f"[Security Sync] CF API error for zone {zone_id}: {type(e).__name__}: {e}")
-        return {"code": 403, "message": f"CF API error: {type(e).__name__}"}
+        logger.error(f"[RateLimit Sync] CF API error for zone {zone_id}: {type(e).__name__}: {e}")
+        return {"code": 403, "message": f"CF API error: {type(e).__name__}: {e}"}
     if not cf_data.get("success"):
-        raise HTTPException(status_code=500, detail="Failed to fetch from Cloudflare")
+        errors = cf_data.get("errors", [])
+        logger.error(f"[RateLimit Sync] CF API failed for zone {zone_id}: {errors}")
+        return {"code": 403, "message": f"CF API errors: {errors}"}
 
     rules = cf_data.get("result", [])
     now = datetime.utcnow()
@@ -63,6 +65,7 @@ async def sync_rules(
 
     synced = 0
     for rule in rules:
+        ratelimit = rule.get("ratelimit", {})
         doc = {
             "rule_id": rule["id"],
             "zone_id": zone_id,
@@ -70,6 +73,7 @@ async def sync_rules(
             "description": rule.get("description", ""),
             "expression": rule.get("expression", ""),
             "action": rule.get("action", "block"),
+            "ratelimit": ratelimit,
             "enabled": rule.get("enabled", True),
             "synced_at": now,
         }
@@ -80,15 +84,14 @@ async def sync_rules(
         )
         synced += 1
 
-    # Delete stale security rules (not updated in this sync)
     stale = await collection.delete_many({"zone_id": zone_id, "synced_at": {"$lt": now}})
-    logger.info(f"[Security Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}, stale_removed={stale.deleted_count}")
+    logger.info(f"[RateLimit Sync] Complete for account_id={account_id}, zone_id={zone_id}: synced={synced}/{len(rules)}, stale_removed={stale.deleted_count}")
     return {"code": 200, "data": {"synced": synced, "total": len(rules), "stale_removed": stale.deleted_count}}
 
 
 @zone_router.get("")
 async def list_rules(account_id: int, zone_id: str):
-    """Read security rules for a specific zone from MongoDB"""
+    """Read rate limit rules for a specific zone from MongoDB"""
     db = await get_db()
     collection = db[get_collection_name(account_id, zone_id)]
     rows = await collection.find({"account_id": str(account_id)}).to_list(length=5000)
@@ -99,7 +102,7 @@ async def list_rules(account_id: int, zone_id: str):
 
 @zone_router.delete("/sync")
 async def clear_rules(account_id: int, zone_id: str):
-    """Clear synced security rules from MongoDB"""
+    """Clear synced rate limit rules from MongoDB"""
     db = await get_db()
     collection = db[get_collection_name(account_id, zone_id)]
     result = await collection.delete_many({})

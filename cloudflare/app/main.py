@@ -5,7 +5,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, security_rules, whitelist, dns_domain
+from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, security_rules, whitelist, dns_domain, ratelimit, sync_rules, ddos, managed
 from app.services.db import close_pool, get_pool
 from app.services.redis import close_redis
 from app.services.mongodb import close_db, get_db
@@ -52,7 +52,14 @@ app.include_router(dns.router, prefix="/dns", tags=["DNS"])
 app.include_router(cache_rule.router, prefix="/cacheRule", tags=["CacheRule"])
 app.include_router(security_rules.router, prefix="/securityRules", tags=["SecurityRules"])
 app.include_router(whitelist.router, prefix="/whitelist", tags=["Whitelist"])
+app.include_router(ratelimit.router, prefix="/ratelimit", tags=["RateLimit"])
+app.include_router(ratelimit.zone_router, prefix="/zones/{zone_id}/ratelimit", tags=["RateLimit"])
+app.include_router(sync_rules.router, prefix="/syncRules", tags=["SyncRules"])
 app.include_router(dns_domain.router, prefix="/dnsDomain", tags=["DNS Domain"])
+app.include_router(ddos.router, prefix="/ddos", tags=["DDoS"])
+app.include_router(ddos.zone_router, prefix="/zones/{zone_id}/ddos", tags=["DDoS"])
+app.include_router(managed.router, prefix="/managed", tags=["Managed"])
+app.include_router(managed.zone_router, prefix="/zones/{zone_id}/managed", tags=["Managed"])
 
 
 @app.get("/health")

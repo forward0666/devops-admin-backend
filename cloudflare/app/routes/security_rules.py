@@ -1,6 +1,9 @@
+import logging
 from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 from app.services.mongodb import get_db
 
@@ -87,6 +90,7 @@ async def create_security_rule(body: dict):
         "projectId": project_id,
         "env": env,
         "name": name,
+        "description": (body.get("description") or "").strip(),
         "entries": norm_entries,
         "username": (body.get("username") or "").strip(),
         "userIp": (body.get("userIp") or "").strip(),
@@ -116,7 +120,7 @@ async def update_security_rule(rule_id: str, body: dict):
         raise HTTPException(status_code=404, detail="Rule not found")
 
     update_fields = {"updatedAt": datetime.utcnow()}
-    for field in ["name", "env", "username", "userIp", "operator"]:
+    for field in ["name", "description", "env", "username", "userIp", "operator"]:
         if body.get(field) is not None:
             update_fields[field] = body[field].strip() if isinstance(body[field], str) else body[field]
 

@@ -257,6 +257,41 @@ async def run_sync_cache(task: dict):
     logger.info(f"[Task] ✅ sync_cache '{task_name}' completed in {elapsed}s")
 
 
+async def run_sync_rule(task: dict):
+    """Trigger sync rule push for selected sync rules"""
+    start_time = time.monotonic()
+    task_id = task.get("id")
+    task_name = task.get("name", "")
+    config = task.get("config", {})
+    sync_rule_ids = config.get("sync_rule_ids", [])
+    if not sync_rule_ids:
+        logger.warning(f"[Task] sync_rule '{task_name}': no sync_rule_ids in config")
+        return
+
+    cf_url = await get_service_url("cloudflare")
+    failed = 0
+
+    async with httpx.AsyncClient(timeout=300) as client:
+        for rule_id in sync_rule_ids:
+            try:
+                url = f"{cf_url}/syncRules/{rule_id}/push"
+                logger.info(f"[Task] sync_rule: POST {url}")
+                resp = await client.post(url)
+                if resp.status_code == 200:
+                    logger.info(f"[Task] sync_rule '{task_name}': rule {rule_id} pushed")
+                else:
+                    failed += 1
+                    logger.warning(f"[Task] sync_rule '{task_name}': rule {rule_id} returned {resp.status_code}")
+            except BaseException as e:
+                failed += 1
+                logger.error(f"[Task] sync_rule '{task_name}': failed for rule {rule_id}: {type(e).__name__}: {e}")
+
+    status = "success" if failed == 0 else f"failed {failed}/{len(sync_rule_ids)}"
+    await execute("UPDATE task SET last_run_at=NOW(), last_status=%s WHERE id=%s", (status, task_id))
+    elapsed = round(time.monotonic() - start_time, 2)
+    logger.info(f"[Task] ✅ sync_rule '{task_name}' completed in {elapsed}s, status={status}")
+
+
 async def run_sync_domain(task: dict):
     """Sync Cloudflare domains (dns_records -> dns_domains)"""
     start_time = time.monotonic()
@@ -291,6 +326,7 @@ TASK_EXECUTORS = {
     "sync_security": run_sync_security,
     "sync_cache": run_sync_cache,
     "sync_domain": run_sync_domain,
+    "sync_rule": run_sync_rule,
 }
 
 

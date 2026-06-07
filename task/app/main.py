@@ -3,13 +3,17 @@ import asyncio
 import time
 
 from fastapi import FastAPI, Request
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("anyio").setLevel(logging.WARNING)
 from contextlib import asynccontextmanager
 
 from app.routes import task
 from app.services.db import get_pool, close_pool
 from app.services.scheduler import start_scheduler, stop_scheduler
-
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
