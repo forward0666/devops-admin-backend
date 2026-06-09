@@ -94,10 +94,12 @@ public class WhitelistServiceImpl implements WhitelistService {
                 "env", env != null ? env : "",
                 "operator", operator != null ? operator : ""
         );
+        log.info("🔵 CF Whitelist POST /whitelist: projectId={}, ruleId={}, ip={}", projectId, ruleId, ip);
         return webClient.post().uri("/whitelist")
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .doOnNext(resp -> log.info("🔵 CF Whitelist response: {}", resp))
                 .map(resp -> String.valueOf(resp.getOrDefault("message", "操作完成")))
                 .onErrorResume(e -> {
                     String errMsg = e.getMessage();
