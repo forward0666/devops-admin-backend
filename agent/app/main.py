@@ -4,7 +4,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import agent
+from app.routes import agent, mcp, tool, model, stream
 from app.services.db import get_pool, close_pool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -40,7 +40,11 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-app.include_router(agent.router, prefix="/agent", tags=["Agent"])
+app.include_router(agent.router, tags=["Agent"])
+app.include_router(mcp.router, tags=["MCP"])
+app.include_router(tool.router, tags=["Tool"])
+app.include_router(model.router, tags=["Model"])
+app.include_router(stream.router, tags=["Stream"])
 
 
 @app.get("/health")

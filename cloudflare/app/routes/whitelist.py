@@ -21,12 +21,90 @@ def _serialize(doc: dict) -> dict:
     return doc
 
 
+async def _get_rule_via_rulesets(cf, zone_id, cf_rule_id):
+    """Read a single rule via new Rulesets API."""
+    resp = cf.rulesets.list(zone_id=zone_id)
+    ruleset_id = None
+    for r in resp:
+        r_dict = r.model_dump()
+        if r_dict.get("phase") == "http_request_firewall_custom":
+            ruleset_id = r_dict["id"]
+            break
+    if not ruleset_id:
+        raise Exception("No http_request_firewall_custom ruleset found")
+    detail = cf.rulesets.get(ruleset_id=ruleset_id, zone_id=zone_id)
+    for rule in (detail.rules or []):
+        r = rule.model_dump()
+        if r.get("id") == cf_rule_id:
+            return r
+    raise Exception("Rule " + cf_rule_id + " not found in ruleset")
+
+
+async def _edit_rule_via_rulesets(cf, zone_id, cf_rule_id, expression, action=None, description=None, enabled=None):
+    """Edit a rule's expression via new Rulesets API."""
+    resp = cf.rulesets.list(zone_id=zone_id)
+    ruleset_id = None
+    for r in resp:
+        r_dict = r.model_dump()
+        if r_dict.get("phase") == "http_request_firewall_custom":
+            ruleset_id = r_dict["id"]
+            break
+    if not ruleset_id:
+        raise Exception("No http_request_firewall_custom ruleset found")
+    kwargs = {
+        "rule_id": cf_rule_id,
+        "ruleset_id": ruleset_id,
+        "zone_id": zone_id,
+        "expression": expression,
+    }
+    if action:
+        kwargs["action"] = action
+        if action == "skip":
+            kwargs["action_parameters"] = {"ruleset": "current"}
+    if description is not None:
+        kwargs["description"] = description
+    if enabled is not None:
+        kwargs["enabled"] = enabled
+    resp = cf.rulesets.rules.edit(**kwargs)
+    return resp
+
+
+async def _read_and_modify_expression(cf, zone_id, cf_rule_id, modifier_fn):
+    """
+    Generic helper: read rule via Rulesets API, apply modifier_fn(expr) -> new_expr, write back.
+    Returns (old_expr, new_expr, rule_data).
+    """
+    rule_data = await _get_rule_via_rulesets(cf, zone_id, cf_rule_id)
+    expr = rule_data.get("expression", "")
+    if not expr:
+        raise Exception("expression is empty")
+    new_expr = modifier_fn(expr)
+    if new_expr is None:
+        return (expr, None, rule_data)
+    await _edit_rule_via_rulesets(
+        cf, zone_id, cf_rule_id, new_expr,
+        action=rule_data.get("action", "block"),
+        description=rule_data.get("description", ""),
+        enabled=not rule_data.get("paused", False),
+    )
+    return (expr, new_expr, rule_data)
+
+
+async def _find_token_for_zone(db, accounts, zone_id):
+    for acc in accounts:
+        coll_name = "account_" + str(acc["id"]) + "_zones"
+        zone_doc = await db[coll_name].find_one({"zone_id": zone_id})
+        if zone_doc:
+            return acc["api_key"]
+    return None
+
+
 @router.get("")
 async def list_whitelists(projectId: int = Query(...), env: str = Query(None)):
     db = await get_db()
     query = {"projectId": projectId}
     if env:
-        query["env"] = {"$regex": f"^{env}$", "$options": "i"}
+        query["env"] = {"$regex": "^" + env + "$", "$options": "i"}
     rows = await db[WHITELIST_COLLECTION].find(query).sort("createdAt", -1).to_list(length=500)
     return {"code": 200, "data": [_serialize(r) for r in rows]}
 
@@ -74,70 +152,39 @@ async def add_whitelist_ip(body: dict):
             errors.append({"entry": entry, "reason": "missing zoneId or ruleId"})
             continue
 
-        token = None
-        for acc in accounts:
-            coll_name = f"account_{acc['id']}_zones"
-            zone_doc = await db[coll_name].find_one({"zone_id": zone_id})
-            if zone_doc:
-                token = acc["api_key"]
-                break
-
+        token = await _find_token_for_zone(db, accounts, zone_id)
         if not token:
             logger.error(f"[4] Account not found for zone {zone_id}")
             errors.append({"zoneId": zone_id, "reason": "account not found for zone"})
             continue
         logger.info(f"[4] Found token for zone")
 
+        def add_ip_modifier(expr):
+            for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
+                match = re.search(pat, expr)
+                if match:
+                    existing_ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
+                    logger.info(f"[6] Current IPs: {existing_ips}, adding: {ip}")
+                    if ip in existing_ips:
+                        logger.info(f"[6] IP already exists, skipping CF update")
+                        results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": expr, "skipped": True})
+                        return None  # signal: skip
+                    existing_ips.append(ip)
+                    new_expr = re.sub(pat, "(ip.src in {" + " ".join(existing_ips) + "})", expr)
+                    logger.info(f"[6] New expression: '{new_expr}'")
+                    return new_expr
+            return None
+
         try:
             cf = await cf_client.async_get_client(token)
-            resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
-            raw = resp.model_dump()
-            filter_data = raw.get("filter") or {}
-            expr = (filter_data.get("expression", "") if isinstance(filter_data, dict) else "") or raw.get("expression", "") or ""
-            filter_id = (filter_data.get("id", "") if isinstance(filter_data, dict) else "") or ""
-            logger.info(f"[5] Expression: '{expr}', filter_id={filter_id}")
+            old_expr, new_expr, rule_data = await _read_and_modify_expression(cf, zone_id, cf_rule_id, add_ip_modifier)
+            if new_expr:
+                logger.info(f"[7] SUCCESS")
+                results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": new_expr})
+            # if new_expr is None, modifier already appended result (skipped) or no pattern matched
         except Exception as e:
-            logger.error(f"[5] CF API error: {type(e).__name__}: {e}")
+            logger.error(f"[5/7] CF API error: {type(e).__name__}: {e}")
             errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": f"CF API error: {e}"})
-            continue
-
-        if not expr:
-            logger.error(f"[5] Expression is empty")
-            errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": "expression is empty"})
-            continue
-
-        new_expr = None
-        for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
-            match = re.search(pat, expr)
-            if match:
-                existing_ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
-                logger.info(f"[6] Current IPs: {existing_ips}, adding: {ip}")
-                if ip in existing_ips:
-                    logger.info(f"[6] IP already exists, skipping CF update")
-                    results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": expr, "skipped": True})
-                    break
-                existing_ips.append(ip)
-                new_expr = re.sub(pat, f"(ip.src in {{{' '.join(existing_ips)}}})", expr)
-                logger.info(f"[6] New expression: '{new_expr}'")
-                break
-
-        if not new_expr:
-            logger.error(f"[6] No pattern matched for: '{expr}'")
-            errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": f"expression has no ip.src in pattern: {expr}"})
-            continue
-
-        try:
-            if filter_id:
-                logger.info(f"[7] Updating filter {filter_id}")
-                cf.filters.update(filter_id=filter_id, zone_id=zone_id, expression=new_expr)
-            else:
-                logger.info(f"[7] Creating new filter")
-                cf.filters.create(zone_id=zone_id, expression=new_expr)
-            logger.info(f"[7] SUCCESS")
-            results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": new_expr})
-        except Exception as e:
-            logger.error(f"[7] CF update error: {type(e).__name__}: {e}")
-            errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": f"CF update error: {e}"})
 
     doc = {
         "projectId": project_id,
@@ -157,7 +204,7 @@ async def add_whitelist_ip(body: dict):
     if errors and not results:
         raise HTTPException(status_code=400, detail={"message": "All entries failed", "errors": errors})
 
-    return {"code": 200, "data": {"updated": len(results), "errors": errors}, "message": f"已添加至规则 [{rule.get('name', '')}]"}
+    return {"code": 200, "data": {"updated": len(results), "errors": errors}, "message": "已添加至规则 [" + rule.get("name", "") + "]"}
 
 
 @router.put("")
@@ -178,14 +225,12 @@ async def update_whitelist_ip(body: dict):
 
     db = await get_db()
 
-    # Check how many records share the same old IP
-    shared_query: dict = {"ip": old_ip, "projectId": project_id}
+    shared_query = {"ip": old_ip, "projectId": project_id}
     if rule_id:
         shared_query["ruleId"] = rule_id
     shared_count = await db[WHITELIST_COLLECTION].count_documents(shared_query)
     logger.info(f"[1] Records sharing IP {old_ip}: {shared_count}")
 
-    # Step 1: Remove old IP from CF only if no other users share it
     if shared_count <= 1:
         logger.info(f"[2] Only one user, removing old IP from CF")
         if rule_id:
@@ -193,16 +238,13 @@ async def update_whitelist_ip(body: dict):
     else:
         logger.info(f"[2] {shared_count} users share this IP, skipping CF remove")
 
-    # Step 2: Add new IP to CF
     if rule_id:
         logger.info(f"[3] Adding new IP to CF")
         await _add_ip_to_cf(db, project_id, rule_id, new_ip)
 
-    # Step 3: Update only THIS user's whitelist record (not all records with old IP)
-    update_query: dict = {"ip": old_ip, "projectId": project_id}
+    update_query = {"ip": old_ip, "projectId": project_id}
     if rule_id:
         update_query["ruleId"] = rule_id
-    # Only update one record (the one being edited)
     record_id = body.get("id")
     if record_id:
         try:
@@ -216,19 +258,18 @@ async def update_whitelist_ip(body: dict):
         await db[WHITELIST_COLLECTION].update_one(update_query, {"$set": {"ip": new_ip, "updatedAt": datetime.utcnow()}})
 
     logger.info(f"[4] Done")
-    return {"code": 200, "message": f"IP updated from {old_ip} to {new_ip}"}
+    return {"code": 200, "message": "IP updated from " + old_ip + " to " + new_ip}
 
 
-async def _remove_ip_from_cf(db, project_id: int, rule_id: str, ip: str):
-    """Helper: remove IP from CF filter expression"""
+async def _remove_ip_from_cf(db, project_id, rule_id, ip):
     try:
         oid = ObjectId(rule_id)
     except Exception:
-        return None
+        return
 
     rule = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
     if not rule:
-        return None
+        return
 
     entries = rule.get("entries", [])
     accounts = await query_all("SELECT id, api_key FROM account")
@@ -239,46 +280,37 @@ async def _remove_ip_from_cf(db, project_id: int, rule_id: str, ip: str):
         if not zone_id or not cf_rule_id:
             continue
 
-        token = None
-        for acc in accounts:
-            if await db[f"account_{acc['id']}_zones"].find_one({"zone_id": zone_id}):
-                token = acc["api_key"]
-                break
+        token = await _find_token_for_zone(db, accounts, zone_id)
         if not token:
             continue
 
-        try:
-            cf = await cf_client.async_get_client(token)
-            resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
-            raw = resp.model_dump()
-            filter_data = raw.get("filter") or {}
-            expr = (filter_data.get("expression", "") if isinstance(filter_data, dict) else "") or ""
-            filter_id = (filter_data.get("id", "") if isinstance(filter_data, dict) else "") or ""
-
+        def remove_ip_modifier(expr):
             for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
                 match = re.search(pat, expr)
                 if match:
                     ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
                     if ip in ips:
                         ips.remove(ip)
-                    new_expr = re.sub(pat, f"(ip.src in {{{' '.join(ips)}}})", expr) if ips else re.sub(pat, "", expr).strip()
-                    if filter_id and new_expr:
-                        cf.filters.update(filter_id=filter_id, zone_id=zone_id, expression=new_expr)
-                    break
+                    new_expr = re.sub(pat, "(ip.src in {" + " ".join(ips) + "})", expr) if ips else re.sub(pat, "", expr).strip()
+                    return new_expr if new_expr else None
+            return None
+
+        try:
+            cf = await cf_client.async_get_client(token)
+            await _read_and_modify_expression(cf, zone_id, cf_rule_id, remove_ip_modifier)
         except Exception as e:
             logger.error(f"_remove_ip_from_cf error: {e}")
 
 
-async def _add_ip_to_cf(db, project_id: int, rule_id: str, ip: str):
-    """Helper: add IP to CF filter expression"""
+async def _add_ip_to_cf(db, project_id, rule_id, ip):
     try:
         oid = ObjectId(rule_id)
     except Exception:
-        return None
+        return
 
     rule = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
     if not rule:
-        return None
+        return
 
     entries = rule.get("entries", [])
     accounts = await query_all("SELECT id, api_key FROM account")
@@ -289,39 +321,30 @@ async def _add_ip_to_cf(db, project_id: int, rule_id: str, ip: str):
         if not zone_id or not cf_rule_id:
             continue
 
-        token = None
-        for acc in accounts:
-            if await db[f"account_{acc['id']}_zones"].find_one({"zone_id": zone_id}):
-                token = acc["api_key"]
-                break
+        token = await _find_token_for_zone(db, accounts, zone_id)
         if not token:
             continue
 
-        try:
-            cf = await cf_client.async_get_client(token)
-            resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
-            raw = resp.model_dump()
-            filter_data = raw.get("filter") or {}
-            expr = (filter_data.get("expression", "") if isinstance(filter_data, dict) else "") or ""
-            filter_id = (filter_data.get("id", "") if isinstance(filter_data, dict) else "") or ""
-
+        def add_ip_modifier(expr):
             for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
                 match = re.search(pat, expr)
                 if match:
                     ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
                     if ip not in ips:
                         ips.append(ip)
-                    new_expr = re.sub(pat, f"(ip.src in {{{' '.join(ips)}}})", expr)
-                    if filter_id:
-                        cf.filters.update(filter_id=filter_id, zone_id=zone_id, expression=new_expr)
-                    break
+                    new_expr = re.sub(pat, "(ip.src in {" + " ".join(ips) + "})", expr)
+                    return new_expr
+            return None
+
+        try:
+            cf = await cf_client.async_get_client(token)
+            await _read_and_modify_expression(cf, zone_id, cf_rule_id, add_ip_modifier)
         except Exception as e:
             logger.error(f"_add_ip_to_cf error: {e}")
 
 
 @router.delete("/remove")
 async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(None), ip: str = Query(...), username: str = Query(None)):
-    """Remove IP from CF filter expression"""
     logger.info(f"========== Remove IP ========== projectId={projectId}, ruleId={ruleId}, ip={ip}")
     db = await get_db()
 
@@ -356,84 +379,55 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
                 errors.append({"entry": entry, "reason": "missing zoneId or ruleId"})
                 continue
 
-            token = None
-            for acc in accounts:
-                coll_name = f"account_{acc['id']}_zones"
-                if await db[coll_name].find_one({"zone_id": zone_id}):
-                    token = acc["api_key"]
-                    break
+            token = await _find_token_for_zone(db, accounts, zone_id)
             if not token:
                 logger.error(f"[4] Account not found for zone {zone_id}")
                 errors.append({"zoneId": zone_id, "reason": "account not found"})
                 continue
             logger.info(f"[4] Found token for zone")
 
+            ip_found = [False]
+            original_expr = [None]
+
+            def remove_ip_modifier(expr):
+                original_expr[0] = expr
+                for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
+                    match = re.search(pat, expr)
+                    if match:
+                        ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
+                        logger.info(f"[6] Current IPs: {ips}, removing: {ip}")
+                        if ip in ips:
+                            ips.remove(ip)
+                            ip_found[0] = True
+                        else:
+                            logger.warning(f"[6] IP {ip} not found in expression, skipping CF update")
+                        logger.info(f"[6] Remaining IPs: {ips}")
+                        if ips:
+                            return re.sub(pat, "(ip.src in {" + " ".join(ips) + "})", expr)
+                        else:
+                            return re.sub(pat, "", expr).strip() or None
+                return None
+
             try:
                 cf = await cf_client.async_get_client(token)
-                resp = cf.firewall.rules.get(rule_id=cf_rule_id, zone_id=zone_id)
-                raw = resp.model_dump()
-                filter_data = raw.get("filter") or {}
-                expr = (filter_data.get("expression", "") if isinstance(filter_data, dict) else "") or ""
-                filter_id = (filter_data.get("id", "") if isinstance(filter_data, dict) else "") or ""
-                logger.info(f"[5] Expression: '{expr}', filter_id={filter_id}")
-            except Exception as e:
-                logger.error(f"[5] CF API error: {type(e).__name__}: {e}")
-                errors.append({"zoneId": zone_id, "reason": f"CF API error: {e}"})
-                continue
-
-            if not expr:
-                logger.error(f"[5] Expression is empty")
-                errors.append({"zoneId": zone_id, "reason": "expression is empty"})
-                continue
-
-            new_expr = None
-            ip_found = False
-            for pat in [r'\(ip\.src in \{([^}]*)\}\)', r'ip\.src in \{([^}]*)\}']:
-                match = re.search(pat, expr)
-                if match:
-                    ips = [x.strip() for x in match.group(1).replace(',', ' ').split() if x.strip()]
-                    logger.info(f"[6] Current IPs: {ips}, removing: {ip}")
-                    if ip in ips:
-                        ips.remove(ip)
-                        ip_found = True
-                    else:
-                        logger.warning(f"[6] IP {ip} not found in expression, skipping CF update")
-                    logger.info(f"[6] Remaining IPs: {ips}")
-                    if ips:
-                        new_expr = re.sub(pat, f"(ip.src in {{{' '.join(ips)}}})", expr)
-                    else:
-                        new_expr = re.sub(pat, "", expr).strip()
-                    logger.info(f"[6] New expression: '{new_expr}'")
-                    break
-
-            if not ip_found:
-                results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": expr, "ipNotFound": True})
-                continue
-
-            if new_expr is None:
-                logger.error(f"[6] No pattern matched for: '{expr}'")
-                errors.append({"zoneId": zone_id, "reason": f"expression has no ip.src pattern: {expr}"})
-                continue
-
-            try:
-                if filter_id:
-                    if new_expr:
-                        logger.info(f"[7] Updating filter {filter_id}")
-                        cf.filters.update(filter_id=filter_id, zone_id=zone_id, expression=new_expr)
-                    else:
-                        logger.info(f"[7] Deleting filter {filter_id} (no IPs left)")
-                        cf.filters.delete(filter_id=filter_id, zone_id=zone_id)
+                old_expr, new_expr, rule_data = await _read_and_modify_expression(cf, zone_id, cf_rule_id, remove_ip_modifier)
+                logger.info(f"[5] Expression: '{old_expr}'")
+                if not ip_found[0]:
+                    results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": old_expr, "ipNotFound": True})
+                elif new_expr:
                     logger.info(f"[7] SUCCESS")
-                else:
-                    logger.warning(f"[7] No filter_id, skipping update")
-                results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": new_expr})
+                    results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": new_expr})
+                elif new_expr is None:
+                    # Expression became empty after removal — rule still exists but with empty expr
+                    logger.warning(f"[7] Expression became empty after removing IP")
+                    results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": "", "empty": True})
             except Exception as e:
-                logger.error(f"[7] CF update error: {type(e).__name__}: {e}")
-                errors.append({"zoneId": zone_id, "reason": f"CF update error: {e}"})
+                logger.error(f"[5/7] CF API error: {type(e).__name__}: {e}")
+                errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": f"CF API error: {e}"})
     else:
         logger.info("[1] No ruleId provided, skipping CF update")
 
-    delete_query: dict = {"ip": ip, "projectId": projectId}
+    delete_query = {"ip": ip, "projectId": projectId}
     if ruleId:
         delete_query["ruleId"] = ruleId
     if username:
@@ -445,7 +439,7 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
         raise HTTPException(status_code=400, detail={"message": "All entries failed", "errors": errors})
 
     logger.info(f"========== Remove IP Done ==========")
-    return {"code": 200, "data": {"removed": len(results), "deleted": delete_result.deleted_count, "errors": errors}, "message": f"IP removed, {delete_result.deleted_count} record(s) deleted"}
+    return {"code": 200, "data": {"removed": len(results), "deleted": delete_result.deleted_count, "errors": errors}, "message": "IP removed, " + str(delete_result.deleted_count) + " record(s) deleted"}
 
 
 @router.delete("/{wl_id}")
