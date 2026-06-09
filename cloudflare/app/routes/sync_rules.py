@@ -701,7 +701,7 @@ async def push_sync_rule(rule_id: int):
                         src_proxied = src.get("proxied", False)
                         tgt_proxied = tgt.get("proxied", False)
                         if src_content != tgt_content or src_ttl != tgt_ttl or src_proxied != tgt_proxied:
-                            update_data = {"content": src_content, "ttl": src_ttl, "proxied": src_proxied, "name": src.get("name"), "type": src.get("type")}
+                            update_data = {"content": src_content, "ttl": src_ttl, "proxied": src_proxied, "name": tgt.get("name"), "type": src.get("type")}
                             result = cf_client.update_dns(token, target_zone_id, tgt["id"], update_data)
                             if result.get("success"):
                                 pushed_update += 1
