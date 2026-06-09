@@ -279,7 +279,8 @@ public class TextUpdateHandler implements UpdateHandler {
                 .flatMap(projectId -> {
                     return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env, operatorName)
                             .flatMap(result -> {
-                                String text = "✅ " + result + "\n\nIP: " + ip + " | 用户: " + (username.isEmpty() ? "未填写" : username) + "\n操作人: " + operatorName + "\n\n⏳ 此消息将在 30 秒后自动销毁";
+                                String icon = result.startsWith("失败") ? "❌" : "✅";
+                                String text = icon + " " + result + "\n\nIP: " + ip + " | 用户: " + (username.isEmpty() ? "未填写" : username) + "\n操作人: " + operatorName + "\n\n⏳ 此消息将在 30 秒后自动销毁";
                                 // 删除用户发送的原始消息 + 发送回复 + 调度删除
                                 return botClientService.deleteMessage(token, chatId, userMessageId)
                                         .onErrorResume(e -> Mono.empty())
