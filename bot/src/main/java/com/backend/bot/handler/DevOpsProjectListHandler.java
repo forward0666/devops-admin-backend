@@ -72,10 +72,7 @@ public class DevOpsProjectListHandler implements CallbackActionHandler {
                 || callbackData.startsWith("callback_data_" + PROJECT_SELECT_PREFIX)
                 || callbackData.equals("callback_data_" + PROJECT_INFO_ACTION)
                 || callbackData.equals("callback_data_" + PROJECT_MEMBER_ACTION)
-                || callbackData.equals("callback_data_" + PROJECT_DOMAIN_ACTION)
-                || callbackData.equals("callback_data_" + PROJECT_MIDDLEWARE_ACTION)
-                || callbackData.equals("callback_data_" + PURGECACHE_ACTION)
-                || callbackData.equals("callback_data_" + WHITELIST_ACTION);
+                || callbackData.equals("callback_data_" + PROJECT_MIDDLEWARE_ACTION);
     }
 
     @Override
