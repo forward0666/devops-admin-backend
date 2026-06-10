@@ -52,16 +52,6 @@ public class DevOpsProjectListHandler implements CallbackActionHandler {
     private static final String PROJECT_INFO_ACTION = "PROJECT_INFO_ACTION";
     private static final String PROJECT_MEMBER_ACTION = "PROJECT_MEMBER_ACTION";
     private static final String PROJECT_DOMAIN_ACTION = "PROJECT_DOMAIN_ACTION";
-    private static final String PROJECT_DOMAIN_PROD_ACTION = "PROJECT_DOMAIN_PROD_ACTION";
-    private static final String PROJECT_DOMAIN_UAT_ACTION = "PROJECT_DOMAIN_UAT_ACTION";
-    private static final String PROJECT_DOMAIN_TEST_ACTION = "PROJECT_DOMAIN_TEST_ACTION";
-    private static final String PROJECT_DOMAIN_DEV_ACTION = "PROJECT_DOMAIN_DEV_ACTION";
-    private static final String PROJECT_PURGECACHE_PROD_ACTION = "PROJECT_PURGECACHE_PROD_ACTION";
-    private static final String PROJECT_PURGECACHE_UAT_ACTION = "PROJECT_PURGECACHE_UAT_ACTION";
-    private static final String PROJECT_PURGECACHE_TEST_ACTION = "PROJECT_PURGECACHE_TEST_ACTION";
-    private static final String PROJECT_PURGECACHE_DEV_ACTION = "PROJECT_PURGECACHE_DEV_ACTION";
-    private static final String PROJECT_WHITELIST_PROD_ACTION = "PROJECT_WHITELIST_PROD_ACTION";
-    private static final String PROJECT_WHITELIST_TEST_ACTION = "PROJECT_WHITELIST_TEST_ACTION";
     private static final String PROJECT_MIDDLEWARE_ACTION = "PROJECT_MIDDLEWARE_ACTION";
     private static final String PURGECACHE_ACTION = "PURGECACHE_ACTION";
     private static final String WHITELIST_ACTION = "WHITELIST_ACTION";
@@ -78,12 +68,11 @@ public class DevOpsProjectListHandler implements CallbackActionHandler {
     @Override
     public boolean supports(String callbackData) {
         if (callbackData == null) return false;
-        String cd = callbackData.replace("callback_data_", "");
-        return cd.equals(PROJECT_LIST_ACTION)
-                || cd.startsWith(PROJECT_SELECT_PREFIX)
-                || cd.equals(PROJECT_INFO_ACTION)
-                || cd.equals(PROJECT_MEMBER_ACTION)
-                || cd.equals(PROJECT_MIDDLEWARE_ACTION);
+        return callbackData.equals("callback_data_" + PROJECT_LIST_ACTION)
+                || callbackData.startsWith("callback_data_" + PROJECT_SELECT_PREFIX)
+                || callbackData.equals("callback_data_" + PROJECT_INFO_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_MEMBER_ACTION)
+                || callbackData.equals("callback_data_" + PROJECT_MIDDLEWARE_ACTION);
     }
 
     @Override
@@ -227,7 +216,7 @@ public class DevOpsProjectListHandler implements CallbackActionHandler {
         return switch (action) {
             case PROJECT_INFO_ACTION -> fetchProjectInfo(prefix, token, chatId, messageId, projectId, tgUsername);
             case PROJECT_MEMBER_ACTION -> fetchProjectMembers(prefix, token, chatId, messageId, projectId, tgUsername);
-            case PROJECT_DOMAIN_ACTION -> fetchProjectDomains(prefix, token, chatId, messageId, projectId, null, tgUsername);
+            case PROJECT_DOMAIN_ACTION -> fetchProjectDomains(prefix, token, chatId, messageId, projectId, tgUsername);
             case PROJECT_MIDDLEWARE_ACTION -> fetchProjectMiddlewares(prefix, token, chatId, messageId, projectId, tgUsername);
             case PURGECACHE_ACTION -> sendPurgeCacheMenu(token, chatId, projectId);
             case WHITELIST_ACTION -> sendWhitelistMenu(token, chatId, projectId);
@@ -330,16 +319,13 @@ public class DevOpsProjectListHandler implements CallbackActionHandler {
                 });
     }
 
-    private Mono<Void> fetchProjectDomains(String prefix, String token, Long chatId, Long messageId, Long projectId, String env, String tgUsername) {
-        String cacheKey = "bot:devops:domains:" + projectId + ":" + env;
+    private Mono<Void> fetchProjectDomains(String prefix, String token, Long chatId, Long messageId, Long projectId, String tgUsername) {
+        String cacheKey = "bot:devops:domains:" + projectId;
         WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl())
                 .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot").build();
 
-        String uri = "/domain/list?projectId={projectId}&env={env}";
-        if (env == null || env.isEmpty()) uri = "/domain/list?projectId={projectId}";
-
         return cacheOrFetch(cacheKey, Duration.ofSeconds(60),
-                webClient.get().uri(uri, projectId, env).retrieve())
+                webClient.get().uri("/domain/list?projectId={projectId}", projectId).retrieve())
                 .flatMap(response -> {
                     Object dataObj = response.get("data");
                     List<Map<String, Object>> domains;
