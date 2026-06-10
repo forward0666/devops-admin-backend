@@ -48,6 +48,14 @@ public class OtherCommandHandler implements UpdateHandler {
         Long chatId = botUpdate.message().chat().id();
         String type = botUpdate.message().chat().type();
 
+        // 群聊中，命令必须包含 @当前 bot username，否则跳过（避免每个 bot 都回复）
+        if (chatId < 0 && botEntity.getBotUsername() != null) {
+            String botMention = "@" + botEntity.getBotUsername();
+            if (!text.contains(botMention)) {
+                return Mono.empty();
+            }
+        }
+
         // --- 仅处理非 /start 的命令 ---
         if (text != null && text.startsWith("/")) {
             // 这是处理 /help, /settings 等其他命令的地方

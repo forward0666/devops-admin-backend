@@ -73,7 +73,7 @@ public class WhitelistPromptHandler implements CallbackActionHandler {
 
             // 1. 🌟 设置会话状态 (为了接收用户的后续回复)
             // 这里将 originalMessageId 存入会话，以便后续 TextUpdateHandler 删除提示消息
-            Mono<Void> updateSessionMono = userSessionService.updateUserSession(userId, sessionState, originalMessageId);
+            Mono<Void> updateSessionMono = userSessionService.updateUserSession(userId, sessionState, originalMessageId, botEntity.getBotName());
 
             // 2. 🌟 准备响应文本 (包含操作人信息和倒计时提示)
             String newText = String.format(" **%s** 选择了 **%s**，\n请回复此消息，输入以下格式信息：\n\n`%s`\n\n*⏳ 此提示消息将在 %d 秒后自动销毁，请尽快操作。*",

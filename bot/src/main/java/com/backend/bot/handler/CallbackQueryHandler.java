@@ -52,12 +52,12 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
 
         // ⚠️ 关键：flatMap 里返回 Mono<Void> 也会触发 switchIfEmpty（因为 Mono<Void> 不发射元素）
         // 用 hasSession boolean 避免这个问题
-        return userSessionService.getUserSession(userId)
+        return userSessionService.getUserSession(userId, context.botEntity().getBotName())
                 .map(session -> true)
                 .defaultIfEmpty(false)
                 .flatMap(hasSession -> {
                     if (hasSession) {
-                        return userSessionService.getUserSession(userId)
+                        return userSessionService.getUserSession(userId, context.botEntity().getBotName())
                                 .flatMap(session -> {
                                     String state = session.getState();
                                     if (TelegramConstants.SESSION_STATE_PROCESSING_START.equals(state)) {
@@ -74,7 +74,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                         // 没有会话
                         if (isMenuNavigation) {
                             log.info("{}⚠️ User {} has no session, clicked navigation: {}. Creating temp session.", logPrefix, userId, callbackData);
-                            return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null)
+                            return userSessionService.updateUserSession(userId, "TEMPORARY_SESSION", null, context.botName())
                                     .contextWrite(contextView)
                                     .then(processCallbackNormally(context, logPrefix, contextView, logIdentifier, userId, callbackData, callbackQueryId));
                         } else {
@@ -103,10 +103,12 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
                 .contextWrite(contextView)
                 .subscribe(null, e -> log.error("{}❌ Failed to answer callback: {}", logPrefix, e.getMessage()));
 
-        // 执行回调处理器
+        // 执行回调处理器 - 按顺序尝试，handler 通过发送消息/标记来表明已处理
+        // 由于所有 handler 返回 Mono<Void>（不发射元素），无法用 switchIfEmpty 区分
+        // 改为：第一个 supports 匹配的 handler 直接执行，不再 fallback
         Mono<Void> handlerMono = actionHandlers.stream()
                 .sorted(Comparator.comparingInt(CallbackActionHandler::getOrder))
-                .filter(handler -> handler.supports(callbackData))
+                .filter(handler -> handler.supports(callbackData, context.botEntity()))
                 .findFirst()
                 .map(handler -> {
                     log.info("{}🚀 {} Dispatching {} to {}", logPrefix, logIdentifier, callbackData, handler.getClass().getSimpleName());
@@ -117,7 +119,7 @@ public class CallbackQueryHandler extends AbstractUpdateHandler {
         // Skip session clear for WhitelistIpHandler (needs to set session state)
         final CallbackActionHandler finalHandler = actionHandlers.stream()
                 .sorted(Comparator.comparingInt(CallbackActionHandler::getOrder))
-                .filter(h -> h.supports(callbackData))
+                .filter(h -> h.supports(callbackData, context.botEntity()))
                 .findFirst().orElse(null);
         boolean shouldClearSession = !(finalHandler instanceof WhitelistIpHandler);
 

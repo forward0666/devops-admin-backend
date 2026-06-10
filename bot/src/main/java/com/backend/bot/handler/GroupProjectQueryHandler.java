@@ -171,7 +171,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
         return cacheOrFetch(membersCacheKey, USER_CACHE_TTL,
                 webClient.get().uri("/projectMember?projectId={projectId}", projectId).retrieve())
                 .map(response -> {
-                    log.debug("{}🔍 Member response: {}", traceLogPrefix, response);
+                    log.info("{}🔍 Member response: {}", traceLogPrefix, response);
                     Object code = response.get("code");
                     if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
                         return "None";
@@ -187,7 +187,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                     } else {
                         members = List.of();
                     }
-                    log.debug("{}🔍 Members count: {}, tgUsername: {}", traceLogPrefix, members.size(), tgUsername);
+                    log.info("{}🔍 Members count: {}, tgUsername: {}", traceLogPrefix, members.size(), tgUsername);
                     return members.stream()
                             .filter(m -> tgUsername.equalsIgnoreCase(String.valueOf(getVal(m, "tgUsername", ""))))
                             .map(m -> String.valueOf(getVal(m, "projectRole", "Member")))

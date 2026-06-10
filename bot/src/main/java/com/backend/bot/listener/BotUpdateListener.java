@@ -4,6 +4,7 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.UserDto;
 import com.backend.bot.event.BotUpdateEvent;
 import com.backend.bot.service.BotCoreService;
+import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.BotUpdateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import filter.TraceIdFilter;
@@ -30,6 +31,7 @@ public class BotUpdateListener {
     private final Scheduler blockingTaskScheduler;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final UserSessionService userSessionService;
 
     private static final int MAX_UNAUTHORIZED_ATTEMPTS = 2;
     private static final Duration BLACKLIST_TTL = Duration.ofDays(30);
@@ -40,13 +42,15 @@ public class BotUpdateListener {
 
             @Qualifier("blockingTaskScheduler") Scheduler blockingTaskScheduler,
             ReactiveStringRedisTemplate redisTemplate,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            UserSessionService userSessionService) {
         this.botCoreService = botCoreService;
         this.botUpdateHandlerService = botUpdateHandlerService;
 
         this.blockingTaskScheduler = blockingTaskScheduler;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.userSessionService = userSessionService;
     }
 
     @EventListener
@@ -112,19 +116,34 @@ public class BotUpdateListener {
                             });
                 })
                 .flatMap(botConfigEntity -> {
-                    String logMessage = "";
-                    if (botUpdate.message() != null && botUpdate.message().text() != null) {
-                        logMessage = String.format("Routing TEXT message (Length: %d)", botUpdate.message().text().length());
-                    } else if (botUpdate.callbackQuery() != null) {
-                        logMessage = "Routing CALLBACK query";
-                    } else {
-                        logMessage = "Routing OTHER update type";
+                    // 群聊：纯文本消息（非命令、非 @mention、非 callback）检查 session，无 session 则跳过
+                    if (chatId != null && chatId < 0
+                            && botUpdate.callbackQuery() == null
+                            && botUpdate.message() != null
+                            && botUpdate.message().text() != null) {
+                        String text = botUpdate.message().text().trim();
+                        boolean isCommand = text.startsWith("/");
+                        boolean isMention = text.startsWith("@" + botName) || text.equals("@" + botName);
+                        if (!isCommand && !isMention) {
+                            // 非命令非mention，检查用户是否有 active session
+                            return userSessionService.getUserSession(userId, botName)
+                                    .hasElement()
+                                    .flatMap(hasSession -> {
+                                        if (Boolean.FALSE.equals(hasSession)) {
+                                            log.info("⏭️ [traceId={}] Skipping group text for bot {} (no session): {}", traceId, botName, text);
+                                            return Mono.empty();
+                                        }
+                                        log.info("✅ [traceId={}] Bot {} has session, routing to handler", traceId, botName);
+                                        return routeToUpdateHandler(traceId, botConfigEntity, botUpdate);
+                                    })
+                                    .onErrorResume(e -> {
+                                        log.error("❌ [traceId={}] Session check error for bot {}: {}", traceId, botName, e.getMessage(), e);
+                                        return Mono.empty();
+                                    });
+                        }
                     }
 
-                    log.info("[traceId={}]✅ Update passed filters. {} to BotUpdateHandlerService.",
-                            traceId, logMessage);
-
-                    return botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate);
+                    return routeToUpdateHandler(traceId, botConfigEntity, botUpdate);
                 })
                 .contextWrite(context -> {
                     if (traceId != null) {
@@ -139,6 +158,19 @@ public class BotUpdateListener {
         processingPipeline
                 .subscribeOn(blockingTaskScheduler)
                 .subscribe();
+    }
+
+    private Mono<Void> routeToUpdateHandler(String traceId, com.backend.bot.entity.BotConfigEntity botConfigEntity, BotUpdateDto botUpdate) {
+        String logMessage = "";
+        if (botUpdate.message() != null && botUpdate.message().text() != null) {
+            logMessage = String.format("Routing TEXT message (Length: %d)", botUpdate.message().text().length());
+        } else if (botUpdate.callbackQuery() != null) {
+            logMessage = "Routing CALLBACK query";
+        } else {
+            logMessage = "Routing OTHER update type";
+        }
+        log.info("[traceId={}]✅ Update passed filters. {} to BotUpdateHandlerService.", traceId, logMessage);
+        return botUpdateHandlerService.handleUpdate(botConfigEntity, botUpdate);
     }
 
     private String extractUserInfo(BotUpdateDto update) {

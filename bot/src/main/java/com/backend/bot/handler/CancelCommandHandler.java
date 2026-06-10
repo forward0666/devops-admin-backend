@@ -53,7 +53,7 @@ public class CancelCommandHandler extends AbstractUpdateHandler {
         log.info("{}✅ Handling /cancel command. Identity: {}", logPrefix, identityLog);
 
         // 1. 检查用户是否有活动会话
-        Mono<String> messageMono = userSessionService.getUserSession(userId)
+        Mono<String> messageMono = userSessionService.getUserSession(userId, context.botEntity().getBotName())
                 .map(session -> {
                     String state = session.getState();
                     log.info("{}⚠️ User {} cancelled operation with state: {}", logPrefix, userId, state);

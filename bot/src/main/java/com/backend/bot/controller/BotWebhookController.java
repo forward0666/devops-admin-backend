@@ -127,8 +127,8 @@ public class BotWebhookController {
 
             return botCoreService.findByBotName(botName)
                     .timeout(Duration.ofSeconds(3))
-                    .flatMap(bot -> {
-                        if (bot.getStatus() != null && bot.getStatus() != 1) {
+                    .flatMap(botEntity -> {
+                        if (botEntity.getStatus() != null && botEntity.getStatus() != 1) {
                             log.info("⛔ Bot {} is disabled, ignoring message", botName);
                             return Mono.<Void>empty();
                         }
@@ -142,34 +142,29 @@ public class BotWebhookController {
                                 .flatMap(isBlacklisted -> {
                                     if (Boolean.TRUE.equals(isBlacklisted)) {
                                         log.info("🔒 BLACKLISTED group chat: botName={}, userId={}", botName, user.id());
-                                        return botCoreService.findByBotName(botName)
-                                                .timeout(Duration.ofSeconds(3))
-                                                .flatMap(bl -> {
-                                                    final Long msgId = extractMessageId(botUpdate);
-                                                    String warnMsg = String.format(
-                                                            "🚫 %s (%s) 已在黑名单中，如需解封请联系管理员。",
-                                                            user.firstName() != null ? user.firstName() : "",
-                                                            user.username() != null ? "@" + user.username() : "N/A");
-                                                    Mono<Void> sendWarning = botClientService.sendMenuMessageWithResponse(
-                                                            bl.getBotToken(), chatId, warnMsg, null
-                                                    ).flatMap(respJson -> {
-                                                        try {
-                                                            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
-                                                            Long warnMsgId = root.path("result").path("message_id").asLong(0);
-                                                            if (warnMsgId != 0) {
-                                                                return interactiveMessageService.scheduleMessageDeletion(
-                                                                        bl.getBotToken(), 0L, chatId, warnMsgId, 5, null, com.backend.bot.util.LogUtils.buildTraceContext()
-                                                                );
-                                                            }
-                                                        } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
-                                                        return Mono.<Void>empty();
-                                                    }).onErrorResume(e -> Mono.<Void>empty());
-                                                    Mono<Void> deleteMsg = msgId != null
-                                                            ? botClientService.deleteMessage(bl.getBotToken(), chatId, msgId)
-                                                            : Mono.<Void>empty();
-                                                    return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
-                                                })
-                                                .then(Mono.<Void>empty());
+                                        final Long msgId = extractMessageId(botUpdate);
+                                        String warnMsg = String.format(
+                                                "🚫 %s (%s) 已在黑名单中，如需解封请联系管理员。",
+                                                user.firstName() != null ? user.firstName() : "",
+                                                user.username() != null ? "@" + user.username() : "N/A");
+                                        Mono<Void> sendWarning = botClientService.sendMenuMessageWithResponse(
+                                                botEntity.getBotToken(), chatId, warnMsg, null
+                                        ).flatMap(respJson -> {
+                                            try {
+                                                com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(respJson);
+                                                Long warnMsgId = root.path("result").path("message_id").asLong(0);
+                                                if (warnMsgId != 0) {
+                                                    return interactiveMessageService.scheduleMessageDeletion(
+                                                            botEntity.getBotToken(), 0L, chatId, warnMsgId, 5, null, com.backend.bot.util.LogUtils.buildTraceContext()
+                                                    );
+                                                }
+                                            } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
+                                            return Mono.<Void>empty();
+                                        }).onErrorResume(e -> Mono.<Void>empty());
+                                        Mono<Void> deleteMsg = msgId != null
+                                                ? botClientService.deleteMessage(botEntity.getBotToken(), chatId, msgId)
+                                                : Mono.<Void>empty();
+                                        return sendWarning.timeout(Duration.ofSeconds(3)).then(deleteMsg.timeout(Duration.ofSeconds(3)));
                                     }
                                     log.debug("🔓 Not blacklisted | botName={}, userId={}", botName, user.id());
                                     return Mono.defer(() -> {

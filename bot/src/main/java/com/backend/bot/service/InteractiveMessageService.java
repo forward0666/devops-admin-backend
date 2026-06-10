@@ -40,12 +40,12 @@ public class InteractiveMessageService {
         double score = System.currentTimeMillis() / 1000.0 + delaySeconds;
         String value = chatId + ":" + messageId + ":" + (userId != null ? userId : 0) + ":" + token;
 
-        log.info("{}⏳ [Step1] 准备写入Redis ZSET | chatId={}, messageId={}, userId={}, delay={}s, value长度={}, score={}",
+        log.debug("{}⏳ [Step1] 准备写入Redis ZSET | chatId={}, messageId={}, userId={}, delay={}s, value长度={}, score={}",
                 combinedLogPrefix, chatId, messageId, userId, delaySeconds, value.length(), score);
 
         return Mono.fromRunnable(() -> {
                     Boolean added = stringRedisTemplate.opsForZSet().add(ZSET_KEY, value, score);
-                    log.info("{}✅ [Step2] Redis ZSET写入完成 | added={}, key={}, score={}", combinedLogPrefix, added, ZSET_KEY, score);
+                    log.debug("{}✅ [Step2] Redis ZSET写入完成 | added={}, key={}, score={}", combinedLogPrefix, added, ZSET_KEY, score);
                     Long size = stringRedisTemplate.opsForZSet().size(ZSET_KEY);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -58,15 +58,15 @@ public class InteractiveMessageService {
 
     public void cancelPendingDeletion(Long chatId, Long messageId) {
         String prefix = chatId + ":" + messageId + ":";
-        log.info("🗑️ [cancelPendingDeletion] 开始取消 | chatId={}, messageId={}", chatId, messageId);
+        log.debug("🗑️ [cancelPendingDeletion] 开始取消 | chatId={}, messageId={}", chatId, messageId);
         Set<String> all = stringRedisTemplate.opsForZSet().range(ZSET_KEY, 0, -1);
         if (all != null) {
             List<String> toRemove = all.stream().filter(v -> v.startsWith(prefix)).toList();
             if (!toRemove.isEmpty()) {
                 stringRedisTemplate.opsForZSet().remove(ZSET_KEY, toRemove.toArray());
-                log.info("✅ [cancelPendingDeletion] 已取消 {} 个任务 | messageId={}", toRemove.size(), messageId);
+                log.debug("✅ [cancelPendingDeletion] 已取消 {} 个任务 | messageId={}", toRemove.size(), messageId);
             } else {
-                log.info("📭 [cancelPendingDeletion] 未找到待删除任务 | messageId={}", messageId);
+                log.debug("📭 [cancelPendingDeletion] 未找到待删除任务 | messageId={}", messageId);
             }
         }
     }
@@ -85,7 +85,7 @@ public class InteractiveMessageService {
                 return;
             }
 
-            log.info("🔍 [ScheduledTask] 发现 {} 个过期任务(共{}个) | 开始处理...", expired.size(), totalSize);
+            log.debug("🔍 [ScheduledTask] 发现 {} 个过期任务(共{}个) | 开始处理...", expired.size(), totalSize);
 
             for (ZSetOperations.TypedTuple<String> tuple : expired) {
                 String value = tuple.getValue();
@@ -94,7 +94,7 @@ public class InteractiveMessageService {
             }
 
             Long removed = stringRedisTemplate.opsForZSet().removeRangeByScore(ZSET_KEY, 0, now);
-            log.info("✅ [ScheduledTask] 清理完成 | 删除了 {} 个过期项, ZSET剩余={}", removed,
+            log.debug("✅ [ScheduledTask] 清理完成 | 删除了 {} 个过期项, ZSET剩余={}", removed,
                     stringRedisTemplate.opsForZSet().size(ZSET_KEY));
         } catch (Exception e) {
             log.error("❌ [ScheduledTask] 执行失败", e);
@@ -114,20 +114,12 @@ public class InteractiveMessageService {
             long userId = Long.parseLong(parts[2]);
             String token = parts[3];
 
-            log.info("🗑️ [processDeletion] 开始删除 | chatId={}, messageId={}, userId={}", chatId, messageId, userId);
+            log.debug("🗑️ [processDeletion] 开始删除 | chatId={}, messageId={}, userId={}", chatId, messageId, userId);
 
             botClientService.deleteMessage(token, chatId, messageId)
-                    .doOnSuccess(v -> {
-                        log.info("✅ [processDeletion] 删除成功 | chatId={}, messageId={}, userId={}", chatId, messageId, userId);
-                        if (userId != 0L) {
-                            userSessionService.clearUserSession(userId).subscribe();
-                        }
-                    })
+                    .doOnSuccess(v -> log.debug("✅ [processDeletion] 删除成功 | chatId={}, messageId={}, userId={}", chatId, messageId, userId))
                     .onErrorResume(e -> {
                         log.warn("⚠️ [processDeletion] 删除失败(可能已删除) | chatId={}, messageId={}, error={}", chatId, messageId, e.getMessage());
-                        if (userId != 0L) {
-                            userSessionService.clearUserSession(userId).subscribe();
-                        }
                         return Mono.empty();
                     })
                     .subscribe();

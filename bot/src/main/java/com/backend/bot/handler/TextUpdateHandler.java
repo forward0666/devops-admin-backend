@@ -3,10 +3,10 @@ package com.backend.bot.handler;
 import com.backend.bot.constants.TelegramConstants;
 import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.UserDto;
-import com.backend.bot.dto.UserDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.UserSessionEntity;
 import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.GroupProjectService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.WhitelistService;
 import com.backend.bot.service.InteractiveMessageService;
@@ -33,7 +33,7 @@ public class TextUpdateHandler implements UpdateHandler {
     private final BotClientService botClientService;
     private final UserSessionService userSessionService;
     private final WhitelistService whitelistService;
-    private final com.backend.bot.repository.BotGroupRepository botGroupRepository;
+    private final GroupProjectService groupProjectService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.data.redis.core.ReactiveStringRedisTemplate redisTemplate;
     private final InteractiveMessageService interactiveMessageService;
@@ -107,7 +107,7 @@ public class TextUpdateHandler implements UpdateHandler {
             // --------------------------------------------------------
 
             // 1. 获取用户当前会话状态
-            return userSessionService.getUserSession(userId)
+            return userSessionService.getUserSession(userId, botName)
                     .flatMap(session -> {
                         // 统一使用 session.getState()
                         String state = session.getState();
@@ -263,19 +263,7 @@ public class TextUpdateHandler implements UpdateHandler {
         log.info("{}✅ Whitelist input parsed. IP: {}, Username: {}, RuleId: {}, Env: {}, Operator: {}",
                 traceLogPrefix, ip, username, ruleId, env, operatorName);
 
-        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(cached -> {
-                    try {
-                        com.backend.bot.entity.BotGroupEntity entity = objectMapper.readValue(cached, com.backend.bot.entity.BotGroupEntity.class);
-                        return Mono.just(entity.getProjectId());
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
-                        .map(com.backend.bot.entity.BotGroupEntity::getProjectId)
-                        .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))))
+        return groupProjectService.getProjectId(botName, chatId, userId)
                 .flatMap(projectId -> {
                     return whitelistService.addCfWhitelistIp(projectId, ruleId, ip, username, env, operatorName)
                             .flatMap(result -> {
@@ -287,15 +275,29 @@ public class TextUpdateHandler implements UpdateHandler {
                                         .then(userSessionService.clearUserSession(userId))
                                         .then(botClientService.sendMenuMessageWithResponse(token, chatId, text, null))
                                         .flatMap(resp -> {
-                                            try {
+                                        try {
+                                                log.warn("🔍 Parsing sendMessage response: resp={}", resp);
                                                 Map<String, Object> respMap = objectMapper.readValue(resp, Map.class);
-                                                Map<String, Object> res = (Map<String, Object>) respMap.get("result");
-                                                Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
+                                                Object resultObj = respMap.get("result");
+                                                log.warn("🔍 resultObj={}, type={}", resultObj, resultObj != null ? resultObj.getClass().getSimpleName() : "null");
+                                                if (!(resultObj instanceof Map)) {
+                                                    log.warn("⚠️ sendMessage result is not a Map: {}", resultObj);
+                                                    return Mono.empty();
+                                                }
+                                                Map<String, Object> res = (Map<String, Object>) resultObj;
+                                                Object msgIdObj = res.get("message_id");
+                                                log.warn("🔍 msgIdObj={}, type={}", msgIdObj, msgIdObj != null ? msgIdObj.getClass().getSimpleName() : "null");
+                                                if (msgIdObj == null) {
+                                                    log.warn("⚠️ No message_id in response: {}", resp);
+                                                    return Mono.empty();
+                                                }
+                                                Long msgId = Long.valueOf(String.valueOf(msgIdObj));
+                                                log.debug("🔍 Scheduling deletion for msgId={}", msgId);
                                                 return interactiveMessageService.scheduleMessageDeletion(
-                                                        token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
+                                                        token, null, chatId, msgId, 30, "WhitelistAdd", com.backend.bot.util.LogUtils.buildTraceContext()
                                                 ).then(Mono.empty());
                                             } catch (Exception e) {
-                                                log.warn("⚠️ Failed to schedule message deletion: {}", e.getMessage());
+                                                log.warn("⚠️ Failed to schedule message deletion: {}", e.getMessage(), e);
                                                 return Mono.empty();
                                             }
                                         });
@@ -315,7 +317,7 @@ public class TextUpdateHandler implements UpdateHandler {
                                     Map<String, Object> res = (Map<String, Object>) respMap.get("result");
                                     Long msgId = Long.valueOf(String.valueOf(res.get("message_id")));
                                     return interactiveMessageService.scheduleMessageDeletion(
-                                            token, null, chatId, msgId, 30, "WhitelistAdd", reactor.util.context.Context.of(LogUtils.TRACE_ID_KEY, org.slf4j.MDC.get(LogUtils.TRACE_ID_KEY))
+                                            token, null, chatId, msgId, 30, "WhitelistAdd", com.backend.bot.util.LogUtils.buildTraceContext()
                                     ).then(Mono.empty());
                                 } catch (Exception ex) {
                                     log.warn("⚠️ Failed to schedule message deletion: {}", ex.getMessage());

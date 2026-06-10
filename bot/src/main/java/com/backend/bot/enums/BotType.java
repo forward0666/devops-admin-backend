@@ -12,7 +12,9 @@ public enum BotType {
     
     GENERAL("general"),
     
-    ALERT("alert");
+    ALERT("alert"),
+    
+    DEVOPS("devops");
 
     private final String dbValue;
 

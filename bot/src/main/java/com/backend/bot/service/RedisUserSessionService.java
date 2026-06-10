@@ -19,10 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * 基于 Redis 的会话状态管理服务实现。
- * 用于在多实例部署环境中共享用户会话状态。
- */
 @Service
 @Primary
 @RequiredArgsConstructor
@@ -32,32 +28,19 @@ public class RedisUserSessionService implements UserSessionService {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    // 存储菜单自动销毁任务：Key=UserId, Value=Disposable
-    // 这部分仍然在内存中，因为 Disposable 对象无法序列化到 Redis
     private final ConcurrentMap<Long, Disposable> pendingDeletions = new ConcurrentHashMap<>();
-    
-    // 存储系统消息（userId=0）的自动删除任务：Key=UniqueId, Value=Disposable
-    // 避免多个系统消息互相覆盖，使用原子计数器生成唯一ID
     private final ConcurrentMap<Long, Disposable> systemMessageDeletions = new ConcurrentHashMap<>();
     private final AtomicLong systemMessageCounter = new AtomicLong(0);
 
-    // Redis Key 前缀
     private static final String SESSION_KEY_PREFIX = "telegram:session:";
-
-    // 会话过期时间（5分钟）
     private static final Duration SESSION_TTL = Duration.ofMinutes(5);
 
-    /**
-     * 构建 Redis Key
-     */
     private String buildSessionKey(Long userId) {
         return SESSION_KEY_PREFIX + userId;
     }
 
-    // 移除了 buildUserIdKey，因为它不再使用
-
     @Override
-    public Mono<Void> updateUserSession(Long userId, String newState, Long referenceMessageId) {
+    public Mono<Void> updateUserSession(Long userId, String newState, Long referenceMessageId, String botName) {
         return Mono.deferContextual(contextView -> {
             final String logPrefix = getLogPrefix(contextView);
 
@@ -66,15 +49,15 @@ public class RedisUserSessionService implements UserSessionService {
                         .userId(userId)
                         .currentState(newState)
                         .referenceMessageId(referenceMessageId)
+                        .botName(botName)
                         .build();
 
                 String sessionKey = buildSessionKey(userId);
                 String sessionJson = objectMapper.writeValueAsString(session);
 
-
-                // 存储会话并设置过期时间
                 return redisTemplate.opsForValue()
                         .set(sessionKey, sessionJson, SESSION_TTL)
+                        .doOnSuccess(v -> log.info("{}✅ Session stored for userId={}, botName={}, state={}", logPrefix, userId, botName, newState))
                         .then()
                         .onErrorResume(e -> {
                             log.error("{}❌ Failed to store user session in Redis for userId: {}. Error: {}", logPrefix, userId, e.getMessage(), e);
@@ -89,25 +72,37 @@ public class RedisUserSessionService implements UserSessionService {
 
     @Override
     public Mono<UserSessionEntity> getUserSession(Long userId) {
+        return doGetSession(userId, null);
+    }
+
+    @Override
+    public Mono<UserSessionEntity> getUserSession(Long userId, String botName) {
+        return doGetSession(userId, botName);
+    }
+
+    private Mono<UserSessionEntity> doGetSession(Long userId, String botName) {
         return Mono.deferContextual(contextView -> {
             final String logPrefix = getLogPrefix(contextView);
             String sessionKey = buildSessionKey(userId);
 
             return redisTemplate.opsForValue().get(sessionKey)
-                    .map(sessionJson -> {
+                    .doOnNext(json -> log.info("{}🔎 Raw session JSON for userId={}, botName={}: {}", logPrefix, userId, botName, json))
+                    .flatMap(sessionJson -> {
                         try {
                             UserSessionEntity session = objectMapper.readValue(sessionJson, UserSessionEntity.class);
+                            // 按 botName 过滤
+                            if (botName != null && !botName.equals(session.getBotName())) {
+                                log.debug("{}🔎 Session belongs to bot {} (expected {}), skipping for userId: {}", logPrefix, session.getBotName(), botName, userId);
+                                return Mono.empty();
+                            }
                             log.debug("{}🔎 Found session in Redis for userId: {}. State: {}", logPrefix, userId, session.getCurrentState());
-                            return session;
+                            return Mono.just(session);
                         } catch (JsonProcessingException e) {
                             log.error("{}❌ Failed to deserialize user session from Redis for userId: {}. Error: {}", logPrefix, userId, e.getMessage(), e);
-                            // 反序列化失败，应清除该键
-                            // FIX: 导入 Context 并使用 Context.of(contextView) 修复找不到符号的问题
                             clearUserSession(userId).contextWrite(Context.of(contextView)).subscribe();
-                            return null;
+                            return Mono.empty();
                         }
                     })
-                    .filter(session -> session != null)
                     .switchIfEmpty(Mono.defer(() -> {
                         log.debug("{}🔎 No session found in Redis for userId: {}", logPrefix, userId);
                         return Mono.empty();
@@ -115,34 +110,24 @@ public class RedisUserSessionService implements UserSessionService {
         });
     }
 
-    /**
-     * 检查用户是否有任何活跃会话
-     * FIX: 只需要检查主会话键 (telegram:session:{userId}) 是否存在。
-     * @param userId 用户ID
-     * @return Mono&lt;Boolean&gt; 如果用户有会话返回 true，否则返回 false
-     */
     @Override
     public Mono<Boolean> hasAnySession(Long userId) {
         return Mono.deferContextual(contextView -> {
             final String logPrefix = getLogPrefix(contextView);
             String sessionKey = buildSessionKey(userId);
 
-            log.debug("{}🔍 Checking if user {} has any session by primary key: {}", logPrefix, userId, sessionKey);
-
             return redisTemplate.hasKey(sessionKey)
                     .defaultIfEmpty(false)
-                    .doOnNext(hasKey -> {
-                        if (hasKey) {
-                            log.debug("{}✅ User {} has an active session.", logPrefix, userId);
-                        } else {
-                            log.debug("{}❌ User {} has no active session.", logPrefix, userId);
-                        }
-                    })
                     .onErrorResume(e -> {
-                        log.error("{}❌ Failed to check primary session key for userId: {}. Assuming no session (Safety fall-through).", logPrefix, userId, e);
+                        log.error("{}❌ Failed to check session key for userId: {}. Error: {}", logPrefix, userId, e.getMessage(), e);
                         return Mono.just(false);
                     });
         });
+    }
+
+    @Override
+    public Mono<Boolean> hasAnySession(Long userId, String botName) {
+        return getUserSession(userId, botName).hasElement();
     }
 
     @Override
@@ -150,9 +135,6 @@ public class RedisUserSessionService implements UserSessionService {
         return Mono.deferContextual(contextView -> {
             final String logPrefix = getLogPrefix(contextView);
             String sessionKey = buildSessionKey(userId);
-
-            // 只需要删除主会话键
-            log.debug("🗑️ Clearing user session for userId={}", userId);
 
             return redisTemplate.delete(sessionKey)
                     .then()
@@ -169,13 +151,10 @@ public class RedisUserSessionService implements UserSessionService {
             final String logPrefix = getLogPrefix(contextView);
 
             if (userId == 0L) {
-                // 对于系统消息（userId=0），使用唯一的计数器值作为键
-                // 不取消之前的系统消息，让它们独立运行
                 long uniqueId = systemMessageCounter.incrementAndGet();
                 systemMessageDeletions.put(uniqueId, deletionTask);
                 return Mono.empty();
             } else {
-                // 确保旧任务被取消
                 return cancelPendingDeletion(userId)
                         .then(Mono.fromRunnable(() -> {
                             pendingDeletions.put(userId, deletionTask);
@@ -191,7 +170,6 @@ public class RedisUserSessionService implements UserSessionService {
             final String logPrefix = getLogPrefix(contextView);
 
             if (userId == 0L) {
-                // 对于系统消息（userId=0），取消所有系统消息的删除任务
                 systemMessageDeletions.forEach((id, disposable) -> {
                     if (disposable != null && !disposable.isDisposed()) {
                         disposable.dispose();
@@ -205,20 +183,14 @@ public class RedisUserSessionService implements UserSessionService {
                     Disposable disposable = pendingDeletions.remove(userId);
                     if (disposable != null && !disposable.isDisposed()) {
                         disposable.dispose();
-                    } else if (disposable != null) {
-                        log.debug("{}⚠️ Attempted to cancel a task that was already disposed for userId: {}", logPrefix, userId);
                     }
                 });
             }
         });
     }
 
-    /**
-     * 从上下文中提取日志前缀
-     */
     private String getLogPrefix(ContextView contextView) {
         try {
-            // 使用 LogUtils 来统一处理 traceId 的获取和格式化
             return LogUtils.prepareMdcAndGetPrefix(contextView);
         } catch (Exception e) {
             return "[traceId=N/A]";

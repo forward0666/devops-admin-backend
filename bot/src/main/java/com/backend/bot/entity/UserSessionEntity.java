@@ -44,6 +44,11 @@ public class UserSessionEntity {
     private final Long userId;
 
     /**
+     * 创建该 session 的 bot 名称，用于多 bot 隔离
+     */
+    private final String botName;
+
+    /**
      * 当前会话状态
      * 
      * 表示用户当前所处的操作步骤或等待状态。

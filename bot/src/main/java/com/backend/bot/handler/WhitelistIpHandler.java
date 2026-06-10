@@ -6,6 +6,7 @@ import com.backend.bot.dto.InlineKeyboardButtonDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.service.BotClientService;
+import com.backend.bot.service.GroupProjectService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.util.LogUtils;
@@ -21,7 +22,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +34,7 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     private final BotClientService botClientService;
     private final InteractiveMessageService interactiveMessageService;
     private final UserSessionService userSessionService;
-    private final com.backend.bot.repository.BotGroupRepository botGroupRepository;
+    private final GroupProjectService groupProjectService;
     private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
@@ -93,21 +93,21 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                 if (action.startsWith("PROJECT_WHITELIST_")) {
                     String env = action.replace("PROJECT_WHITELIST_", "").replace("_ACTION", "");
                     log.info("[STEP 1] PROJECT_WHITELIST -> env={}", env);
-                    return handleSecurityRulesList(prefix, botName, chatId, messageId, token, env);
+                    return handleSecurityRulesList(prefix, botName, chatId, messageId, token, env, userId);
                 } else if (action.startsWith("WHITELIST_SELECT_")) {
                     String parts = action.replace("WHITELIST_SELECT_", "");
                     int lastUnderscore = parts.lastIndexOf("_");
                     String ruleId = lastUnderscore > 0 ? parts.substring(0, lastUnderscore) : parts;
                     String env = lastUnderscore > 0 ? parts.substring(lastUnderscore + 1) : "";
                     log.info("[STEP 1] WHITELIST_SELECT -> ruleId={}, env={}", ruleId, env);
-                    return handleSelectRule(prefix, token, chatId, userId, messageId, ruleId, env);
+                    return handleSelectRule(prefix, token, chatId, userId, messageId, ruleId, env, botName);
                 } else if (action.startsWith("WHITELIST_REMOVE_")) {
                     String parts = action.replace("WHITELIST_REMOVE_", "");
                     int lastUnderscore = parts.lastIndexOf("_");
                     String recordId = lastUnderscore > 0 ? parts.substring(0, lastUnderscore) : parts;
                     String env = lastUnderscore > 0 ? parts.substring(lastUnderscore + 1) : "";
                     log.info("[STEP 1] WHITELIST_REMOVE -> recordId={}, env={}", recordId, env);
-                    return handleRemoveIp(prefix, botName, chatId, messageId, token, recordId, env);
+                    return handleRemoveIp(prefix, botName, chatId, messageId, token, recordId, env, userId);
                 }
                 log.warn("[STEP 1] No matching action: {}", action);
                 return Mono.empty();
@@ -124,10 +124,10 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handleSecurityRulesList(String prefix, String botName, Long chatId,
-                                                  Long messageId, String token, String env) {
+                                                  Long messageId, String token, String env, Long userId) {
         log.info("[STEP 2] Fetching projectId for botName={}, chatId={}", botName, chatId);
 
-        return getProjectId(botName, chatId).flatMap(projectId -> {
+        return groupProjectService.getProjectId(botName, chatId, userId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
             WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/securityRules?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
@@ -169,13 +169,13 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handleSelectRule(String prefix, String token, Long chatId, Long userId,
-                                           Long messageId, String ruleId, String env) {
-        log.info("[STEP 2] Selected ruleId={}, env={}, userId={}", ruleId, env, userId);
+                                           Long messageId, String ruleId, String env, String botName) {
+        log.info("[STEP 2] Selected ruleId={}, env={}, userId={}, botName={}", ruleId, env, userId, botName);
 
         String sessionState = STATE_AWAITING_WHITELIST_IP_PREFIX + ruleId + ":" + env;
         log.info("[STEP 3] Setting session state: {}", sessionState);
 
-        return userSessionService.updateUserSession(userId, sessionState, messageId)
+        return userSessionService.updateUserSession(userId, sessionState, messageId, botName)
                 .then(sendPromptMsg(token, chatId));
     }
 
@@ -203,10 +203,10 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handleWhitelistList(String prefix, String botName, Long chatId,
-                                              Long messageId, String token, String env) {
+                                              Long messageId, String token, String env, Long userId) {
         log.info("[STEP 2] Listing whitelist for botName={}, env={}", botName, env);
 
-        return getProjectId(botName, chatId).flatMap(projectId -> {
+        return groupProjectService.getProjectId(botName, chatId, userId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
             WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/whitelist?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
@@ -246,10 +246,10 @@ public class WhitelistIpHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handleRemoveIp(String prefix, String botName, Long chatId,
-                                         Long messageId, String token, String recordId, String env) {
+                                         Long messageId, String token, String recordId, String env, Long userId) {
         log.info("[STEP 2] Removing recordId={}, botName={}", recordId, botName);
 
-        return getProjectId(botName, chatId).flatMap(projectId -> {
+        return groupProjectService.getProjectId(botName, chatId, userId).flatMap(projectId -> {
             log.info("[STEP 3] projectId={}", projectId);
             WebClient webClient = getBuilder(getCloudflareBaseUrl()).baseUrl(getCloudflareBaseUrl()).build();
             String uri = "/whitelist/" + recordId + "?projectId=" + projectId;
@@ -261,35 +261,13 @@ public class WhitelistIpHandler implements CallbackActionHandler {
                         String msg = String.valueOf(response.getOrDefault("message", "已删除"));
                         log.info("[STEP 5] Delete result: {}", msg);
                         return sendMsg(token, chatId, "✅ " + msg, null)
-                                .then(handleWhitelistList(prefix, botName, chatId, messageId, token, env));
+                                .then(handleWhitelistList(prefix, botName, chatId, messageId, token, env, userId));
                     });
         })
         .onErrorResume(e -> {
             log.error("[ERROR] handleRemoveIp: {}", e.getMessage(), e);
             return sendMsg(token, chatId, "⚠️ 删除失败: " + e.getMessage(), null);
         });
-    }
-
-    private Mono<Long> getProjectId(String botName, Long chatId) {
-        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(cached -> {
-                    try {
-                        com.backend.bot.entity.BotGroupEntity entity = objectMapper.readValue(cached, com.backend.bot.entity.BotGroupEntity.class);
-                        return Mono.just(entity.getProjectId());
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
-                        .flatMap(entity -> {
-                            try {
-                                String json = objectMapper.writeValueAsString(entity);
-                                redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
-                            } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
-                            return Mono.just(entity.getProjectId());
-                        })
-                        .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))));
     }
 
     private Mono<Void> sendMsg(String token, Long chatId, String text, InlineKeyboardMarkupDto markup) {

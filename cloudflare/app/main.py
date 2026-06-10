@@ -36,7 +36,7 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     elapsed = round((time.monotonic() - start) * 1000, 2)
     client = request.client.host if request.client else "unknown"
-    logger.info(f"{request.method} {request.url.path} [{response.status_code}] {elapsed}ms client={client}")
+    logger.info(f"{request.method} {request.url.path}?{request.query_params} [{response.status_code}] {elapsed}ms client={client}")
     return response
 
 

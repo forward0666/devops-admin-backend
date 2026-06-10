@@ -5,8 +5,7 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.dto.InlineKeyboardButtonDto;
 import com.backend.bot.dto.InlineKeyboardMarkupDto;
 import com.backend.bot.entity.BotConfigEntity;
-import com.backend.bot.entity.BotGroupEntity;
-import com.backend.bot.repository.BotGroupRepository;
+import com.backend.bot.service.GroupProjectService;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
 import com.backend.bot.util.LogUtils;
@@ -22,7 +21,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +31,7 @@ import java.util.Map;
 public class CachePurgeHandler implements CallbackActionHandler {
 
     private final BotClientService botClientService;
-    private final BotGroupRepository botGroupRepository;
+    private final GroupProjectService groupProjectService;
     private final InteractiveMessageService interactiveMessageService;
     private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
@@ -84,6 +82,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
         HandlerContext ctx = new HandlerContext(botEntity, botUpdate);
         String token = ctx.token();
         Long chatId = ctx.chatId();
+        Long userId = ctx.userId();
         Long messageId = ctx.messageId();
         String botName = ctx.botName();
         String callbackData = botUpdate.callbackQuery().data();
@@ -97,14 +96,14 @@ public class CachePurgeHandler implements CallbackActionHandler {
 
             if (action.startsWith("PROJECT_PURGECACHE_")) {
                 String env = action.replace("PROJECT_PURGECACHE_", "").replace("_ACTION", "");
-                return handlePurgeCacheList(prefix, botName, chatId, messageId, token, env);
+                return handlePurgeCacheList(prefix, botName, chatId, messageId, token, env, userId);
             } else if (action.startsWith("PURGE_RULE_")) {
                 // PURGE_RULE_{ruleId}_{env}
                 String parts = action.replace("PURGE_RULE_", "");
                 int lastUnderscore = parts.lastIndexOf("_");
                 String ruleId = lastUnderscore > 0 ? parts.substring(0, lastUnderscore) : parts;
-                String ruleEnv = lastUnderscore > 0 ? parts.substring(lastUnderscore + 1) : "";
-                return handlePurgeRule(prefix, botName, chatId, messageId, token, ruleId, tgUsername, ruleEnv);
+                String ruleEnv = lastUnderscore > 0 ? parts.substring(lastUnderscore + 1).toUpperCase() : "";
+                return handlePurgeRule(prefix, botName, chatId, messageId, token, ruleId, tgUsername, ruleEnv, userId);
             }
             return Mono.empty();
         })
@@ -113,10 +112,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handlePurgeCacheList(String prefix, String botName, Long chatId,
-                                              Long messageId, String token, String env) {
+                                              Long messageId, String token, String env, Long userId) {
 
         return Mono.zip(
-                getProjectId(botName, chatId),
+                groupProjectService.getProjectId(botName, chatId, userId),
                 Mono.just(getCloudflareBaseUrl())
         ).flatMap(tuple -> {
             Long projectId = tuple.getT1();
@@ -152,10 +151,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
     }
 
     private Mono<Void> handlePurgeRule(String prefix, String botName, Long chatId,
-                                         Long messageId, String token, String ruleId, String tgUsername, String env) {
+                                         Long messageId, String token, String ruleId, String tgUsername, String env, Long userId) {
 
         return Mono.zip(
-                getProjectId(botName, chatId),
+                groupProjectService.getProjectId(botName, chatId, userId),
                 Mono.just(getCloudflareBaseUrl())
         ).flatMap(tuple -> {
             Long projectId = tuple.getT1();
@@ -164,6 +163,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
             WebClient userClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl()).build();
 
             String uri = "/domain/list?projectId=" + projectId + (env != null && !env.isEmpty() ? "&env=" + env : "");
+            log.info("{}🔍 CachePurgeRule: userBaseUrl={}, uri={}, projectId={}, env={}", prefix, getUserBaseUrl(), uri, projectId, env);
             return userClient.get().uri(uri)
                     .header("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
                     .retrieve()
@@ -179,9 +179,10 @@ public class CachePurgeHandler implements CallbackActionHandler {
                         } else {
                             domainList = List.of();
                         }
+                        log.info("{}🔍 CachePurgeRule: domain list size={}, raw={}", prefix, domainList.size(), domainList.size() > 0 ? domainList.stream().map(d -> d.get("type") + ":" + d.get("domainName")).toList() : "empty");
                         return domainList.stream()
                                 .filter(d -> "web".equals(String.valueOf(d.get("type"))))
-                                .map(d -> String.valueOf(d.get("domain")))
+                                .map(d -> String.valueOf(d.getOrDefault("domain", d.get("domainName"))))
                                 .toList();
                     })
                     .flatMap(domains -> {
@@ -222,27 +223,7 @@ public class CachePurgeHandler implements CallbackActionHandler {
         });
     }
 
-    private Mono<Long> getProjectId(String botName, Long chatId) {
-        String cacheKey = "bot:groupProject:" + botName + ":" + chatId;
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(cached -> {
-                    try {
-                        BotGroupEntity entity = objectMapper.readValue(cached, BotGroupEntity.class);
-                        return Mono.just(entity.getProjectId());
-                    } catch (Exception e) {
-                        return Mono.empty();
-                    }
-                })
-                .switchIfEmpty(botGroupRepository.findByBotNameAndChatId(botName, chatId)
-                        .flatMap(entity -> {
-                            try {
-                                String json = objectMapper.writeValueAsString(entity);
-                                redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(300)).subscribe();
-                            } catch (Exception e) { log.debug("Ignored exception: {}", e.getMessage()); }
-                            return Mono.just(entity.getProjectId());
-                        })
-                        .switchIfEmpty(Mono.error(new RuntimeException("该群组未绑定项目"))));
-    }
+
 
     private Mono<Void> sendMsg(String token, Long chatId, String text, InlineKeyboardMarkupDto markup) {
         return botClientService.sendMenuMessageWithResponse(token, chatId, text, markup)

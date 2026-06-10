@@ -20,6 +20,14 @@ public interface CallbackActionHandler {
     boolean supports(String callbackData);
 
     /**
+     * 检查是否支持处理（含 bot 上下文）。默认实现等同 supports(callbackData)。
+     * Handler 可重写此方法做更精细的判断。
+     */
+    default boolean supports(String callbackData, BotConfigEntity botEntity) {
+        return supports(callbackData);
+ }
+
+    /**
      * 执行具体的业务逻辑。
      *
      * @param botEntity Bot配置信息

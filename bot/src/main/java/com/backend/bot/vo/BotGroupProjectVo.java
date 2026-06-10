@@ -1,6 +1,6 @@
 package com.backend.bot.vo;
 
-import com.backend.bot.entity.BotGroupProjectEntity;
+import com.backend.bot.entity.BotGroupEntity;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,7 +16,7 @@ public class BotGroupProjectVo {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static BotGroupProjectVo fromEntity(BotGroupProjectEntity entity) {
+    public static BotGroupProjectVo fromEntity(BotGroupEntity entity) {
         BotGroupProjectVo vo = new BotGroupProjectVo();
         vo.setId(entity.getId());
         vo.setBotName(entity.getBotName());

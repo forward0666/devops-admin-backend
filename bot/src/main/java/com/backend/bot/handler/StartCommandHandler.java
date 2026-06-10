@@ -10,7 +10,7 @@ import com.backend.bot.service.RedisUserSessionService;
 import com.backend.bot.service.UserSessionService;
 import com.backend.bot.service.BotMenuService;
 import com.backend.bot.template.MenuType;
-import com.backend.bot.repository.BotGroupProjectRepository;
+import com.backend.bot.repository.BotGroupRepository;
 import com.backend.bot.util.BotUserUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,7 +37,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
     private final RedisUserSessionService redisUserSessionService;
     private final ObjectMapper objectMapper;
     private final BotMenuService botMenuService;
-    private final BotGroupProjectRepository botGroupProjectRepository;
+    private final BotGroupRepository botGroupRepository;
     private final WebClient.Builder lbWebClientBuilder;
     private final WebClient.Builder webClientBuilder;
 
@@ -105,7 +105,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         }
 
         // 检查 Redis 中是否存在用户会话标记（UserSession:1 或 UserSession:0）
-        return redisUserSessionService.hasAnySession(userId)
+        return redisUserSessionService.hasAnySession(userId, context.botName())
                 .doOnNext(hasSession -> log.info("{}🔍 [Step2] Session检查完成 | hasSession={}, userId={}", logPrefix, hasSession, userId))
                 .flatMap(hasSession -> {
                     if (hasSession) {
@@ -172,7 +172,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         Long userId = context.userId();
 
         // 先设置 session，再查菜单（避免 Mono.zip 空 empty 导致卡死）
-        return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null)
+        return userSessionService.updateUserSession(userId, TelegramConstants.SESSION_STATE_PROCESSING_START, null, context.botName())
                 .then(botMenuService.findMainMenuByBotType(context.botEntity().getBotType().getDbValue(), 1))
                         .switchIfEmpty(Mono.fromCallable(() -> MenuType.createFallbackKeyboard(context.botEntity().getBotType().name())))
                         .defaultIfEmpty(EMPTY_MENU)
@@ -200,6 +200,11 @@ public class StartCommandHandler extends AbstractUpdateHandler {
         Long chatId = context.chatId();
         if (chatId >= 0) return Mono.just(true);
 
+        // DEVOPS 类型不需要项目成员检查
+        if (context.botEntity().getBotType() == com.backend.bot.enums.BotType.DEVOPS) {
+            return Mono.just(true);
+        }
+
         String tgUsername = context.username();
         String mention = tgUsername != null ? "@" + tgUsername : "";
         String rejectMsg = "⚠️ 您不是该项目成员，无权限查看，" + (mention.isEmpty() ? "且未设置用户名。" : mention + "。");
@@ -210,7 +215,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
             return Mono.just(false);
         }
 
-        return botGroupProjectRepository.findByBotNameAndChatId(context.botName(), chatId)
+        return botGroupRepository.findByBotNameAndChatId(context.botName(), chatId)
                 .flatMap(binding -> {
                     WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl()).build();
                     return webClient.get()
@@ -219,6 +224,7 @@ public class StartCommandHandler extends AbstractUpdateHandler {
                             .retrieve()
                             .bodyToMono(Map.class)
                             .map(response -> {
+                                log.info("{}🔍 projectMember response: {}", logPrefix, response);
                                 Object code = response.get("code");
                                 if (code != null && !"200".equals(String.valueOf(code)) && !"201".equals(String.valueOf(code))) {
                                     return false;
