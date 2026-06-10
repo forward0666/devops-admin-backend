@@ -38,6 +38,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
     private final WebClient.Builder webClientBuilder;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final GroupProjectService groupProjectService;
 
     private static final Duration GP_CACHE_TTL = Duration.ofSeconds(300);
     private static final Duration USER_CACHE_TTL = Duration.ofSeconds(60);
