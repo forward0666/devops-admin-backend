@@ -124,31 +124,25 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                         return Mono.empty();
                     }))
                     .flatMap(binding -> {
-                        if (binding.getProjectId() == null) {
-                            return replyNoBinding(token, chatId, messageId);
-                        }
+                        return groupProjectService.getProjectId(botName, chatId, userId)
+                                .flatMap(projectId -> {
+                                    WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl())
+                                            .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
+                                            .build();
 
-                        WebClient webClient = getBuilder(getUserBaseUrl()).baseUrl(getUserBaseUrl())
-                                .defaultHeader("X-Tg-Username", tgUsername != null ? tgUsername : "bot")
-                                .build();
-
-                        // 先查 TG 用户的 project role
-                        return resolveUserRole(webClient, binding.getProjectId(), tgUsername, traceLogPrefix)
-                                .flatMap(role -> {
-                                    log.info("{}🔍 Resolved role: {} for tgUsername={}", traceLogPrefix, role, tgUsername);
-                                    if ("None".equals(role)) {
-                                        return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看，@" + tgUsername + "。", true);
+                                    // DEVOPS 类型不需要成员验证
+                                    if (botEntity.getBotType() == com.backend.bot.enums.BotType.DEVOPS) {
+                                        return handleQueryAction(webClient, projectId, action, token, chatId, messageId, traceLogPrefix);
                                     }
-                                    return switch (action) {
-                                        case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, binding, token, chatId, messageId, traceLogPrefix);
-                                        case PROJECT_MEMBER_ACTION -> fetchList(webClient, binding, "/projectMember?projectId=" + binding.getProjectId(), token, chatId, messageId, "👥 成员列表", null, traceLogPrefix);
-                                        case PROJECT_DOMAIN_PROD_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=PROD", token, chatId, messageId, "🌐 生产域名列表", role, traceLogPrefix);
-                                        case PROJECT_DOMAIN_UAT_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=UAT", token, chatId, messageId, "🌐 UAT域名列表", role, traceLogPrefix);
-                                        case PROJECT_DOMAIN_TEST_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=TEST", token, chatId, messageId, "🌐 TEST域名列表", role, traceLogPrefix);
-                                        case PROJECT_DOMAIN_DEV_ACTION -> fetchList(webClient, binding, "/domain/list?projectId=" + binding.getProjectId() + "&env=DEV", token, chatId, messageId, "🌐 DEV域名列表", role, traceLogPrefix);
-                                        case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, binding, "/middleware/list?projectId=" + binding.getProjectId(), token, chatId, messageId, "🔧 中间件列表", role, traceLogPrefix);
-                                        default -> Mono.empty();
-                                    };
+
+                                    // GENERAL 类型需要成员验证
+                                    return resolveUserRole(webClient, projectId, tgUsername, traceLogPrefix)
+                                            .flatMap(role -> {
+                                                if ("None".equals(role)) {
+                                                    return replyText(token, chatId, messageId, "⚠️ 您不是该项目成员，无权限查看，@" + tgUsername + "。", true);
+                                                }
+                                                return handleQueryAction(webClient, projectId, action, token, chatId, messageId, traceLogPrefix);
+                                            });
                                 });
                     })
                     .onErrorResume(e -> {
@@ -197,12 +191,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .onErrorReturn("None");
     }
 
-    private Mono<Void> fetchProjectInfo(WebClient webClient, BotGroupEntity binding,
+    private Mono<Void> fetchProjectInfo(WebClient webClient, Long projectId,
                                            String token, Long chatId, Long messageId, String traceLogPrefix) {
-        log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, binding.getProjectId());
-        String projectCacheKey = "bot:project:" + binding.getProjectId();
+        log.info("{}🔍 Fetching project info: projectId={}", traceLogPrefix, projectId);
+        String projectCacheKey = "bot:project:" + projectId;
         return cacheOrFetch(projectCacheKey, USER_CACHE_TTL,
-                webClient.get().uri("/project/{id}", binding.getProjectId()).retrieve())
+                webClient.get().uri("/project/{id}", projectId).retrieve())
                 .doOnNext(project -> log.info("{}🔍 Project response: {}", traceLogPrefix, project))
                 .flatMap(project -> {
                     Object code = project.get("code");
@@ -214,12 +208,12 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
                     if (data == null) {
                         return replyText(token, chatId, messageId,
-                                String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()), true);
+                                String.format("📋 *项目信息（本地）*\n\n项目ID：%d\n\n⚠️ 暂无详细信息", projectId), true);
                     }
 
                     StringBuilder sb = new StringBuilder();
                     sb.append("📋 *项目信息*\n\n");
-                    sb.append("项目名称：").append(getVal(data, "name", binding.getProjectName())).append("\n");
+                    sb.append("项目名称：").append(getVal(data, "name", "")).append("\n");
                     sb.append("描述：").append(getVal(data, "description", "暂无")).append("\n");
                     sb.append("技术栈：").append(getVal(data, "techStack", "暂无")).append("\n");
                     sb.append("状态：").append(getVal(data, "status", "未知")).append("\n");
@@ -231,23 +225,23 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
                 .onErrorResume(e -> {
                     log.warn("{}⚠️ Failed to fetch project info: {}", traceLogPrefix, e.getMessage());
                     return replyText(token, chatId, messageId,
-                            String.format("📋 *项目信息（本地）*\n\n项目名称：%s\n项目ID：%d\n\n⚠️ 暂无详细信息", binding.getProjectName(), binding.getProjectId()), true);
+                            String.format("📋 *项目信息（本地）*\n\n项目ID：%d\n\n⚠️ 暂无详细信息", projectId), true);
                 });
     }
 
-    private Mono<Void> fetchList(WebClient webClient, BotGroupEntity binding, String uri,
+    private Mono<Void> fetchList(WebClient webClient, Long projectId, String uri,
                                   String token, Long chatId, Long messageId, String title, String role, String traceLogPrefix) {
         log.info("{}🔍 Fetching list: title={}, role={}", traceLogPrefix, title, role);
         // Determine cache key based on URI
         String cacheKey;
         if (uri.contains("/projectMember")) {
-            cacheKey = "bot:projectMembers:" + binding.getProjectId();
+            cacheKey = "bot:projectMembers:" + projectId;
         } else if (uri.contains("/domain/")) {
             // 从 URI 提取 env 参数作为缓存 key 的一部分
             String envPart = uri.contains("env=") ? uri.substring(uri.indexOf("env=") + 4).split("&")[0] : "all";
-            cacheKey = "bot:domains:" + binding.getProjectId() + ":" + role + ":" + envPart;
+            cacheKey = "bot:domains:" + projectId + ":" + envPart;
         } else {
-            cacheKey = "bot:middlewares:" + binding.getProjectId() + ":" + role;
+            cacheKey = "bot:middlewares:" + projectId;
         }
 
         return cacheOrFetch(cacheKey, USER_CACHE_TTL,
@@ -279,7 +273,7 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
 
                     StringBuilder sb = new StringBuilder();
                     sb.append(title).append("\n");
-                    sb.append("项目：").append(binding.getProjectName()).append("\n");
+                    sb.append("项目ID：").append(projectId).append("\n");
 
                     // 域名列表：按环境分组，仅多环境时显示环境标签
                     if (items != null && !items.isEmpty() && title.contains("域名")) {
@@ -401,6 +395,20 @@ public class GroupProjectQueryHandler implements CallbackActionHandler {
             send = send.doOnSuccess(v -> interactiveMessageService.scheduleMessageDeletion(token, null, chatId, messageId, 10, "[bot]", com.backend.bot.util.LogUtils.buildTraceContext()).subscribe());
         }
         return send.then();
+    }
+
+    private Mono<Void> handleQueryAction(WebClient webClient, Long projectId, String action,
+                                                  String token, Long chatId, Long messageId, String traceLogPrefix) {
+        return switch (action) {
+            case PROJECT_INFO_ACTION -> fetchProjectInfo(webClient, projectId, token, chatId, messageId, traceLogPrefix);
+            case PROJECT_MEMBER_ACTION -> fetchList(webClient, projectId, "/projectMember?projectId=" + projectId, token, chatId, messageId, "👥 成员列表", null, traceLogPrefix);
+            case PROJECT_DOMAIN_PROD_ACTION -> fetchList(webClient, projectId, "/domain/list?projectId=" + projectId + "&env=PROD", token, chatId, messageId, "🌐 生产域名列表", null, traceLogPrefix);
+            case PROJECT_DOMAIN_UAT_ACTION -> fetchList(webClient, projectId, "/domain/list?projectId=" + projectId + "&env=UAT", token, chatId, messageId, "🌐 UAT域名列表", null, traceLogPrefix);
+            case PROJECT_DOMAIN_TEST_ACTION -> fetchList(webClient, projectId, "/domain/list?projectId=" + projectId + "&env=TEST", token, chatId, messageId, "🌐 TEST域名列表", null, traceLogPrefix);
+            case PROJECT_DOMAIN_DEV_ACTION -> fetchList(webClient, projectId, "/domain/list?projectId=" + projectId + "&env=DEV", token, chatId, messageId, "🌐 DEV域名列表", null, traceLogPrefix);
+            case PROJECT_MIDDLEWARE_ACTION -> fetchList(webClient, projectId, "/middleware/list?projectId=" + projectId, token, chatId, messageId, "🔧 中间件列表", null, traceLogPrefix);
+            default -> Mono.empty();
+        };
     }
 
     private Mono<Void> replyNoBinding(String token, Long chatId, Long messageId) {
