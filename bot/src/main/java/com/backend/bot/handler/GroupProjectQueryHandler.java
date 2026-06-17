@@ -5,6 +5,7 @@ import com.backend.bot.dto.BotUpdateDto;
 import com.backend.bot.entity.BotConfigEntity;
 import com.backend.bot.entity.BotGroupEntity;
 import com.backend.bot.repository.BotGroupRepository;
+import com.backend.bot.service.GroupProjectService;
 import org.springframework.beans.factory.annotation.Value;
 import com.backend.bot.service.BotClientService;
 import com.backend.bot.service.InteractiveMessageService;
