@@ -68,6 +68,10 @@ public class UserController {
             if (updates.containsKey("phone")) existing.setPhone((String) updates.get("phone"));
             if (updates.containsKey("tgUsername")) existing.setTgUsername((String) updates.get("tgUsername"));
             if (updates.containsKey("position")) existing.setPosition((String) updates.get("position"));
+            if (updates.containsKey("departmentId")) {
+                Object deptVal = updates.get("departmentId");
+                existing.setDepartmentId(deptVal != null ? Long.valueOf(deptVal.toString()) : null);
+            }
             if (updates.containsKey("avatarUrl")) existing.setAvatarUrl((String) updates.get("avatarUrl"));
 
             userMapper.update(existing);
