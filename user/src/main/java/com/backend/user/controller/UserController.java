@@ -92,6 +92,30 @@ public class UserController {
         }
     }
 
+    @PutMapping("/resetVerification")
+    public ApiResponseDto<Void> resetVerification(HttpServletRequest request, @RequestBody Map<String, String> body) {
+        try {
+            Long userId = getCurrentUserId(request);
+            UserEntity existing = userMapper.findById(userId);
+            if (existing == null) {
+                return ApiResponseDto.error("User not found");
+            }
+            String type = body.get("type");
+            if ("email".equals(type)) {
+                existing.setEmailVerified(false);
+            } else if ("telegram".equals(type)) {
+                existing.setTgUsername(null);
+            }
+            userMapper.update(existing);
+            cacheService.delete("user:" + userId);
+            cacheService.delete("users:list");
+            return ApiResponseDto.success("Verification reset successfully", null);
+        } catch (Exception e) {
+            log.error("Failed to reset verification", e);
+            return ApiResponseDto.error("Failed to reset verification");
+        }
+    }
+
     @PutMapping("/password")
     public ApiResponseDto<Void> changePassword(HttpServletRequest request, @RequestBody Map<String, String> passwordRequest) {
         try {
