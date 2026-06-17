@@ -166,6 +166,7 @@ public class SsoService {
         }
 
         String jwksUrl = keycloakUrl + "/realms/" + keycloakRealm + "/protocol/openid-connect/certs";
+        log.info("Fetching JWKS from: {}", jwksUrl);
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(jwksUrl))
@@ -173,6 +174,10 @@ public class SsoService {
                 .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        log.info("JWKS response status: {}, body length: {}", response.statusCode(), response.body().length());
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("JWKS endpoint returned status " + response.statusCode() + ": " + response.body().substring(0, Math.min(200, response.body().length())));
+        }
         JsonNode jwks = objectMapper.readTree(response.body());
         JsonNode keys = jwks.get("keys");
 
