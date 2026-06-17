@@ -76,8 +76,15 @@ public class UserController {
 
             userMapper.update(existing);
             cacheService.clearByPrefix("bot:projectMembers:");
-            cacheService.clearByPrefix("user:" + userId);
-            cacheService.clearByPrefix("users:");
+            // 清除 manage 服务的用户缓存（直接删指定 key）
+            try {
+                cacheService.delete("user:" + userId);
+                cacheService.delete("users:list");
+            } catch (Exception e) {
+                // fallback: 用 prefix 清理
+                cacheService.clearByPrefix("user:");
+                cacheService.clearByPrefix("users:");
+            }
             return ApiResponseDto.success("Profile updated successfully", UserVo.fromEntity(existing));
         } catch (Exception e) {
             log.error("Failed to update profile", e);
