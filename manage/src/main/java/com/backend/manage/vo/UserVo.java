@@ -21,7 +21,8 @@ public record UserVo(
         boolean phoneVerified,
         LocalDateTime lastLoginAt,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String source
 ) {
     public static UserVo fromEntity(UserEntity entity) {
         return fromEntity(entity, false);
@@ -46,7 +47,8 @@ public record UserVo(
                 entity.isPhoneVerified(),
                 entity.getLastLoginAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getSource()
         );
     }
 }
