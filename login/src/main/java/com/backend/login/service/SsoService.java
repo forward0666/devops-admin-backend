@@ -40,6 +40,9 @@ public class SsoService {
     private CacheService cacheService;
 
     @Autowired
+    private org.springframework.data.redis.core.RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Value("${keycloak.url:https://keycloak.sdjk35.com}")
@@ -139,7 +142,17 @@ public class SsoService {
         user.setSource("keycloak");
 
         userMapper.insert(user);
-        log.info("SSO user created: {} (email={})", username, email);
+        log.info("SSO user created: {} (email={}, source={})", username, email, user.getSource());
+
+        // 清除 manage 服务的用户列表缓存
+        try {
+            if (cacheService.isRedisAvailable()) {
+                redisTemplate.delete("users:list");
+                log.info("Cleared users:list cache after SSO user creation");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to clear users:list cache: {}", e.getMessage());
+        }
 
         return user;
     }
