@@ -278,6 +278,13 @@ public class AuthService {
         return login(loginRequest, null);
     }
 
+    /**
+     * 生成 JWT token（供 SSO 等外部调用）
+     */
+    public com.backend.login.dto.JwtResponseDto generateToken(JwtGenerateRequestDto request) {
+        return securityServiceClient.generateToken(request);
+    }
+
     public void logout(String token) {
         try {
             String username = jwtUtil.getUsernameFromToken(token);

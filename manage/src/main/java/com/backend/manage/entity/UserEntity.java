@@ -140,4 +140,9 @@ public class UserEntity {
      * 密码修改时间
      */
     private LocalDateTime passwordChangedAt;
+
+    /**
+     * 用户来源
+     */
+    private String source;
 }

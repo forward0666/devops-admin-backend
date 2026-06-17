@@ -30,6 +30,7 @@
         <result property="lastLoginIp" column="last_login_ip"/>
         <result property="loginCount" column="login_count"/>
         <result property="passwordChangedAt" column="password_changed_at"/>
+        <result property="source" column="source"/>
     </resultMap>
 
     <!-- ================= 查询 ================= -->
@@ -87,6 +88,7 @@
             email,
             phone,
             tg_username,
+            source,
             full_name,
             avatar_url,
             department_id,
@@ -99,7 +101,8 @@
             email_verified,
             phone_verified,
             login_count,
-            password_changed_at
+            password_changed_at,
+            source
         )
         VALUES (
                    #{username},
@@ -119,7 +122,8 @@
                    #{emailVerified},
                    #{phoneVerified},
                    #{loginCount},
-                   #{passwordChangedAt}
+                   #{passwordChangedAt},
+                   #{source}
                )
     </insert>
 

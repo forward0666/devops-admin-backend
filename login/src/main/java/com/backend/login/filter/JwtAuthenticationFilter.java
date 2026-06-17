@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         // Skip JWT validation for login endpoint, logout, and health checks
-        if (path.equals("/authLogIn") || path.equals("/authLogOut") || path.equals("/validate-token") || path.equals("/health") || path.equals("/actuator/health")) {
+        if (path.equals("/authLogIn") || path.equals("/authLogOut") || path.equals("/authSSO") || path.equals("/validate-token") || path.equals("/health") || path.equals("/actuator/health")) {
             log.debug("Skipping JWT validation for path: {}", path);
             filterChain.doFilter(request, response);
             return;

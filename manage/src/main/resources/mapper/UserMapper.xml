@@ -30,6 +30,7 @@
         <result property="lastLoginIp" column="last_login_ip"/>
         <result property="loginCount" column="login_count"/>
         <result property="passwordChangedAt" column="password_changed_at"/>
+        <result property="source" column="source"/>
     </resultMap>
 
     <!-- ================= 查询 ================= -->

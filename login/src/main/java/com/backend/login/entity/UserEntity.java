@@ -140,4 +140,10 @@ public class UserEntity {
      * 密码修改时间
      */
     private LocalDateTime passwordChangedAt;
+
+    /**
+     * 用户来源
+     * 例如：local, sso, keycloak
+     */
+    private String source;
 }
