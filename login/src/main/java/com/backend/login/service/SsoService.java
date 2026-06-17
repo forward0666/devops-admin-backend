@@ -108,12 +108,7 @@ public class SsoService {
         if (user != null) {
             // 更新最后登录信息
             userMapper.updateLoginInfo(user.getId(), LocalDateTime.now(), null);
-            // SSO 登录更新 source 为 keycloak
-            if (!"keycloak".equals(user.getSource())) {
-                user.setSource("keycloak");
-                userMapper.update(user);
-            }
-            log.info("SSO user found: {}", username);
+            log.info("SSO user found: {} (source={})", username, user.getSource());
             return user;
         }
 
