@@ -57,7 +57,8 @@ public class RoleCacheService {
     }
 
     public void clearAllRoleCache() {
-        cacheService.clearByPrefix(ROLE_PREFIX);
+        if (!cacheService.isRedisAvailable()) return;
+        redisTemplate.delete(ROLE_LIST);
         redisTemplate.delete(ROLE_LIST);
     }
 }

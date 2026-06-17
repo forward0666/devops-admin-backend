@@ -57,7 +57,8 @@ public class PositionCacheService {
     }
 
     public void clearAllPositionCache() {
-        cacheService.clearByPrefix(POSITION_PREFIX);
+        if (!cacheService.isRedisAvailable()) return;
+        redisTemplate.delete(POSITION_LIST);
         redisTemplate.delete(POSITION_LIST);
     }
 }

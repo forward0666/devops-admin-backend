@@ -109,6 +109,8 @@ public class UserController {
                     userRequest.getDepartmentId(), userRequest.getActive(), userRequest.getUpdatedBy());
             if (updatedUser != null) {
                 cacheService.clearByPrefix("bot:projectMembers:");
+                cacheService.delete("user:" + id);
+                cacheService.delete("users:list");
                 return ApiResponseDto.success("User updated successfully", UserVo.fromEntity(updatedUser));
             } else {
                 return ApiResponseDto.error("User not found");
@@ -176,6 +178,8 @@ public class UserController {
             AccessValidator.validate(request, jwtUtil, "sys_admin", "admin");
             boolean deleted = userService.deleteUser(id);
             if (deleted) {
+                cacheService.delete("user:" + id);
+                cacheService.delete("users:list");
                 return ApiResponseDto.success("User deleted successfully", null);
             } else {
                 return ApiResponseDto.error("User not found");

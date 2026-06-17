@@ -84,8 +84,9 @@ public class DepartmentCacheService {
     }
 
     public void clearDepartmentsCache() {
-        cacheService.clearByPrefix(DEPT_PREFIX);
+        if (!cacheService.isRedisAvailable()) return;
         redisTemplate.delete(DEPT_LIST);
+        log.info("✅ Cleared departments cache: {}", DEPT_LIST);
     }
 
     public void departmentUsersCache(Long deptId, List<UserEntity> users) {

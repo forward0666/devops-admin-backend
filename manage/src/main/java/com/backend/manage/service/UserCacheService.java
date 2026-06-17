@@ -63,7 +63,7 @@ public class UserCacheService {
     }
 
     public void clearAllUserCache() {
-        cacheService.clearByPrefix(USER_PREFIX);
+        if (!cacheService.isRedisAvailable()) return;
         redisTemplate.delete(USERS_LIST);
     }
 
