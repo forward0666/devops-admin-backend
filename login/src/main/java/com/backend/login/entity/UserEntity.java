@@ -146,4 +146,6 @@ public class UserEntity {
      * 例如：local, sso, keycloak
      */
     private String source;
+
+    private boolean tgVerified;
 }

@@ -31,6 +31,7 @@
         <result property="loginCount" column="login_count"/>
         <result property="passwordChangedAt" column="password_changed_at"/>
         <result property="source" column="source"/>
+        <result property="tgVerified" column="tg_verified"/>
     </resultMap>
 
     <!-- ================= 查询 ================= -->

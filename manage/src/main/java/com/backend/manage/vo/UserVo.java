@@ -22,7 +22,8 @@ public record UserVo(
         LocalDateTime lastLoginAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        String source
+        String source,
+        boolean tgVerified
 ) {
     public static UserVo fromEntity(UserEntity entity) {
         return fromEntity(entity, false);
@@ -48,7 +49,8 @@ public record UserVo(
                 entity.getLastLoginAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                entity.getSource()
+                entity.getSource(),
+                entity.isTgVerified()
         );
     }
 }

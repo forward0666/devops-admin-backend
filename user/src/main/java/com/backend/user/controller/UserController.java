@@ -104,7 +104,7 @@ public class UserController {
             if ("email".equals(type)) {
                 existing.setEmailVerified(false);
             } else if ("telegram".equals(type)) {
-                existing.setTgUsername(null);
+                existing.setTgVerified(false);
             }
             userMapper.update(existing);
             cacheService.delete("user:" + userId);

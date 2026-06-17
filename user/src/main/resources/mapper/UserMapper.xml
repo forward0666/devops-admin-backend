@@ -30,6 +30,7 @@
         <result property="lastLoginIp" column="last_login_ip"/>
         <result property="loginCount" column="login_count"/>
         <result property="passwordChangedAt" column="password_changed_at"/>
+        <result property="tgVerified" column="tg_verified"/>
     </resultMap>
 
     <!-- ================= 查询 ================= -->
@@ -132,6 +133,7 @@
             email           = NULLIF(#{email}, ''),
             phone           = NULLIF(#{phone}, ''),
             tg_username     = NULLIF(#{tgUsername}, ''),
+            tg_verified     = #{tgVerified},
             full_name       = #{fullName},
             avatar_url      = #{avatarUrl},
             department_id   = #{departmentId},

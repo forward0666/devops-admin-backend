@@ -145,4 +145,6 @@ public class UserEntity {
      * 用户来源
      */
     private String source;
+
+    private boolean tgVerified;
 }

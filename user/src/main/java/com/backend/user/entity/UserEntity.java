@@ -140,4 +140,9 @@ public class UserEntity {
      * 密码修改时间
      */
     private LocalDateTime passwordChangedAt;
+
+    /**
+     * Telegram 验证状态
+     */
+    private boolean tgVerified;
 }
