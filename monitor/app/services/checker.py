@@ -274,6 +274,8 @@ async def run_check_for_rule(rule: dict):
         except: domains = []
 
     # ── Step 1: Load domains ──
+    domain_client_mongo = None
+    domain_db = None
     domains_to_check = []
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
@@ -281,17 +283,15 @@ async def run_check_for_rule(rule: dict):
         uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
         domain_client_mongo = AsyncIOMotorClient(uri)
         domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
+        logger.info(f"[Step 1] Connected to MongoDB database: {DOMAIN_MONGODB_DATABASE}")
         if domains:
-            # Check selected domains only
             domains_to_check = [d for d in domains if d]
         else:
-            # Check all non-ignored domains
             docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
             for doc in docs:
                 name = doc.get("name", "")
                 if name and name not in domains_to_check:
                     domains_to_check.append(name)
-        domain_client_mongo.close()
     except Exception as e:
         logger.error(f"[Monitor] Failed to fetch domains: {e}")
 
@@ -359,17 +359,13 @@ async def run_check_for_rule(rule: dict):
     domains_to_check.sort(key=_sort_key)
     logger.info(f"[Step 4] Sorted: A good > CNAME all > A bad")
 
-    # ── Step 5: Connect Domain DB ──
-    domain_client_mongo = None
+    # ── Step 5: Use same domain DB connection ──
     dns_col = None
-    try:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
-        uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
-        domain_client_mongo = AsyncIOMotorClient(uri)
-        dns_col = domain_client_mongo[DOMAIN_MONGODB_DATABASE]["domain"]
-    except Exception as e:
-        logger.error(f"[Step 5] Failed to connect domain DB: {e}")
+    if domain_db is not None:
+        dns_col = domain_db["domain"]
+        logger.info(f"[Step 5] Using domain DB connection, collection=domain")
+    else:
+        logger.error("[Step 5] domain_db is None, cannot write results")
 
     # ── Step 5.5: Pre-resolve DNS (batch, higher concurrency) ──
     dns_pre_sem = asyncio.Semaphore(DNS_CONCURRENCY * 2)
@@ -483,15 +479,6 @@ async def run_check_for_rule(rule: dict):
     if dns_updates and dns_col is not None:
         result = await dns_col.bulk_write(dns_updates)
         logger.info(f"[Step 8] Domain update: wrote={len(dns_updates)}, matched={result.matched_count}, modified={result.modified_count}")
-        if result.matched_count == 0 and domains_to_check:
-            sample_checker = domains_to_check[:3]
-            sample_db = await dns_col.find({}, {"name": 1}).limit(3).to_list(3)
-            sample_names = [s.get("name") for s in sample_db]
-            logger.warning(f"[Step 8] MISMATCH! checker={sample_checker} vs db={sample_names}")
-            # Check if names match with exact comparison
-            for s in sample_checker:
-                found = await dns_col.count_documents({"name": s})
-                logger.warning(f"[Step 8]   '{s}' -> found={found}")
     elif dns_col is None:
         logger.error("[Step 8] Skipped: dns_col is None (domain DB connection failed)")
     else:
