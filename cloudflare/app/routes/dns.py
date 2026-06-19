@@ -37,12 +37,9 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
 
     import asyncio
 
-    # 先清理所有 account 的旧 DNS 记录
-    db_cols = await db.list_collection_names()
-    for col_name in db_cols:
-        if col_name.endswith("_dns_records"):
-            await db[col_name].delete_many({})
-    logger.info(f"[DNS Sync] Cleared all DNS record collections")
+    # 先清理该 account 的旧 DNS 记录
+    deleted = await dns_collection.delete_many({"account_id": str(account_id)})
+    logger.info(f"[DNS Sync] Cleared {deleted.deleted_count} old records for account_id={account_id}")
 
     now = datetime.utcnow()
     total_synced = 0
