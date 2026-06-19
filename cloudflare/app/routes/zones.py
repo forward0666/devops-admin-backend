@@ -26,6 +26,18 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     db = await get_db()
     collection = db[get_collection_name(account_id, "zones")]
 
+    # 1. 验证 token
+    try:
+        verify_data = await cf_client.async_verify_token(x_cf_token)
+        if verify_data.get("success"):
+            token_status = verify_data.get("result", {}).get("status", "unknown")
+            logger.info(f"[Zone Sync] Token status: {token_status}")
+        else:
+            logger.warning(f"[Zone Sync] Token verify failed: {verify_data}")
+    except Exception as e:
+        logger.warning(f"[Zone Sync] Token verify error (non-fatal): {e}")
+
+    # 2. 获取 zones
     try:
         cf_data = await cf_client.async_list_zones(x_cf_token)
     except Exception as e:
@@ -37,21 +49,22 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
 
     zones = cf_data.get("result", [])
     logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
-    now = datetime.utcnow()
 
-    # 按 CF account.id 分组，取最多的作为当前 account 的 CF account ID
+    # 3. 按 CF account.id 分组，确定当前 token 对应的 CF account
     cf_account_counts: dict[str, int] = {}
     for z in zones:
         cf_acc = (z.get("account") or {}).get("id", "")
         if cf_acc:
             cf_account_counts[cf_acc] = cf_account_counts.get(cf_acc, 0) + 1
     cf_account_id = max(cf_account_counts, key=cf_account_counts.get) if cf_account_counts else ""
-    logger.info(f"[Zone Sync] CF account groups: {cf_account_counts}, using: {cf_account_id}")
+    logger.info(f"[Zone Sync] CF account groups: {cf_account_counts}, primary: {cf_account_id}")
 
-    # 先清理该 account 的旧 zones
+    # 4. 清理旧数据
     deleted = await collection.delete_many({"account_id": str(account_id)})
     logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
 
+    # 5. 写入属于当前 CF account 的 zones
+    now = datetime.utcnow()
     synced = 0
     skipped = 0
     for zone in zones:

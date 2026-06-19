@@ -333,6 +333,20 @@ def delete_cache_rule(api_token: str, zone_id: str, rule_id: str) -> dict:
 async def async_list_zones(api_token: str, per_page: int = 50, account_id: str = None) -> dict:
     return await asyncio.to_thread(list_zones, api_token, per_page, account_id)
 
+
+def verify_token(api_token: str) -> dict:
+    cf = get_client(api_token)
+    # CF API 没有直接的 token verify，用 user.ips 间接测试
+    try:
+        resp = cf.user.ips.list()
+        return {"success": True, "result": {"status": "active"}}
+    except Exception as e:
+        return {"success": False, "errors": [{"message": str(e)}]}
+
+
+async def async_verify_token(api_token: str) -> dict:
+    return await asyncio.to_thread(verify_token, api_token)
+
 async def async_get_zone(api_token: str, zone_id: str) -> dict:
     return await asyncio.to_thread(get_zone, api_token, zone_id)
 
