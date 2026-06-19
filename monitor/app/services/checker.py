@@ -480,9 +480,13 @@ async def run_check_for_rule(rule: dict):
         await collection.bulk_write(upsert_ops)
         logger.info(f"[Step 8] Upserted {len(upsert_ops)} results")
 
-    if dns_updates:
-        await dns_col.bulk_write(dns_updates)
-        logger.info(f"[Step 8] Updated {len(dns_updates)} dns_domains")
+    if dns_updates and dns_col is not None:
+        result = await dns_col.bulk_write(dns_updates)
+        logger.info(f"[Step 8] Updated {len(dns_updates)} domain records, matched={result.matched_count}, modified={result.modified_count}")
+    elif dns_col is None:
+        logger.error("[Step 8] Skipped: dns_col is None (domain DB connection failed)")
+    else:
+        logger.info("[Step 8] No domain updates to write")
 
     if domain_client_mongo:
         domain_client_mongo.close()
