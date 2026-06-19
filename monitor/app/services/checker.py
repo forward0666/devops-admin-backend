@@ -287,8 +287,8 @@ async def run_check_for_rule(rule: dict):
                 uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
                 domain_client_mongo = AsyncIOMotorClient(uri)
                 domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
-                total_docs = await domain_db["dns_domains"].count_documents({"is_ignored": {"$ne": True}})
-                docs = await domain_db["dns_domains"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
+                total_docs = await domain_db["domain"].count_documents({"is_ignored": {"$ne": True}})
+                docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
                 seen_names = set()
                 for doc in docs:
                     name = doc.get("name", "")
@@ -377,7 +377,7 @@ async def run_check_for_rule(rule: dict):
         from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
         uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
         domain_client_mongo = AsyncIOMotorClient(uri)
-        dns_col = domain_client_mongo[DOMAIN_MONGODB_DATABASE]["dns_domains"]
+        dns_col = domain_client_mongo[DOMAIN_MONGODB_DATABASE]["domain"]
     except Exception as e:
         logger.error(f"[Step 5] Failed to connect domain DB: {e}")
 
