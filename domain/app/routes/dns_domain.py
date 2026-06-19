@@ -16,8 +16,6 @@ async def sync_dns_domains():
     """从 cloudflare 库的所有 account_{id}_dns_records 集合同步 A/CNAME 记录"""
     db = await get_db()
     source_db = await get_source_db()
-    logger.info(f"[Sync] Writing to db={db.name}, collection={COLLECTION}")
-    logger.info(f"[Sync] Reading from source_db={source_db.name}")
     now = datetime.utcnow()
     total_synced = 0
 
