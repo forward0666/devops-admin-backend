@@ -5,7 +5,6 @@ from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
 from app.routes import domain, dns_domain
-from app.services.db import close_pool, get_pool
 from app.services.mongodb import close_db, get_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -16,11 +15,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Domain Manager starting...")
-    await get_pool()
     await get_db()
     yield
     logger.info("🛑 Domain Manager shutting down...")
-    await close_pool()
     await close_db()
 
 
