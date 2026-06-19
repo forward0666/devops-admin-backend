@@ -267,43 +267,23 @@ async def run_check_for_rule(rule: dict):
     """Run check for a single rule and save results to MongoDB"""
     rule_id = rule["id"]
     rule_name = rule["name"]
-    source = rule["source"]
-    domains = rule.get("domains", [])
-    custom_domains = rule.get("custom_domains", "")
 
-    # ── Step 1: Load domains ──
+    # ── Step 1: Load all non-ignored domains from domain DB ──
     domains_to_check = []
-
-    if source == "custom" and custom_domains:
-        for line in custom_domains.strip().split("\n"):
-            d = line.strip()
-            if d:
-                domains_to_check.append(d)
-    elif domains:
-        if "all" in domains:
-            try:
-                from motor.motor_asyncio import AsyncIOMotorClient
-                from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
-                uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
-                domain_client_mongo = AsyncIOMotorClient(uri)
-                domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
-                total_docs = await domain_db["domain"].count_documents({"is_ignored": {"$ne": True}})
-                docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
-                seen_names = set()
-                for doc in docs:
-                    name = doc.get("name", "")
-                    if name and name not in domains_to_check:
-                        domains_to_check.append(name)
-                    if name:
-                        seen_names.add(name)
-                empty_count = total_docs - len(seen_names)
-                if empty_count > 0:
-                    logger.warning(f"[Monitor] {empty_count} docs in dns_domains have empty name, skipped")
-                domain_client_mongo.close()
-            except Exception as e:
-                logger.error(f"[Monitor] Failed to fetch all domains: {e}")
-        else:
-            domains_to_check = [d for d in domains if d != "all"]
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
+        uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
+        domain_client_mongo = AsyncIOMotorClient(uri)
+        domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
+        docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
+        for doc in docs:
+            name = doc.get("name", "")
+            if name and name not in domains_to_check:
+                domains_to_check.append(name)
+        domain_client_mongo.close()
+    except Exception as e:
+        logger.error(f"[Monitor] Failed to fetch domains: {e}")
 
     if not domains_to_check:
         logger.warning(f"[Monitor] Rule '{rule_name}' has no domains to check")
@@ -447,7 +427,6 @@ async def run_check_for_rule(rule: dict):
         doc = {
             "rule_id": rule_id,
             "rule_name": rule_name,
-            "source": source,
             "checked_at": now,
             "last_protocol": protocol or "http",
             "record_type": result.get("record_type", "unknown"),
@@ -527,12 +506,6 @@ async def run_single_check(rule_id: int):
     try:
         rule = await query_one("SELECT * FROM monitor_rule WHERE id=%s AND enabled=1", (rule_id,))
         if rule:
-            if isinstance(rule.get("domains"), str):
-                import json
-                try:
-                    rule["domains"] = json.loads(rule["domains"])
-                except:
-                    rule["domains"] = []
             await run_check_for_rule(rule)
     finally:
         await release_lock(lock_name)
