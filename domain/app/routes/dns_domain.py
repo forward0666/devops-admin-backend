@@ -44,6 +44,10 @@ async def sync_dns_domains():
         logger.info(f"[Sync] {coll_name}: sample record_ids: {rids[:3]}")
         logger.info(f"[Sync] {coll_name}: sample names: {[r.get('name') for r in records[:3]]}")
         logger.info(f"[Sync] {coll_name}: unique record_ids: {len(set(rids))}, total: {len(rids)}")
+        # Check types
+        types = set(type(r).__name__ for r in records if r.get("record_id"))
+        logger.info(f"[Sync] {coll_name}: record_id types: {types}")
+        logger.info(f"[Sync] {coll_name}: sample record_id repr: {[repr(r.get('record_id')) for r in records[:2]]}")
         if prev_rids:
             overlap = set(rids) & prev_rids
             logger.info(f"[Sync] {coll_name}: overlap with previous: {len(overlap)}")
