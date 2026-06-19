@@ -19,7 +19,7 @@ def get_collection_name(account_id: int, suffix: str) -> str:
 async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-Token")):
     """Fetch zones from Cloudflare API and sync to MongoDB"""
     logger.info(f"[Zone Sync] Start sync for account_id={account_id}")
-    account = await query_one("SELECT id, name, tags FROM account WHERE id = %s", (account_id,))
+    account = await query_one("SELECT id, name, tags, cf_account_id FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -50,14 +50,25 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     zones = cf_data.get("result", [])
     logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
 
-    # 3. 按 CF account.id 分组，确定当前 token 对应的 CF account
+    # 3. 确定 CF account ID（优先用数据库存的，否则从 zones 推断）
+    saved_cf_account_id = account.get("cf_account_id") or ""
     cf_account_counts: dict[str, int] = {}
     for z in zones:
         cf_acc = (z.get("account") or {}).get("id", "")
         if cf_acc:
             cf_account_counts[cf_acc] = cf_account_counts.get(cf_acc, 0) + 1
-    cf_account_id = max(cf_account_counts, key=cf_account_counts.get) if cf_account_counts else ""
-    logger.info(f"[Zone Sync] CF account groups: {cf_account_counts}, primary: {cf_account_id}")
+    inferred_cf_account_id = max(cf_account_counts, key=cf_account_counts.get) if cf_account_counts else ""
+    cf_account_id = saved_cf_account_id or inferred_cf_account_id
+    logger.info(f"[Zone Sync] CF account: saved={saved_cf_account_id}, inferred={inferred_cf_account_id}, using={cf_account_id}")
+
+    # 保存 CF account ID 到 MySQL（首次同步时）
+    if not saved_cf_account_id and inferred_cf_account_id:
+        try:
+            from app.services.db import execute
+            await execute("UPDATE account SET cf_account_id = %s WHERE id = %s", (inferred_cf_account_id, account_id))
+            logger.info(f"[Zone Sync] Saved cf_account_id={inferred_cf_account_id} for account_id={account_id}")
+        except Exception as e:
+            logger.warning(f"[Zone Sync] Failed to save cf_account_id: {e}")
 
     # 4. 清理旧数据
     deleted = await collection.delete_many({"account_id": str(account_id)})
