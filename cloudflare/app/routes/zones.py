@@ -78,6 +78,31 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     return {"code": 200, "data": {"synced": synced, "total": len(zones)}}
 
 
+@router.post("/syncAll")
+async def sync_all_zones(x_cf_token: str = Header(..., alias="X-Cf-Token")):
+    """Sync zones for all accounts"""
+    accounts = await query_all("SELECT id, name FROM account ORDER BY id")
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No accounts found")
+
+    results = []
+    for acc in accounts:
+        try:
+            # Get token for this account
+            acc_row = await query_one("SELECT api_key FROM account WHERE id = %s", (acc["id"],))
+            if not acc_row:
+                continue
+            token = acc_row["api_key"]
+            # Reuse sync_zones logic
+            result = await sync_zones(acc["id"], token)
+            results.append({"account_id": acc["id"], "account_name": acc["name"], "data": result.get("data", {})})
+        except Exception as e:
+            logger.error(f"[Zone Sync All] Failed for account {acc['id']}: {e}")
+            results.append({"account_id": acc["id"], "account_name": acc["name"], "error": str(e)})
+
+    return {"code": 200, "data": results}
+
+
 @router.get("")
 async def list_zones(account_id: int = None):
     """Read zones from MongoDB"""
