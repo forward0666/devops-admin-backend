@@ -293,13 +293,13 @@ async def run_sync_rule(task: dict):
 
 
 async def run_sync_domain(task: dict):
-    """Sync Cloudflare domains (dns_records -> dns_domains)"""
+    """Sync domains (dns_records -> domain collection)"""
     start_time = time.monotonic()
     task_id = task.get("id")
     task_name = task.get("name", "")
 
-    cf_url = await get_service_url("cloudflare")
-    url = f"{cf_url}/dnsDomain/sync"
+    domain_url = await get_service_url("domain")
+    url = f"{domain_url}/domain/sync"
     logger.info(f"[Task] sync_domain: POST {url}")
 
     async with httpx.AsyncClient(timeout=300) as client:
