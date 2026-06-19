@@ -39,6 +39,10 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
     now = datetime.utcnow()
 
+    # 先清理该 account 的旧数据
+    deleted = await collection.delete_many({"account_id": str(account_id)})
+    logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
+
     synced = 0
     for zone in zones:
         doc = {
@@ -61,10 +65,7 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
         )
         synced += 1
 
-    # Delete stale zones (not updated in this sync)
-    stale = await collection.delete_many({"account_id": str(account_id), "synced_at": {"$lt": now}})
-
-    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}, stale_removed={stale.deleted_count}")
+    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}")
     return {"code": 200, "data": {"synced": synced, "total": len(zones), "stale_removed": stale.deleted_count}}
 
 
