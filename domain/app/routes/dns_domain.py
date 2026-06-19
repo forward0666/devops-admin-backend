@@ -39,7 +39,11 @@ async def sync_dns_domains():
         if not records:
             continue
 
-        logger.info(f"[Sync] {coll_name}: {len(records)} records")
+            logger.info(f"[Sync] {coll_name}: {len(records)} records")
+        rids = [r.get("record_id", "") for r in records]
+        zone_ids = set(r.get("zone_id", "") for r in records)
+        logger.info(f"[Sync] {coll_name}: {len(zone_ids)} unique zones")
+        logger.info(f"[Sync] {coll_name}: sample zone_ids: {list(zone_ids)[:3]}")
         for r in records:
             doc = {
                 "record_id": r.get("record_id", ""),
