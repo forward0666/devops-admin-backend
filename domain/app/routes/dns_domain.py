@@ -98,7 +98,7 @@ async def sync_dns_domains():
     await db[COLLECTION].update_many({"is_ignored": {"$exists": False}}, {"$set": {"is_ignored": False}})
     await db[COLLECTION].update_many({"remark": {"$exists": False}}, {"$set": {"remark": ""}})
 
-    logger.info(f"DNS domains sync complete: {total_synced} new/modified, {len(dns_collections)} collections, target={db.name}.{COLLECTION}")
+    logger.info(f"DNS domains sync complete: {total_synced} new records, target={db.name}.{COLLECTION}")
     return {"code": 200, "data": {"synced": total_synced, "collections": len(dns_collections)}}
 
 
@@ -106,8 +106,6 @@ async def sync_dns_domains():
 async def list_dns_domains(keyword: str = None, type: str = None, is_ignored: bool = None):
     """查询 dns_domains"""
     db = await get_db()
-    total = await db[COLLECTION].count_documents({})
-    logger.info(f"[List] db={db.name}, collection={COLLECTION}, total={total}")
     query = {}
     if type:
         query["type"] = type
