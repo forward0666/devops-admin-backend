@@ -18,6 +18,7 @@ async def sync_dns_domains():
     source_db = await get_source_db()
     now = datetime.utcnow()
     total_synced = 0
+    prev_rids = set()
 
     # 列出源库中所有 *_dns_records 集合
     collections = await source_db.list_collection_names()
@@ -42,6 +43,11 @@ async def sync_dns_domains():
         rids = [r.get("record_id", "") for r in records]
         logger.info(f"[Sync] {coll_name}: sample record_ids: {rids[:3]}")
         logger.info(f"[Sync] {coll_name}: sample names: {[r.get('name') for r in records[:3]]}")
+        logger.info(f"[Sync] {coll_name}: unique record_ids: {len(set(rids))}, total: {len(rids)}")
+        if prev_rids:
+            overlap = set(rids) & prev_rids
+            logger.info(f"[Sync] {coll_name}: overlap with previous: {len(overlap)}")
+        prev_rids = set(rids)
         for r in records:
             doc = {
                 "record_id": r.get("record_id", ""),
