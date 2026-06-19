@@ -35,7 +35,7 @@ async def log_requests(request: Request, call_next):
 
 
 app.include_router(domain.router, tags=["Domain"])
-app.include_router(dns_domain.router, prefix="/dnsDomain", tags=["DNS Domain"])
+app.include_router(dns_domain.router, prefix="/domain", tags=["DNS Domain"])
 
 
 @app.get("/health")
