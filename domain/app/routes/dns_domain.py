@@ -97,6 +97,8 @@ async def sync_dns_domains():
 async def list_dns_domains(keyword: str = None, type: str = None, is_ignored: bool = None):
     """查询 dns_domains"""
     db = await get_db()
+    total = await db[COLLECTION].count_documents({})
+    logger.info(f"[List] db={db.name}, collection={COLLECTION}, total={total}")
     query = {}
     if type:
         query["type"] = type
