@@ -89,7 +89,7 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     total_synced = sum(results)
 
     logger.info(f"[DNS Sync] Complete for account_id={account_id}: synced={total_synced}")
-    return {"code": 200, "data": {"synced": total_synced, "stale_removed": stale.deleted_count}}
+    return {"code": 200, "data": {"synced": total_synced}}
 
 
 @router.get("")
