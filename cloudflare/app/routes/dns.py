@@ -92,6 +92,28 @@ async def sync_dns(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-To
     return {"code": 200, "data": {"synced": total_synced}}
 
 
+@router.post("/syncAll")
+async def sync_all_dns():
+    """Sync DNS records for all accounts"""
+    accounts = await query_all("SELECT id, name FROM account ORDER BY id")
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No accounts found")
+
+    results = []
+    for acc in accounts:
+        try:
+            acc_row = await query_one("SELECT api_key FROM account WHERE id = %s", (acc["id"],))
+            if not acc_row:
+                continue
+            result = await sync_dns(acc["id"], acc_row["api_key"])
+            results.append({"account_id": acc["id"], "account_name": acc["name"], "data": result.get("data", {})})
+        except Exception as e:
+            logger.error(f"[DNS Sync All] Failed for account {acc['id']}: {e}")
+            results.append({"account_id": acc["id"], "account_name": acc["name"], "error": str(e)})
+
+    return {"code": 200, "data": results}
+
+
 @router.get("")
 async def list_dns(account_id: int = None):
     """Read DNS records from MongoDB"""
