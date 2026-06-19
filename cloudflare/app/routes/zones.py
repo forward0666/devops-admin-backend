@@ -79,7 +79,7 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
 
 
 @router.post("/syncAll")
-async def sync_all_zones(x_cf_token: str = Header(..., alias="X-Cf-Token")):
+async def sync_all_zones():
     """Sync zones for all accounts"""
     accounts = await query_all("SELECT id, name FROM account ORDER BY id")
     if not accounts:
