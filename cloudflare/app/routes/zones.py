@@ -18,7 +18,7 @@ def get_collection_name(account_id: int, suffix: str) -> str:
 @router.post("/sync")
 async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-Token")):
     """Fetch zones from Cloudflare API and sync to MongoDB"""
-    logger.info(f"[Zone Sync] Start sync for account_id={account_id}")
+    logger.info(f"[Zone Sync] Start sync for account_id={account_id}, token={x_cf_token[:8]}...")
     account = await query_one("SELECT id, name, tags FROM account WHERE id = %s", (account_id,))
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
