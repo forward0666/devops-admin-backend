@@ -43,8 +43,22 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     deleted = await collection.delete_many({"account_id": str(account_id)})
     logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
 
+    # 收集其他 account 的已有 zone_id，避免跨 account 重复
+    existing_zones = set()
+    db_cols = await db.list_collection_names()
+    for col_name in db_cols:
+        if col_name.endswith("_zones") and col_name != get_collection_name(account_id, "zones"):
+            async for z in db[col_name].find({}, {"zone_id": 1}):
+                existing_zones.add(z.get("zone_id"))
+    logger.info(f"[Zone Sync] Found {len(existing_zones)} zones in other accounts")
+
     synced = 0
+    skipped = 0
     for zone in zones:
+        if zone["id"] in existing_zones:
+            skipped += 1
+            continue
+        existing_zones.add(zone["id"])
         doc = {
             "zone_id": zone["id"],
             "account_id": str(account_id),
@@ -65,8 +79,8 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
         )
         synced += 1
 
-    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}")
-    return {"code": 200, "data": {"synced": synced, "total": len(zones), "stale_removed": stale.deleted_count}}
+    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}, skipped={skipped} (already in other account)")
+    return {"code": 200, "data": {"synced": synced, "skipped": skipped, "total": len(zones)}}
 
 
 @router.get("")
