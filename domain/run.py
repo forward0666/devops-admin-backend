@@ -10,6 +10,7 @@ from app.services.nacos_client import fetch_config, register_service, send_heart
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def heartbeat_daemon():
