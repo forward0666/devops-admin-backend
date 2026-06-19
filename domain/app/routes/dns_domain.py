@@ -50,6 +50,14 @@ async def sync_dns_domains():
         if prev_rids:
             overlap = set(rids) & prev_rids
             logger.info(f"[Sync] {coll_name}: overlap with previous: {len(overlap)}")
+            if overlap:
+                sample_overlap = list(overlap)[:3]
+                logger.info(f"[Sync] {coll_name}: overlap sample: {sample_overlap}")
+                # Check which collection these came from
+                for rid in sample_overlap:
+                    in_prev = rid in prev_rids
+                    in_curr = rid in set(rids)
+                    logger.info(f"[Sync]   rid={rid} in_prev={in_prev} in_curr={in_curr}")
         prev_rids = set(rids)
         for r in records:
             doc = {
