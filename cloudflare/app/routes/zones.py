@@ -27,7 +27,7 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     collection = db[get_collection_name(account_id, "zones")]
 
     try:
-        cf_data = await cf_client.async_list_zones(x_cf_token, account_id=str(account_id))
+        cf_data = await cf_client.async_list_zones(x_cf_token)
     except Exception as e:
         logger.error(f"[Zone Sync] CF API error for account_id={account_id}: {type(e).__name__}: {e}")
         return {"code": 403, "message": f"CF API error: {type(e).__name__}"}
