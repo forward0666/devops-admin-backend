@@ -299,7 +299,7 @@ async def run_check_for_rule(rule: dict):
                 empty_count = total_docs - len(seen_names)
                 if empty_count > 0:
                     logger.warning(f"[Monitor] {empty_count} docs in dns_domains have empty name, skipped")
-                cf_client_mongo.close()
+                domain_client_mongo.close()
             except Exception as e:
                 logger.error(f"[Monitor] Failed to fetch all domains: {e}")
         else:
