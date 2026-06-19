@@ -53,9 +53,23 @@ async def sync_dns_domains():
                 "priority": r.get("priority"),
                 "synced_at": now,
             }
+            sync_fields = {
+                "record_id": doc["record_id"],
+                "zone_id": doc["zone_id"],
+                "zone_name": doc["zone_name"],
+                "account_id": doc["account_id"],
+                "account_name": doc["account_name"],
+                "type": doc["type"],
+                "name": doc["name"],
+                "content": doc["content"],
+                "proxied": doc["proxied"],
+                "ttl": doc["ttl"],
+                "priority": doc["priority"],
+                "synced_at": now,
+            }
             await db[COLLECTION].update_one(
                 {"record_id": doc["record_id"]},
-                {"$set": doc, "$setOnInsert": {"is_public": False, "is_ignored": False, "remark": ""}},
+                {"$set": sync_fields, "$setOnInsert": {"is_public": False, "is_ignored": False, "remark": ""}},
                 upsert=True,
             )
             total_synced += 1
