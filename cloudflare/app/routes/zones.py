@@ -39,13 +39,15 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
     now = datetime.utcnow()
 
-    # 先清理该 account 的旧数据
-    deleted = await collection.delete_many({"account_id": str(account_id)})
-    logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
-
-    # 收集其他 account 的已有 zone_id，避免跨 account 重复
-    existing_zones = set()
+    # 先清理所有 account 的旧 zones
     db_cols = await db.list_collection_names()
+    for col_name in db_cols:
+        if col_name.endswith("_zones"):
+            await db[col_name].delete_many({})
+    logger.info(f"[Zone Sync] Cleared all zone collections")
+
+    # 收集所有已有 zone_id（此时为空，但保持逻辑一致）
+    existing_zones = set()
     for col_name in db_cols:
         if col_name.endswith("_zones") and col_name != get_collection_name(account_id, "zones"):
             async for z in db[col_name].find({}, {"zone_id": 1}):
