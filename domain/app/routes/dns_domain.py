@@ -38,6 +38,7 @@ async def sync_dns_domains():
         if not records:
             continue
 
+        logger.info(f"[Sync] {coll_name}: {len(records)} records")
         for r in records:
             doc = {
                 "record_id": r.get("record_id", ""),
@@ -67,12 +68,15 @@ async def sync_dns_domains():
                 "priority": doc["priority"],
                 "synced_at": now,
             }
-            await db[COLLECTION].update_one(
+            result = await db[COLLECTION].update_one(
                 {"record_id": doc["record_id"]},
                 {"$set": sync_fields, "$setOnInsert": {"is_public": False, "is_ignored": False, "remark": ""}},
                 upsert=True,
             )
-            total_synced += 1
+            if result.upserted_id:
+                total_synced += 1
+            elif result.modified_count > 0:
+                total_synced += 1
 
     # 删除过期记录
     stale = await db[COLLECTION].delete_many({"synced_at": {"$lt": now}})
@@ -89,7 +93,7 @@ async def sync_dns_domains():
     await db[COLLECTION].update_many({"is_ignored": {"$exists": False}}, {"$set": {"is_ignored": False}})
     await db[COLLECTION].update_many({"remark": {"$exists": False}}, {"$set": {"remark": ""}})
 
-    logger.info(f"DNS domains sync complete: {total_synced} records from {len(dns_collections)} collections, target={db.name}.{COLLECTION}")
+    logger.info(f"DNS domains sync complete: {total_synced} new/modified, {len(dns_collections)} collections, target={db.name}.{COLLECTION}")
     return {"code": 200, "data": {"synced": total_synced, "collections": len(dns_collections)}}
 
 
