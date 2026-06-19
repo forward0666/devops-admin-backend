@@ -17,9 +17,12 @@ def _auto_paginate(paginated_result):
 
 # ── Sync functions ──
 
-def list_zones(api_token: str, per_page: int = 50) -> dict:
+def list_zones(api_token: str, per_page: int = 50, account_id: str = None) -> dict:
     cf = get_client(api_token)
-    resp = cf.zones.list(per_page=per_page)
+    if account_id:
+        resp = cf.zones.list(per_page=per_page, account={"id": account_id})
+    else:
+        resp = cf.zones.list(per_page=per_page)
     result = [z.model_dump() for z in _auto_paginate(resp)]
     return {"success": True, "result": result, "result_info": {}}
 
@@ -327,8 +330,8 @@ def delete_cache_rule(api_token: str, zone_id: str, rule_id: str) -> dict:
 
 # ── Async wrappers (non-blocking, runs sync code in thread pool) ──
 
-async def async_list_zones(api_token: str, per_page: int = 50) -> dict:
-    return await asyncio.to_thread(list_zones, api_token, per_page)
+async def async_list_zones(api_token: str, per_page: int = 50, account_id: str = None) -> dict:
+    return await asyncio.to_thread(list_zones, api_token, per_page, account_id)
 
 async def async_get_zone(api_token: str, zone_id: str) -> dict:
     return await asyncio.to_thread(get_zone, api_token, zone_id)
