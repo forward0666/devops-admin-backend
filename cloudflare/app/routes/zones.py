@@ -45,7 +45,6 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
 
     synced = 0
     for zone in zones:
-        existing_zones.add(zone["id"])
         doc = {
             "zone_id": zone["id"],
             "account_id": str(account_id),
