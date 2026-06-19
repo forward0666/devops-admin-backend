@@ -22,7 +22,7 @@ CONFIG_MAP = {
     "mongodb.password": ("MONGODB_PASSWORD", str),
     "mongodb.database": ("MONGODB_DATABASE", str),
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
-    "source.mongodb.database": ("SOURCE_MONGODB_DATABASE", str),
+    "cloudflare.source.mongodb.database": ("CLOUDFLARE_MONGODB_DATABASE", str),
 }
 
 

@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 import logging
 
-from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_DATABASE, MONGODB_AUTH_DB, SOURCE_MONGODB_DATABASE
+from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_DATABASE, MONGODB_AUTH_DB, CLOUDFLARE_MONGODB_DATABASE
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,8 @@ async def get_source_db():
     if _source_db is None:
         if _client is None:
             await get_db()
-        _source_db = _client[SOURCE_MONGODB_DATABASE]
-        logger.info(f"✅ Source MongoDB: {SOURCE_MONGODB_DATABASE}")
+        _source_db = _client[CLOUDFLARE_MONGODB_DATABASE]
+        logger.info(f"✅ Source MongoDB: {CLOUDFLARE_MONGODB_DATABASE}")
     return _source_db
 
 

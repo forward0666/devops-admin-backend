@@ -19,5 +19,5 @@ MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root123")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "domain")
 MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 
-# Source MongoDB (读 DNS 记录的库)
-SOURCE_MONGODB_DATABASE = os.getenv("SOURCE_MONGODB_DATABASE", "cloudflare")
+# Source MongoDB
+CLOUDFLARE_MONGODB_DATABASE = os.getenv("CLOUDFLARE_MONGODB_DATABASE", "cloudflare")
