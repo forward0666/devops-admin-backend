@@ -44,7 +44,16 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
 
     synced = 0
+    cf_account_id = None
     for zone in zones:
+        # 从第一个 zone 获取 CF account ID，后续只写入同 account 的 zones
+        zone_cf_account = (zone.get("account") or {}).get("id", "")
+        if cf_account_id is None:
+            cf_account_id = zone_cf_account
+            logger.info(f"[Zone Sync] CF account ID: {cf_account_id}")
+        elif zone_cf_account != cf_account_id:
+            logger.warning(f"[Zone Sync] Skipping zone {zone['name']} (account {zone_cf_account} != {cf_account_id})")
+            continue
         doc = {
             "zone_id": zone["id"],
             "account_id": str(account_id),
