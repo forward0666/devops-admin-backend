@@ -7,6 +7,10 @@ router = APIRouter()
 @router.get("")
 async def list_accounts():
     rows = await query_all("SELECT id, name, api_key, description, status, created_at, updated_at FROM account ORDER BY id DESC")
+    for r in rows:
+        if r.get("api_key"):
+            key = r["api_key"]
+            r["api_key"] = key[:4] + "••••••••" + key[-4:] if len(key) > 8 else "••••••••"
     return {"code": 200, "data": rows}
 
 
@@ -15,6 +19,9 @@ async def get_account(account_id: int):
     row = await query_one("SELECT id, name, api_key, description, status, created_at, updated_at FROM account WHERE id = %s", (account_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
+    if row.get("api_key"):
+        key = row["api_key"]
+        row["api_key"] = key[:4] + "••••••••" + key[-4:] if len(key) > 8 else "••••••••"
     return {"code": 200, "data": row}
 
 
