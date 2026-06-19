@@ -5,7 +5,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, security_rules, whitelist, dns_domain, ratelimit, sync_rules, ddos, managed
+from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, security_rules, whitelist, dns_domain, ratelimit, sync_rules, ddos, managed, domain
 from app.services.db import close_pool, get_pool
 from app.services.redis import close_redis
 from app.services.mongodb import close_db, get_db
@@ -60,6 +60,7 @@ app.include_router(ddos.router, prefix="/ddos", tags=["DDoS"])
 app.include_router(ddos.zone_router, prefix="/zones/{zone_id}/ddos", tags=["DDoS"])
 app.include_router(managed.router, prefix="/managed", tags=["Managed"])
 app.include_router(managed.zone_router, prefix="/zones/{zone_id}/managed", tags=["Managed"])
+app.include_router(domain.router, prefix="/domain", tags=["Domain"])
 
 
 @app.get("/health")
