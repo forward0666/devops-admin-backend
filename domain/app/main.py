@@ -33,7 +33,7 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-app.include_router(domain.router, prefix="/domain", tags=["Domain"])
+app.include_router(domain.router, tags=["Domain"])
 
 
 @app.get("/health")
