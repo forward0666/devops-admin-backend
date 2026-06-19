@@ -39,15 +39,9 @@ async def sync_dns_domains():
             continue
 
         logger.info(f"[Sync] {coll_name}: {len(records)} records")
-        # Debug: check for empty or duplicate record_ids
         rids = [r.get("record_id", "") for r in records]
-        empty_rids = sum(1 for r in rids if not r)
-        if empty_rids > 0:
-            logger.warning(f"[Sync] {coll_name}: {empty_rids} records with EMPTY record_id!")
-            # Show sample records with empty record_id
-            for r in records[:3]:
-                if not r.get("record_id"):
-                    logger.warning(f"[Sync]   sample: name={r.get('name')}, type={r.get('type')}, content={r.get('content')}, _id={r.get('_id')}")
+        logger.info(f"[Sync] {coll_name}: sample record_ids: {rids[:3]}")
+        logger.info(f"[Sync] {coll_name}: sample names: {[r.get('name') for r in records[:3]]}")
         for r in records:
             doc = {
                 "record_id": r.get("record_id", ""),
