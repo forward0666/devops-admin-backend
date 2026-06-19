@@ -483,11 +483,15 @@ async def run_check_for_rule(rule: dict):
     if dns_updates and dns_col is not None:
         result = await dns_col.bulk_write(dns_updates)
         logger.info(f"[Step 8] Domain update: wrote={len(dns_updates)}, matched={result.matched_count}, modified={result.modified_count}")
-        if result.matched_count == 0:
-            # Debug: check what names exist in domain collection
-            sample = await dns_col.find({}, {"name": 1}).limit(3).to_list(3)
-            logger.warning(f"[Step 8] No matches! Sample names in domain collection: {[s.get('name') for s in sample]}")
-            logger.warning(f"[Step 8] Checker domains sample: {domains_to_check[:3]}")
+        if result.matched_count == 0 and domains_to_check:
+            sample_checker = domains_to_check[:3]
+            sample_db = await dns_col.find({}, {"name": 1}).limit(3).to_list(3)
+            sample_names = [s.get("name") for s in sample_db]
+            logger.warning(f"[Step 8] MISMATCH! checker={sample_checker} vs db={sample_names}")
+            # Check if names match with exact comparison
+            for s in sample_checker:
+                found = await dns_col.count_documents({"name": s})
+                logger.warning(f"[Step 8]   '{s}' -> found={found}")
     elif dns_col is None:
         logger.error("[Step 8] Skipped: dns_col is None (domain DB connection failed)")
     else:
