@@ -3,6 +3,14 @@ import os
 SERVICE_NAME = "domain"
 SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8091"))
 
+# Nacos
+NACOS_HOST = os.getenv("NACOS_HOST", "192.168.86.9")
+NACOS_PORT = int(os.getenv("NACOS_PORT", "8848"))
+NACOS_NAMESPACE = os.getenv("NACOS_NAMESPACE", "6c5b1db3-a808-4543-a87e-6642e372cb4f")
+NACOS_USERNAME = os.getenv("NACOS_USERNAME", "nacos")
+NACOS_PASSWORD = os.getenv("NACOS_PASSWORD", "nacos")
+NACOS_GROUP = os.getenv("NACOS_GROUP", "DEFAULT_GROUP")
+
 # MongoDB
 MONGODB_HOST = os.getenv("MONGODB_HOST", "192.168.86.9")
 MONGODB_PORT = int(os.getenv("MONGODB_PORT", "27017"))
