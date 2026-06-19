@@ -18,7 +18,7 @@ async def sync_dns_domains():
     source_db = await get_source_db()
     now = datetime.utcnow()
     total_synced = 0
-    prev_rids = set()
+    seen_rids = set()
 
     # 列出源库中所有 *_dns_records 集合
     collections = await source_db.list_collection_names()
@@ -40,25 +40,6 @@ async def sync_dns_domains():
             continue
 
         logger.info(f"[Sync] {coll_name}: {len(records)} records")
-        rids = [r.get("record_id", "") for r in records]
-        logger.info(f"[Sync] {coll_name}: sample record_ids: {rids[:3]}")
-        logger.info(f"[Sync] {coll_name}: sample names: {[r.get('name') for r in records[:3]]}")
-        logger.info(f"[Sync] {coll_name}: unique record_ids: {len(set(rids))}, total: {len(rids)}")
-        # Check types
-        types = set(type(r).__name__ for r in records if r.get("record_id"))
-        logger.info(f"[Sync] {coll_name}: sample record_id type: {type(records[0].get('record_id')).__name__}, value: {records[0].get('record_id')}")
-        if prev_rids:
-            overlap = set(rids) & prev_rids
-            logger.info(f"[Sync] {coll_name}: overlap with previous: {len(overlap)}")
-            if overlap:
-                sample_overlap = list(overlap)[:3]
-                logger.info(f"[Sync] {coll_name}: overlap sample: {sample_overlap}")
-                for rid in sample_overlap:
-                    # Find the record with this record_id in current collection
-                    rec = next((r for r in records if r.get("record_id") == rid), None)
-                    if rec:
-                        logger.info(f"[Sync]   rid={rid} name={rec.get('name')} type={rec.get('type')} content={rec.get('content')}")
-        prev_rids = set(rids)
         for r in records:
             doc = {
                 "record_id": r.get("record_id", ""),
@@ -74,6 +55,10 @@ async def sync_dns_domains():
                 "priority": r.get("priority"),
                 "synced_at": now,
             }
+            rid = doc["record_id"]
+            if rid in seen_rids:
+                continue
+            seen_rids.add(rid)
             sync_fields = {
                 "record_id": doc["record_id"],
                 "zone_id": doc["zone_id"],
