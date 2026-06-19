@@ -44,6 +44,9 @@ MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root123")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "monitor")
 MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 
+# Domain MongoDB (读写 dns_domains)
+DOMAIN_MONGODB_DATABASE = os.getenv("DOMAIN_MONGODB_DATABASE", "domain")
+
 # Service-to-service auth
 GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
 CLOUDFLARE_SERVICE_URL = os.getenv("CLOUDFLARE_SERVICE_URL", "http://127.0.0.1:8090")

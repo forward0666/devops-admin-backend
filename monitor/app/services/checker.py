@@ -283,12 +283,12 @@ async def run_check_for_rule(rule: dict):
         if "all" in domains:
             try:
                 from motor.motor_asyncio import AsyncIOMotorClient
-                from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
-                uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
-                cf_client_mongo = AsyncIOMotorClient(uri)
-                cf_db = cf_client_mongo["cloudflare"]
-                total_docs = await cf_db["dns_domains"].count_documents({"is_ignored": {"$ne": True}})
-                docs = await cf_db["dns_domains"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
+                from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
+                uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
+                domain_client_mongo = AsyncIOMotorClient(uri)
+                domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
+                total_docs = await domain_db["dns_domains"].count_documents({"is_ignored": {"$ne": True}})
+                docs = await domain_db["dns_domains"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
                 seen_names = set()
                 for doc in docs:
                     name = doc.get("name", "")
@@ -369,17 +369,17 @@ async def run_check_for_rule(rule: dict):
     domains_to_check.sort(key=_sort_key)
     logger.info(f"[Step 4] Sorted: A good > CNAME all > A bad")
 
-    # ── Step 5: Connect Cloudflare DB ──
-    cf_client_mongo = None
+    # ── Step 5: Connect Domain DB ──
+    domain_client_mongo = None
     dns_col = None
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
-        from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
-        uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/cloudflare?authSource={MONGODB_AUTH_DB}"
-        cf_client_mongo = AsyncIOMotorClient(uri)
-        dns_col = cf_client_mongo["cloudflare"]["dns_domains"]
+        from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB, DOMAIN_MONGODB_DATABASE
+        uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
+        domain_client_mongo = AsyncIOMotorClient(uri)
+        dns_col = domain_client_mongo[DOMAIN_MONGODB_DATABASE]["dns_domains"]
     except Exception as e:
-        logger.error(f"[Step 5] Failed to connect cloudflare DB: {e}")
+        logger.error(f"[Step 5] Failed to connect domain DB: {e}")
 
     # ── Step 5.5: Pre-resolve DNS (batch, higher concurrency) ──
     dns_pre_sem = asyncio.Semaphore(DNS_CONCURRENCY * 2)
@@ -495,8 +495,8 @@ async def run_check_for_rule(rule: dict):
         await dns_col.bulk_write(dns_updates)
         logger.info(f"[Step 8] Updated {len(dns_updates)} dns_domains")
 
-    if cf_client_mongo:
-        cf_client_mongo.close()
+    if domain_client_mongo:
+        domain_client_mongo.close()
 
     # ── Step 9: Update rule status ──
     overall_status = "ok" if down_count == 0 and error_count == 0 else "warning" if up_count > 0 else "error"

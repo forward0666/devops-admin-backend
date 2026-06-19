@@ -43,6 +43,7 @@ CONFIG_MAP = {
     "mongodb.password": ("MONGODB_PASSWORD", str),
     "mongodb.database": ("MONGODB_DATABASE", str),
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
+    "domain.mongodb.database": ("DOMAIN_MONGODB_DATABASE", str),
     "gateway.secret": ("GATEWAY_SECRET", str),
     "cloudflare.service.url": ("CLOUDFLARE_SERVICE_URL", str),
     "http.concurrency": ("HTTP_CONCURRENCY", int),
