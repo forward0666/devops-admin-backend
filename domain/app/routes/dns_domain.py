@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 import logging
 
-from app.services.mongodb import get_db
+from app.services.mongodb import get_db, get_source_db
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +15,19 @@ COLLECTION = "dns_domains"
 async def sync_dns_domains():
     """从 cloudflare 库的所有 account_{id}_dns_records 集合同步 A/CNAME 记录"""
     db = await get_db()
+    source_db = await get_source_db()
     now = datetime.utcnow()
     total_synced = 0
 
-    # 列出所有 *_dns_records 集合
-    collections = await db.list_collection_names()
+    # 列出源库中所有 *_dns_records 集合
+    collections = await source_db.list_collection_names()
     dns_collections = [c for c in collections if c.endswith("_dns_records")]
 
     if not dns_collections:
         raise HTTPException(status_code=400, detail="No dns_records collections found")
 
     for coll_name in dns_collections:
-        coll = db[coll_name]
+        coll = source_db[coll_name]
         records = await coll.find(
             {"type": {"$in": ["A", "CNAME"]}},
             {"record_id": 1, "zone_id": 1, "zone_name": 1, "account_id": 1,
