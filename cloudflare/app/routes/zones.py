@@ -39,20 +39,25 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
     logger.info(f"[Zone Sync] Fetched {len(zones)} zones from CF")
     now = datetime.utcnow()
 
+    # 按 CF account.id 分组，取最多的作为当前 account 的 CF account ID
+    cf_account_counts: dict[str, int] = {}
+    for z in zones:
+        cf_acc = (z.get("account") or {}).get("id", "")
+        if cf_acc:
+            cf_account_counts[cf_acc] = cf_account_counts.get(cf_acc, 0) + 1
+    cf_account_id = max(cf_account_counts, key=cf_account_counts.get) if cf_account_counts else ""
+    logger.info(f"[Zone Sync] CF account groups: {cf_account_counts}, using: {cf_account_id}")
+
     # 先清理该 account 的旧 zones
     deleted = await collection.delete_many({"account_id": str(account_id)})
     logger.info(f"[Zone Sync] Cleared {deleted.deleted_count} old zones for account_id={account_id}")
 
     synced = 0
-    cf_account_id = None
+    skipped = 0
     for zone in zones:
-        # 从第一个 zone 获取 CF account ID，后续只写入同 account 的 zones
         zone_cf_account = (zone.get("account") or {}).get("id", "")
-        if cf_account_id is None:
-            cf_account_id = zone_cf_account
-            logger.info(f"[Zone Sync] CF account ID: {cf_account_id}")
-        elif zone_cf_account != cf_account_id:
-            logger.warning(f"[Zone Sync] Skipping zone {zone['name']} (account {zone_cf_account} != {cf_account_id})")
+        if cf_account_id and zone_cf_account != cf_account_id:
+            skipped += 1
             continue
         doc = {
             "zone_id": zone["id"],
@@ -74,8 +79,8 @@ async def sync_zones(account_id: int, x_cf_token: str = Header(..., alias="X-Cf-
         )
         synced += 1
 
-    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}/{len(zones)}")
-    return {"code": 200, "data": {"synced": synced, "total": len(zones)}}
+    logger.info(f"[Zone Sync] Complete for account_id={account_id}: synced={synced}, skipped={skipped} (other CF account)")
+    return {"code": 200, "data": {"synced": synced, "skipped": skipped, "total": len(zones)}}
 
 
 @router.post("/syncAll")
