@@ -12,10 +12,17 @@ router = APIRouter()
 @router.get("")
 async def list_rules():
     rows = await query_all(
-        "SELECT id, name, description, enabled, status, last_check, created_at, updated_at "
+        "SELECT id, name, domains, description, enabled, status, last_check, created_at, updated_at "
         "FROM monitor_rule ORDER BY id DESC"
     )
     for r in rows:
+        if isinstance(r.get("domains"), str):
+            try:
+                import json
+                r["domains"] = json.loads(r["domains"])
+            except: r["domains"] = []
+        elif r.get("domains") is None:
+            r["domains"] = []
         r["enabled"] = bool(r.get("enabled", 0))
     return {"code": 200, "data": rows}
 
@@ -23,11 +30,18 @@ async def list_rules():
 @router.get("/{rule_id}")
 async def get_rule(rule_id: int):
     row = await query_one(
-        "SELECT id, name, description, enabled, status, last_check, created_at, updated_at "
+        "SELECT id, name, domains, description, enabled, status, last_check, created_at, updated_at "
         "FROM monitor_rule WHERE id = %s", (rule_id,)
     )
     if not row:
         raise HTTPException(status_code=404, detail="Rule not found")
+    if isinstance(row.get("domains"), str):
+        try:
+            import json
+            row["domains"] = json.loads(row["domains"])
+        except: row["domains"] = []
+    elif row.get("domains") is None:
+        row["domains"] = []
     row["enabled"] = bool(row.get("enabled", 0))
     return {"code": 200, "data": row}
 
@@ -35,17 +49,21 @@ async def get_rule(rule_id: int):
 @router.post("")
 async def create_rule(body: dict):
     name = body.get("name", "").strip()
+    domains = body.get("domains", [])
     description = body.get("description", "").strip()
     enabled = body.get("enabled", True)
 
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
 
+    import json
+    domains_json = json.dumps(domains)
+
     await execute(
-        "INSERT INTO monitor_rule (name, description, enabled) VALUES (%s, %s, %s)",
-        (name, description, enabled),
+        "INSERT INTO monitor_rule (name, domains, description, enabled) VALUES (%s, %s, %s, %s)",
+        (name, domains_json, description, enabled),
     )
-    logger.info(f"[Monitor] Created rule: {name}")
+    logger.info(f"[Monitor] Created rule: {name} (domains={len(domains)})")
     return {"code": 200, "message": "ok"}
 
 
@@ -56,17 +74,21 @@ async def update_rule(rule_id: int, body: dict):
         raise HTTPException(status_code=404, detail="Rule not found")
 
     name = body.get("name", "").strip()
+    domains = body.get("domains", [])
     description = body.get("description", "").strip()
     enabled = body.get("enabled", True)
 
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
 
+    import json
+    domains_json = json.dumps(domains)
+
     await execute(
-        "UPDATE monitor_rule SET name=%s, description=%s, enabled=%s, updated_at=UTC_TIMESTAMP() WHERE id=%s",
-        (name, description, enabled, rule_id),
+        "UPDATE monitor_rule SET name=%s, domains=%s, description=%s, enabled=%s, updated_at=UTC_TIMESTAMP() WHERE id=%s",
+        (name, domains_json, description, enabled, rule_id),
     )
-    logger.info(f"[Monitor] Updated rule {rule_id}: {name}")
+    logger.info(f"[Monitor] Updated rule {rule_id}: {name} (domains={len(domains)})")
     return {"code": 200, "message": "ok"}
 
 
