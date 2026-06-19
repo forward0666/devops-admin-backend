@@ -118,8 +118,6 @@ async def send_heartbeat():
     }
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.put(f"{NACOS_URL}/ns/instance/beat", params=params)
-            if resp.status_code != 200:
-                logger.warning(f"⚠️ Nacos heartbeat failed: {resp.status_code}")
-    except Exception as e:
-        logger.warning(f"⚠️ Nacos heartbeat error: {e}")
+            await client.put(f"{NACOS_URL}/ns/instance/beat", params=params)
+    except Exception:
+        pass
