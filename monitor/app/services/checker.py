@@ -287,12 +287,12 @@ async def run_check_for_rule(rule: dict):
         # Verify connection
         collections = await domain_db.list_collection_names()
         logger.info(f"[Step 1] Collections in {DOMAIN_MONGODB_DATABASE}: {collections}")
-        domain_count = await domain_db["domain"].count_documents({})
+        domain_count = await domain_db["dns_domains"].count_documents({})
         logger.info(f"[Step 1] Documents in {DOMAIN_MONGODB_DATABASE}.domain: {domain_count}")
         if domains:
             domains_to_check = [d for d in domains if d]
         else:
-            docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
+            docs = await domain_db["dns_domains"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
             for doc in docs:
                 name = doc.get("name", "")
                 if name and name not in domains_to_check:
@@ -367,7 +367,7 @@ async def run_check_for_rule(rule: dict):
     # ── Step 5: Use same domain DB connection ──
     dns_col = None
     if domain_db is not None:
-        dns_col = domain_db["domain"]
+        dns_col = domain_db["dns_domains"]
         logger.info(f"[Step 5] Using domain DB connection, collection=domain")
     else:
         logger.error("[Step 5] domain_db is None, cannot write results")

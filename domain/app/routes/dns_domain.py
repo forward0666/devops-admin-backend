@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-COLLECTION = "domain"
+COLLECTION = "dns_domains"
 
 
 @router.post("/sync")
