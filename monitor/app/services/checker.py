@@ -284,16 +284,12 @@ async def run_check_for_rule(rule: dict):
         domain_client_mongo = AsyncIOMotorClient(uri)
         domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
         logger.info(f"[Step 1] MongoDB: {MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}")
-        domain_count = await domain_db["domain"].count_documents({})
-        logger.info(f"[Step 1] domain collection count: {domain_count}")
-        if domains:
-            domains_to_check = [d for d in domains if d]
-        else:
-            docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
-            for doc in docs:
-                name = doc.get("name", "")
-                if name and name not in domains_to_check:
-                    domains_to_check.append(name)
+        # 始终从 collection 读取，忽略规则里的旧域名列表
+        docs = await domain_db["domain"].find({"is_ignored": {"$ne": True}}, {"name": 1}).to_list(length=10000)
+        for doc in docs:
+            name = doc.get("name", "")
+            if name and name not in domains_to_check:
+                domains_to_check.append(name)
     except Exception as e:
         logger.error(f"[Monitor] Failed to fetch domains: {e}")
 
