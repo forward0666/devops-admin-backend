@@ -2,7 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 from datetime import datetime
 import logging
 
-from app.services.db import query_one
+from app.services.db import query_one, query_all
 from app.services.mongodb import get_db
 from app.services import cf_client
 
