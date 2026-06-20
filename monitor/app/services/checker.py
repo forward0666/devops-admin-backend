@@ -283,6 +283,9 @@ async def run_check_for_rule(rule: dict):
         uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}?authSource={MONGODB_AUTH_DB}"
         domain_client_mongo = AsyncIOMotorClient(uri)
         domain_db = domain_client_mongo[DOMAIN_MONGODB_DATABASE]
+        logger.info(f"[Step 1] MongoDB: {MONGODB_HOST}:{MONGODB_PORT}/{DOMAIN_MONGODB_DATABASE}")
+        domain_count = await domain_db["domain"].count_documents({})
+        logger.info(f"[Step 1] domain collection count: {domain_count}")
         if domains:
             domains_to_check = [d for d in domains if d]
         else:
