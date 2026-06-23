@@ -52,6 +52,7 @@ public class DomainService {
         if (entity.getType() != null) fields.put("type", entity.getType());
         if (entity.getEnv() != null) fields.put("env", entity.getEnv());
         if (entity.getRemark() != null) fields.put("remark", entity.getRemark());
+        if (entity.getCdn() != null) fields.put("cdn", entity.getCdn());
         if (fields.isEmpty()) return domainMapper.findByIdAndProjectId(id, projectId);
         domainMapper.update(id, projectId, fields);
         evictDomainCache(projectId);
