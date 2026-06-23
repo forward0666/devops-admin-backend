@@ -20,23 +20,21 @@ def _serialize(doc: dict) -> dict:
 
 
 @router.get("")
-async def list_security_rules(projectId: int = Query(...), env: str = Query(None)):
+async def list_security_rules(group: str = Query(None)):
     db = await get_db()
-    query = {"projectId": projectId}
-    if env:
-        query["env"] = {"$regex": f"^{env}$", "$options": "i"}
+    query = {}
+    if group:
+        query["group"] = group
     rows = await db[COLLECTION].find(query).sort("createdAt", -1).to_list(length=500)
     return {"code": 200, "data": [_serialize(r) for r in rows]}
 
 
 @router.post("")
 async def create_security_rule(body: dict):
-    project_id = body.get("projectId")
     name = (body.get("name") or "").strip()
-    env = (body.get("env") or "").strip()
 
-    if not project_id or not name:
-        raise HTTPException(status_code=400, detail="projectId and name are required")
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
 
     db = await get_db()
 
@@ -80,17 +78,15 @@ async def create_security_rule(body: dict):
     new_rule_ids = {e["ruleId"] for e in norm_entries if e.get("ruleId")}
     if new_rule_ids:
         existing = await db[COLLECTION].find_one({
-            "projectId": project_id,
             "entries.ruleId": {"$in": list(new_rule_ids)}
         })
         if existing:
             raise HTTPException(status_code=400, detail=f"Duplicate Rule ID: {', '.join(new_rule_ids)}")
 
     doc = {
-        "projectId": project_id,
-        "env": env,
         "name": name,
         "description": (body.get("description") or "").strip(),
+        "group": (body.get("group") or "").strip(),
         "entries": norm_entries,
         "username": (body.get("username") or "").strip(),
         "userIp": (body.get("userIp") or "").strip(),
@@ -105,22 +101,18 @@ async def create_security_rule(body: dict):
 
 @router.put("/{rule_id}")
 async def update_security_rule(rule_id: str, body: dict):
-    project_id = body.get("projectId")
-    if not project_id:
-        raise HTTPException(status_code=400, detail="projectId is required")
-
     db = await get_db()
     try:
         oid = ObjectId(rule_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid rule id")
 
-    existing = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
+    existing = await db[COLLECTION].find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Rule not found")
 
     update_fields = {"updatedAt": datetime.utcnow()}
-    for field in ["name", "description", "env", "username", "userIp", "operator"]:
+    for field in ["name", "description", "group", "username", "userIp", "operator"]:
         if body.get(field) is not None:
             update_fields[field] = body[field].strip() if isinstance(body[field], str) else body[field]
 
@@ -147,7 +139,6 @@ async def update_security_rule(rule_id: str, body: dict):
     if new_rule_ids:
         logger.info(f"[PUT] Checking duplicates: ruleIds={new_rule_ids}, exclude_oid={oid}")
         dup = await db[COLLECTION].find_one({
-            "projectId": project_id,
             "_id": {"$ne": oid},
             "entries.ruleId": {"$in": list(new_rule_ids)}
         })
@@ -161,14 +152,14 @@ async def update_security_rule(rule_id: str, body: dict):
 
 
 @router.delete("/{rule_id}")
-async def delete_security_rule(rule_id: str, projectId: int = Query(...)):
+async def delete_security_rule(rule_id: str):
     db = await get_db()
     try:
         oid = ObjectId(rule_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid rule id")
 
-    existing = await db[COLLECTION].find_one({"_id": oid, "projectId": projectId})
+    existing = await db[COLLECTION].find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Rule not found")
 

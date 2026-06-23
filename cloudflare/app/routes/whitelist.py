@@ -100,24 +100,23 @@ async def _find_token_for_zone(db, accounts, zone_id):
 
 
 @router.get("")
-async def list_whitelists(projectId: int = Query(...), env: str = Query(None)):
+async def list_whitelists(group: str = Query(None)):
     db = await get_db()
-    query = {"projectId": projectId}
-    if env:
-        query["env"] = {"$regex": "^" + env + "$", "$options": "i"}
+    query = {}
+    if group:
+        query["group"] = group
     rows = await db[WHITELIST_COLLECTION].find(query).sort("createdAt", -1).to_list(length=500)
     return {"code": 200, "data": [_serialize(r) for r in rows]}
 
 
 @router.post("")
 async def add_whitelist_ip(body: dict):
-    project_id = body.get("projectId")
     rule_id = (body.get("ruleId") or "").strip()
     ip = (body.get("ip") or "").strip()
-    logger.info(f"========== Add Whitelist ========== projectId={project_id}, ruleId={rule_id}, ip={ip}")
+    logger.info(f"========== Add Whitelist ========== ruleId={rule_id}, ip={ip}")
 
-    if not project_id or not rule_id or not ip:
-        raise HTTPException(status_code=400, detail="projectId, ruleId and ip are required")
+    if not rule_id or not ip:
+        raise HTTPException(status_code=400, detail="ruleId and ip are required")
 
     db = await get_db()
 
@@ -126,7 +125,7 @@ async def add_whitelist_ip(body: dict):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ruleId")
 
-    rule = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
+    rule = await db[COLLECTION].find_one({"_id": oid})
     if not rule:
         raise HTTPException(status_code=404, detail="Security rule not found")
 
@@ -187,8 +186,7 @@ async def add_whitelist_ip(body: dict):
             errors.append({"zoneId": zone_id, "ruleId": cf_rule_id, "reason": f"CF API error: {e}"})
 
     doc = {
-        "projectId": project_id,
-        "env": (body.get("env") or "").strip(),
+        "group": (body.get("group") or "").strip(),
         "ruleName": rule.get("name", ""),
         "ruleId": rule_id,
         "username": (body.get("username") or "").strip(),
@@ -210,22 +208,21 @@ async def add_whitelist_ip(body: dict):
 @router.put("")
 async def update_whitelist_ip(body: dict):
     """Update IP: check shared users before removing old IP"""
-    project_id = body.get("projectId")
     rule_id = (body.get("ruleId") or "").strip()
     old_ip = (body.get("oldIp") or "").strip()
     new_ip = (body.get("newIp") or "").strip()
 
-    logger.info(f"========== Update IP ========== projectId={project_id}, ruleId={rule_id}, oldIp={old_ip}, newIp={new_ip}")
+    logger.info(f"========== Update IP ========== ruleId={rule_id}, oldIp={old_ip}, newIp={new_ip}")
 
-    if not project_id or not old_ip or not new_ip:
-        raise HTTPException(status_code=400, detail="projectId, oldIp and newIp are required")
+    if not old_ip or not new_ip:
+        raise HTTPException(status_code=400, detail="oldIp and newIp are required")
 
     if old_ip == new_ip:
         raise HTTPException(status_code=400, detail="oldIp and newIp are the same")
 
     db = await get_db()
 
-    shared_query = {"ip": old_ip, "projectId": project_id}
+    shared_query = {"ip": old_ip}
     if rule_id:
         shared_query["ruleId"] = rule_id
     shared_count = await db[WHITELIST_COLLECTION].count_documents(shared_query)
@@ -234,40 +231,40 @@ async def update_whitelist_ip(body: dict):
     if shared_count <= 1:
         logger.info(f"[2] Only one user, removing old IP from CF")
         if rule_id:
-            await _remove_ip_from_cf(db, project_id, rule_id, old_ip)
+            await _remove_ip_from_cf(db, rule_id, old_ip)
     else:
         logger.info(f"[2] {shared_count} users share this IP, skipping CF remove")
 
     if rule_id:
         logger.info(f"[3] Adding new IP to CF")
-        await _add_ip_to_cf(db, project_id, rule_id, new_ip)
+        await _add_ip_to_cf(db, rule_id, new_ip)
 
-    update_query = {"ip": old_ip, "projectId": project_id}
+    update_query = {"ip": old_ip}
     if rule_id:
         update_query["ruleId"] = rule_id
     record_id = body.get("id")
     if record_id:
         try:
             await db[WHITELIST_COLLECTION].update_one(
-                {"_id": ObjectId(record_id), "projectId": project_id},
-                {"$set": {"ip": new_ip, "updatedAt": datetime.utcnow()}}
+                {"_id": ObjectId(record_id)},
+                {"$set": {"ip": new_ip, "group": (body.get("group") or "").strip(), "updatedAt": datetime.utcnow()}}
             )
         except Exception:
-            await db[WHITELIST_COLLECTION].update_one(update_query, {"$set": {"ip": new_ip, "updatedAt": datetime.utcnow()}})
+            await db[WHITELIST_COLLECTION].update_one(update_query, {"$set": {"ip": new_ip, "group": (body.get("group") or "").strip(), "updatedAt": datetime.utcnow()}})
     else:
-        await db[WHITELIST_COLLECTION].update_one(update_query, {"$set": {"ip": new_ip, "updatedAt": datetime.utcnow()}})
+        await db[WHITELIST_COLLECTION].update_one(update_query, {"$set": {"ip": new_ip, "group": (body.get("group") or "").strip(), "updatedAt": datetime.utcnow()}})
 
     logger.info(f"[4] Done")
     return {"code": 200, "message": "IP updated from " + old_ip + " to " + new_ip}
 
 
-async def _remove_ip_from_cf(db, project_id, rule_id, ip):
+async def _remove_ip_from_cf(db, rule_id, ip):
     try:
         oid = ObjectId(rule_id)
     except Exception:
         return
 
-    rule = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
+    rule = await db[COLLECTION].find_one({"_id": oid})
     if not rule:
         return
 
@@ -302,13 +299,13 @@ async def _remove_ip_from_cf(db, project_id, rule_id, ip):
             logger.error(f"_remove_ip_from_cf error: {e}")
 
 
-async def _add_ip_to_cf(db, project_id, rule_id, ip):
+async def _add_ip_to_cf(db, rule_id, ip):
     try:
         oid = ObjectId(rule_id)
     except Exception:
         return
 
-    rule = await db[COLLECTION].find_one({"_id": oid, "projectId": project_id})
+    rule = await db[COLLECTION].find_one({"_id": oid})
     if not rule:
         return
 
@@ -344,8 +341,8 @@ async def _add_ip_to_cf(db, project_id, rule_id, ip):
 
 
 @router.delete("/remove")
-async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(None), ip: str = Query(...), username: str = Query(None)):
-    logger.info(f"========== Remove IP ========== projectId={projectId}, ruleId={ruleId}, ip={ip}")
+async def remove_whitelist_ip(ruleId: str = Query(None), ip: str = Query(...), username: str = Query(None)):
+    logger.info(f"========== Remove IP ========== ruleId={ruleId}, ip={ip}")
     db = await get_db()
 
     results = []
@@ -357,7 +354,7 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid ruleId")
 
-        rule = await db[COLLECTION].find_one({"_id": oid, "projectId": projectId})
+        rule = await db[COLLECTION].find_one({"_id": oid})
         if not rule:
             raise HTTPException(status_code=404, detail="Security rule not found")
 
@@ -418,7 +415,6 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
                     logger.info(f"[7] SUCCESS")
                     results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": new_expr})
                 elif new_expr is None:
-                    # Expression became empty after removal — rule still exists but with empty expr
                     logger.warning(f"[7] Expression became empty after removing IP")
                     results.append({"zoneId": zone_id, "ruleId": cf_rule_id, "expression": "", "empty": True})
             except Exception as e:
@@ -427,7 +423,7 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
     else:
         logger.info("[1] No ruleId provided, skipping CF update")
 
-    delete_query = {"ip": ip, "projectId": projectId}
+    delete_query = {"ip": ip}
     if ruleId:
         delete_query["ruleId"] = ruleId
     if username:
@@ -443,14 +439,14 @@ async def remove_whitelist_ip(projectId: int = Query(...), ruleId: str = Query(N
 
 
 @router.delete("/{wl_id}")
-async def delete_whitelist(wl_id: str, projectId: int = Query(...)):
+async def delete_whitelist(wl_id: str):
     db = await get_db()
     try:
         oid = ObjectId(wl_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid id")
 
-    existing = await db[WHITELIST_COLLECTION].find_one({"_id": oid, "projectId": projectId})
+    existing = await db[WHITELIST_COLLECTION].find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Whitelist not found")
 

@@ -379,20 +379,13 @@ async def push_sync_rule(rule_id: int):
                         logger.error(f"[Push] Failed to delete security {tgt.get('description')}: {result}")
 
                 # Re-fetch current rules after delete/create to get correct IDs
-                # Create new rules (first rule: index=1, rest: after previous)
-                last_created_id = None
-                for src in to_create:
-                    if not last_created_id:
-                        src["_position"] = {"index": 1}
-                    else:
-                        src["_position"] = {"after": last_created_id}
+                # Create new rules using index-based positioning
+                for idx, src in enumerate(to_create):
+                    src["_position"] = {"index": idx + 1}
                     try:
                         result = cf_client.create_firewall_rule(token, target_zone_id, src)
                         if result.get("success"):
                             pushed_create += 1
-                            created_id = (result.get("result") or {}).get("created_rule_id") or (result.get("result") or {}).get("id")
-                            if created_id:
-                                last_created_id = created_id
                             logger.info(f"[Push] Created security: {src.get('description')}")
                         else:
                             logger.error(f"[Push] Failed to create security {src.get('description')}: {result}")

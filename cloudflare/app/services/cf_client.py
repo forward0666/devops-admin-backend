@@ -107,6 +107,19 @@ def create_firewall_rule(api_token: str, zone_id: str, data: dict) -> dict:
     cf = get_client(api_token)
     ruleset_id = _get_firewall_custom_ruleset_id(api_token, zone_id)
     if not ruleset_id:
+        logger.info(f"[CF] Creating http_request_firewall_custom ruleset for zone {zone_id}")
+        try:
+            resp = cf.rulesets.create(
+                zone_id=zone_id,
+                kind="zone",
+                name="Firewall custom rules",
+                phase="http_request_firewall_custom",
+            )
+            ruleset_id = resp.id if hasattr(resp, 'id') else resp.model_dump().get("id", "")
+        except Exception as e:
+            logger.error(f"[CF] Failed to create firewall ruleset: {e}")
+            return {"success": False, "errors": [{"message": f"Failed to create ruleset: {e}"}]}
+    if not ruleset_id:
         return {"success": False, "errors": [{"message": "No http_request_firewall_custom ruleset found"}]}
 
     action = data.get("action", "block")
