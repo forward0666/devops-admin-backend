@@ -5,7 +5,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import monitor
+from app.routes import monitor, sync_domain
 from app.services.db import close_pool, get_pool
 from app.services.mongodb import close_db, get_db
 
@@ -38,6 +38,7 @@ async def log_requests(request: Request, call_next):
 
 
 app.include_router(monitor.router, prefix="/rules", tags=["Monitor Rules"])
+app.include_router(sync_domain.router, prefix="/sync_domain", tags=["Sync Domain Rules"])
 
 
 @app.get("/health")

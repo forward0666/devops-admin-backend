@@ -22,3 +22,21 @@ CREATE TABLE IF NOT EXISTS monitor_rule (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ALTER TABLE monitor_rule ADD COLUMN description VARCHAR(500) DEFAULT NULL COMMENT 'rule description' AFTER custom_domains;
+
+-- Sync Domain rules table
+CREATE TABLE IF NOT EXISTS sync_domain_rule (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    group_id VARCHAR(255) NOT NULL COMMENT 'domain group id',
+    project_id VARCHAR(255) NOT NULL COMMENT 'target project id',
+    env VARCHAR(50) NOT NULL DEFAULT 'prod' COMMENT 'prod|uat|test|dev',
+    type VARCHAR(50) NOT NULL DEFAULT 'web' COMMENT 'web|admin|callback|api',
+    description VARCHAR(500) DEFAULT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'pending' COMMENT 'pending|ok|error',
+    last_check DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_enabled (enabled),
+    INDEX idx_group_id (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
