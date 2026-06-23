@@ -101,11 +101,11 @@ async def check_rule(rule_id: int):
 
     try:
         import httpx
-        # 1. Get group zones from domain service
-        domain_url = "http://localhost:8084"  # domain service
+        cf_url = "http://localhost:8090"  # self (cloudflare service)
+        user_url = "http://localhost:8084"  # user service
         async with httpx.AsyncClient(timeout=30) as client:
-            # Get groups
-            resp = await client.get(f"{domain_url}/domain/groups")
+            # Get groups from domain service
+            resp = await client.get(f"{user_url}/domain/groups")
             groups = resp.json().get("data", [])
             group = next((g for g in groups if g.get("id") == group_id), None)
             if not group:
@@ -113,7 +113,7 @@ async def check_rule(rule_id: int):
                 raise HTTPException(status_code=404, detail=f"Group '{group_id}' not found")
 
             # Get meta
-            resp = await client.get(f"{domain_url}/domain/meta")
+            resp = await client.get(f"{user_url}/domain/meta")
             meta_list = resp.json().get("data", [])
             group_zone_ids = [m.get("zoneId") for m in meta_list if m.get("groupId") == group_id]
 
@@ -121,8 +121,7 @@ async def check_rule(rule_id: int):
                 await execute("UPDATE sync_domain_rule SET status='ok', last_check=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
                 return {"code": 200, "data": {"synced": 0, "message": "No zones in group"}}
 
-            # Get zone names from cloudflare
-            cf_url = "http://localhost:8090"
+            # Get zone names from cloudflare (self)
             zone_names = []
             for zone_id in group_zone_ids:
                 try:
@@ -138,7 +137,6 @@ async def check_rule(rule_id: int):
                 return {"code": 200, "data": {"synced": 0, "message": "No zone names found"}}
 
             # Import domains to project via user service
-            user_url = "http://localhost:8084"  # user service
             domains = [{"domain": zn, "env": env, "type": rtype, "remark": "", "cdn": ""} for zn in zone_names if zn]
             resp = await client.post(f"{user_url}/domain/import", json={"projectId": project_id, "domains": domains})
             result = resp.json() if resp.status_code == 200 else {}
