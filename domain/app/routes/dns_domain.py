@@ -108,7 +108,7 @@ async def sync_dns_domains():
 
 @router.get("")
 async def list_dns_domains(keyword: str = None, type: str = None, is_ignored: bool = None):
-    """查询 dns_domains"""
+    """查询 dns_domain"""
     db = await get_db()
     query = {}
     if type:

@@ -122,6 +122,8 @@ async def run_task(task_id: int):
     row = await query_one("SELECT * FROM task WHERE id=%s", (task_id,))
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
+    if not row.get("enabled"):
+        raise HTTPException(status_code=400, detail="Task is disabled")
     import json, asyncio
     if isinstance(row.get("config"), str):
         try:

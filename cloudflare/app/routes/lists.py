@@ -282,44 +282,78 @@ async def update_items(list_id: str, body: dict, account_id: int = Query(...)):
     if not item_id:
         raise HTTPException(status_code=400, detail="item id is required")
 
+    # Determine list kind from update item or fetch it
+    list_kind = body.get("list_kind", "ip")
+
     cf, cf_account_id = await _get_cf(account_id)
+    # Get raw api_key for direct HTTP call
+    acc_row = await query_one("SELECT api_key FROM account WHERE id = %s", (account_id,))
+    api_key = acc_row["api_key"] if acc_row else ""
     try:
         # 1. Fetch all current items
         current = cf.rules.lists.items.list(list_id=list_id, account_id=cf_account_id)
         all_items = []
+        sample_logged = False
         for item in current:
             d = item.model_dump(mode="json") if hasattr(item, 'model_dump') else item.__dict__
+            if not sample_logged:
+                logger.info(f"[update_items] sample item raw: {d}")
+                sample_logged = True
             if d.get("id") == item_id:
                 # Replace with updated data
-                new_ip = update_item.get("ip", {})
                 entry = {"id": item_id}
-                if isinstance(new_ip, dict):
-                    entry["ip"] = new_ip.get("ip", d.get("ip", ""))
-                    if new_ip.get("comment") is not None:
-                        entry["comment"] = new_ip["comment"]
-                    elif d.get("comment"):
-                        entry["comment"] = d["comment"]
-                else:
-                    entry["ip"] = new_ip or d.get("ip", "")
-                    if d.get("comment"):
-                        entry["comment"] = d["comment"]
+                if list_kind == "asn":
+                    entry["asn"] = update_item.get("asn", d.get("asn", 0))
+                elif list_kind == "hostname":
+                    entry["hostname"] = update_item.get("hostname", d.get("hostname", {}))
+                elif list_kind == "redirect":
+                    entry["redirect"] = update_item.get("redirect", d.get("redirect", {}))
+                else:  # ip
+                    new_ip = update_item.get("ip", {})
+                    if isinstance(new_ip, dict):
+                        entry["ip"] = new_ip.get("ip", d.get("ip", ""))
+                        if new_ip.get("comment") is not None:
+                            entry["comment"] = new_ip["comment"]
+                        elif d.get("comment"):
+                            entry["comment"] = d["comment"]
+                    else:
+                        entry["ip"] = new_ip or d.get("ip", "")
+                        if d.get("comment"):
+                            entry["comment"] = d["comment"]
+                if "comment" not in entry and d.get("comment"):
+                    entry["comment"] = d["comment"]
                 all_items.append(entry)
             else:
-                entry = {"id": d["id"], "ip": d.get("ip", "")}
+                # Keep existing item - only include id + type-specific field + comment
+                entry = {"id": d["id"]}
+                if list_kind == "asn":
+                    entry["asn"] = d.get("asn", 0)
+                elif list_kind == "hostname":
+                    entry["hostname"] = d.get("hostname", {})
+                elif list_kind == "redirect":
+                    entry["redirect"] = d.get("redirect", {})
+                else:
+                    entry["ip"] = d.get("ip", "")
                 if d.get("comment"):
                     entry["comment"] = d["comment"]
-                if d.get("asn"):
-                    entry["asn"] = d["asn"]
                 all_items.append(entry)
 
-        # 2. PUT all items back
-        resp = cf.rules.lists.items.update(
-            list_id=list_id,
-            account_id=cf_account_id,
-            body=all_items,
-        )
-        data = resp.model_dump(mode="json") if hasattr(resp, 'model_dump') else resp.__dict__
-        return {"code": 200, "data": data, "message": "Item updated"}
+        # 2. PUT all items back - use raw httpx to avoid SDK stripping 'id'
+        logger.info(f"[update_items] list_id={list_id}, list_kind={list_kind}, items_count={len(all_items)}")
+        logger.info(f"[update_items] body: {all_items}")
+        import httpx
+        url = f"https://api.cloudflare.com/client/v4/accounts/{cf_account_id}/rules/lists/{list_id}/items"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        # Try without 'id' - CF API may not accept id in body
+        items_no_id = [{k: v for k, v in item.items() if k != "id"} for item in all_items]
+        logger.info(f"[update_items] body (no id): {items_no_id}")
+        async with httpx.AsyncClient(timeout=30) as http:
+            r = await http.put(url, headers=headers, json={"items": items_no_id})
+        logger.info(f"[update_items] CF response (no id): {r.status_code} {r.text[:500]}")
+        if r.status_code == 200:
+            return {"code": 200, "data": r.json(), "message": "Item updated"}
+        else:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
     except Exception as e:
         logger.error(f"update_items error: {e}")
         raise HTTPException(status_code=400, detail=str(e))

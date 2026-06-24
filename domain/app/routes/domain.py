@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-GROUPS_COLLECTION = "domain_groups"
+GROUPS_COLLECTION = "domain_group"
 META_COLLECTION = "domain_meta"
 
 

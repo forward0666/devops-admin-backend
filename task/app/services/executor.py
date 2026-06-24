@@ -26,7 +26,7 @@ async def get_service_url(service_name: str) -> str:
 async def get_cf_accounts(cf_url: str) -> list:
     """Fetch all accounts from cloudflare service"""
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(f"{cf_url}/accounts")
+        resp = await client.get(f"{cf_url}/accounts", params={"raw": True})
         if resp.status_code == 200:
             return resp.json().get("data", [])
     return []
@@ -318,6 +318,58 @@ async def run_sync_domain(task: dict):
     logger.info(f"[Task] ✅ sync_domain '{task_name}' completed in {elapsed}s")
 
 
+async def run_sync_project_domain(task: dict):
+    """Sync project domains: trigger check on selected or all enabled sync_domain rules"""
+    start_time = time.monotonic()
+    task_id = task.get("id")
+    task_name = task.get("name", "")
+    config = task.get("config", {})
+    rule_ids = config.get("sync_project_domain_rule_ids", [])
+
+    cf_url = await get_service_url("cloudflare")
+    url = f"{cf_url}/sync_domain/rules"
+    logger.info(f"[Task] sync_project_domain: GET {url}")
+
+    async with httpx.AsyncClient(timeout=300) as client:
+        try:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                logger.warning(f"[Task] sync_project_domain '{task_name}': GET rules returned {resp.status_code}")
+                return
+            all_rules = resp.json().get("data", [])
+
+            # -1 means all enabled rules
+            if -1 in rule_ids:
+                rules_to_run = [r for r in all_rules if r.get("enabled")]
+            else:
+                rules_to_run = [r for r in all_rules if r["id"] in rule_ids]
+
+            logger.info(f"[Task] sync_project_domain '{task_name}': {len(rules_to_run)} rules to run")
+
+            synced_total = 0
+            for rule in rules_to_run:
+                rule_id = rule["id"]
+                check_url = f"{cf_url}/sync_domain/rules/{rule_id}/check"
+                try:
+                    r = await client.post(check_url)
+                    if r.status_code == 200:
+                        synced = r.json().get("data", {}).get("synced", 0)
+                        synced_total += synced
+                        logger.info(f"[Task] sync_project_domain '{task_name}': rule {rule_id} synced {synced}")
+                    else:
+                        logger.warning(f"[Task] sync_project_domain '{task_name}': rule {rule_id} returned {r.status_code}")
+                except Exception as e:
+                    logger.error(f"[Task] sync_project_domain '{task_name}': rule {rule_id} failed: {e}")
+
+            logger.info(f"[Task] sync_project_domain '{task_name}': total synced={synced_total}")
+        except Exception as e:
+            logger.error(f"[Task] sync_project_domain '{task_name}': failed: {e}")
+
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", ("success", task_id))
+    elapsed = round(time.monotonic() - start_time, 2)
+    logger.info(f"[Task] ✅ sync_project_domain '{task_name}' completed in {elapsed}s")
+
+
 # Registry: task type -> executor
 TASK_EXECUTORS = {
     "check_domain": run_check_domain,
@@ -327,6 +379,7 @@ TASK_EXECUTORS = {
     "sync_cache": run_sync_cache,
     "sync_domain": run_sync_domain,
     "sync_rule": run_sync_rule,
+    "sync_project_domain": run_sync_project_domain,
 }
 
 

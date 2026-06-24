@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.services.db import query_all, execute
+from app.services.db import query_all, query_one, execute
 from app.services.executor import execute_task
 
 logger = logging.getLogger(__name__)
@@ -131,6 +131,11 @@ async def run_task_wrapper(task: dict):
     """Wrapper for task execution with logging"""
     task_name = task.get("name", "unknown")
     task_id = task.get("id")
+    # Double-check enabled status before execution
+    row = await query_one("SELECT enabled FROM task WHERE id=%s", (task_id,))
+    if not row or not row.get("enabled"):
+        logger.info(f"[Scheduler] ⏭️ Skipped (disabled): {task_name}")
+        return
     logger.info(f"[Scheduler] ▶️ Running: {task_name}")
     try:
         await execute_task(task)

@@ -107,8 +107,8 @@ async def check_rule(rule_id: int):
         from motor.motor_asyncio import AsyncIOMotorClient
         from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
 
-        # Step 1: Get groups from MongoDB domain.domain_groups
-        logger.info(f"[SyncDomain] Step 1: Querying domain.domain_groups, group_id={group_id}")
+        # Step 1: Get groups from MongoDB domain.domain_group
+        logger.info(f"[SyncDomain] Step 1: Querying domain.domain_group, group_id={group_id}")
         domain_uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/domain?authSource={MONGODB_AUTH_DB}"
         domain_client = AsyncIOMotorClient(domain_uri)
         domain_db = domain_client["domain"]
@@ -118,11 +118,11 @@ async def check_rule(rule_id: int):
             group_oid = ObjectId(group_id)
         except Exception:
             group_oid = None
-        group = await domain_db["domain_groups"].find_one({"$or": [{"_id": group_oid}, {"_id": group_id}]}) if group_oid else await domain_db["domain_groups"].find_one({"_id": group_id})
+        group = await domain_db["domain_group"].find_one({"$or": [{"_id": group_oid}, {"_id": group_id}]}) if group_oid else await domain_db["domain_group"].find_one({"_id": group_id})
         if not group:
             domain_client.close()
             await execute("UPDATE sync_domain_rule SET status='error', last_check=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
-            raise HTTPException(status_code=404, detail=f"Group '{group_id}' not found in domain_groups")
+            raise HTTPException(status_code=404, detail=f"Group '{group_id}' not found in domain_group")
         logger.info(f"[SyncDomain] Step 1 done: group={group.get('name', group_id)}")
 
         # Step 2: Get meta from MongoDB domain.domain_meta
@@ -138,9 +138,9 @@ async def check_rule(rule_id: int):
         logger.info(f"[SyncDomain] Step 2 debug: matched={len(meta_list)}, total_in_collection={total_meta}")
         group_zone_ids = [m.get("zoneId") for m in meta_list if m.get("zoneId")]
         logger.info(f"[SyncDomain] Step 2 done: {len(group_zone_ids)} zone_ids in group")
-        domain_client.close()
 
         if not group_zone_ids:
+            domain_client.close()
             await execute("UPDATE sync_domain_rule SET status='ok', last_check=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
             return {"code": 200, "data": {"synced": 0, "message": "No zones in group"}}
 
@@ -159,21 +159,37 @@ async def check_rule(rule_id: int):
         logger.info(f"[SyncDomain] Step 3 done: {len(zone_names)} zone names: {zone_names}")
 
         if not zone_names:
+            domain_client.close()
             await execute("UPDATE sync_domain_rule SET status='ok', last_check=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))
             return {"code": 200, "data": {"synced": 0, "message": "No zone names found"}}
 
-        # Step 3b: Get all DNS records (A/CNAME) under these zones
-        logger.info(f"[SyncDomain] Step 3b: Querying dns_domains for zone names")
-        dns_cursor = cf_db["dns_domains"].find({"zone_name": {"$in": zone_names}, "type": {"$in": ["A", "CNAME"]}})
+        # Step 3b: Get all domains from domain.domain under these zones
+        logger.info(f"[SyncDomain] Step 3b: Querying domain.domain for zone names")
+        domain_db = domain_client["domain"]
+        dns_cursor = domain_db["domain"].find({"zone_name": {"$in": zone_names}})
         dns_records = await dns_cursor.to_list(length=10000)
         domain_names = list({r.get("name", "") for r in dns_records if r.get("name")})
-        logger.info(f"[SyncDomain] Step 3b done: {len(dns_records)} DNS records, {len(domain_names)} unique domains")
+        # Also include zone root domains not yet in domain.domain
+        for zn in zone_names:
+            if zn and zn not in domain_names:
+                domain_names.append(zn)
+        domain_client.close()
+        logger.info(f"[SyncDomain] Step 3b done: {len(dns_records)} records, {len(domain_names)} domains (incl. zone roots)")
 
-        # Step 3c: Filter by env keyword (test/uat/dev → filter, prod → keep all)
-        if env != "prod":
-            before = len(domain_names)
-            domain_names = [d for d in domain_names if env.lower() in d.lower()]
-            logger.info(f"[SyncDomain] Step 3c: filtered by '{env}', {before} -> {len(domain_names)} domains")
+        # Step 3c: Filter by env keyword
+        # dev → only 'dev' domains
+        # uat → only 'uat' domains
+        # test → 'test' domains + domains without 'dev' or 'uat'
+        # prod → all
+        before = len(domain_names)
+        if env == "dev":
+            domain_names = [d for d in domain_names if "dev" in d.lower()]
+        elif env == "uat":
+            domain_names = [d for d in domain_names if "uat" in d.lower()]
+        elif env == "test":
+            domain_names = [d for d in domain_names if "test" in d.lower() or ("dev" not in d.lower() and "uat" not in d.lower())]
+        # prod → keep all
+        logger.info(f"[SyncDomain] Step 3c: filtered by '{env}', {before} -> {len(domain_names)} domains")
 
         if not domain_names:
             await execute("UPDATE sync_domain_rule SET status='ok', last_check=UTC_TIMESTAMP() WHERE id=%s", (rule_id,))

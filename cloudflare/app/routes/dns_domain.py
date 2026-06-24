@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-COLLECTION = "dns_domains"
+COLLECTION = "dns_domain"
 
 
 @router.post("/sync")
 async def sync_dns_domains():
-    """从所有 account 的 dns_records 同步 A/CNAME 记录到 dns_domains 集合"""
+    """从所有 account 的 dns_records 同步 A/CNAME 记录到 dns_domain 集合"""
     db = await get_db()
     accounts = await query_all("SELECT id, name FROM account")
     if not accounts:
@@ -98,7 +98,7 @@ async def list_dns_domains(
     keyword: str = None,
     is_ignored: bool = None,
 ):
-    """查询 dns_domains 集合"""
+    """查询 dns_domain 集合"""
     db = await get_db()
     query = {}
     if account_id:
@@ -127,13 +127,13 @@ async def toggle_all_public(body: dict):
     db = await get_db()
     is_public = body.get("is_public", False)
     result = await db[COLLECTION].update_many({}, {"$set": {"is_public": is_public}})
-    logger.info(f"Toggled all dns_domains is_public={is_public}, matched={result.matched_count}")
+    logger.info(f"Toggled all dns_domain is_public={is_public}, matched={result.matched_count}")
     return {"code": 200, "data": {"updated": result.matched_count}}
 
 
 @router.put("/{record_id}")
 async def update_dns_domain(record_id: str, body: dict):
-    """更新 dns_domains 记录（如 is_public 字段）"""
+    """更新 dns_domain 记录（如 is_public 字段）"""
     from bson import ObjectId
     db = await get_db()
 

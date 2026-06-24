@@ -5,12 +5,13 @@ router = APIRouter()
 
 
 @router.get("")
-async def list_accounts():
+async def list_accounts(raw: bool = False):
     rows = await query_all("SELECT id, name, api_key, description, status, created_at, updated_at FROM account ORDER BY id DESC")
-    for r in rows:
-        if r.get("api_key"):
-            key = r["api_key"]
-            r["api_key"] = key[:4] + "••••••••" + key[-4:] if len(key) > 8 else "••••••••"
+    if not raw:
+        for r in rows:
+            if r.get("api_key"):
+                key = r["api_key"]
+                r["api_key"] = key[:4] + "••••••••" + key[-4:] if len(key) > 8 else "••••••••"
     return {"code": 200, "data": rows}
 
 

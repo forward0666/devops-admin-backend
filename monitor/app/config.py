@@ -44,7 +44,7 @@ MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root123")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "monitor")
 MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 
-# Domain MongoDB (读写 dns_domains)
+# Domain MongoDB (读写 dns_domain)
 DOMAIN_MONGODB_DATABASE = os.getenv("DOMAIN_MONGODB_DATABASE", "domain")
 
 # Service-to-service auth
