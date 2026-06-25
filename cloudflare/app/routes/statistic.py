@@ -60,7 +60,7 @@ async def sync_statistic(body: dict):
     # Build account_id -> api_key map
     account_keys = {str(a["id"]): a["api_key"] for a in accounts}
 
-    # GraphQL query for daily stats
+    # GraphQL query for daily stats (zone-level)
     query = """
     query($zoneTag: String!, $date: String!) {
       viewer {
@@ -69,8 +69,8 @@ async def sync_statistic(body: dict):
             sum {
               requests
               cachedRequests
-              uncachedRequests
-              bytes
+              cachedBandwidth
+              bandwidth
               threats
               pageViews
             }
@@ -122,14 +122,16 @@ async def sync_statistic(body: dict):
 
                 s = http_data[0].get("sum") or {}
                 u = http_data[0].get("uniq") or {}
+                total = s.get("requests", 0)
+                cached = s.get("cachedRequests", 0)
                 record = {
                     "zoneId": zone_id,
                     "domain": zone_name,
                     "date": date,
-                    "total": s.get("requests", 0),
-                    "cached": s.get("cachedRequests", 0),
-                    "uncached": s.get("uncachedRequests", 0),
-                    "bandwidth": s.get("bytes", 0),
+                    "total": total,
+                    "cached": cached,
+                    "uncached": total - cached,
+                    "bandwidth": s.get("bandwidth", 0),
                     "threats": s.get("threats", 0),
                     "pageViews": s.get("pageViews", 0),
                     "uniqueVisitor": u.get("uniques", 0),
