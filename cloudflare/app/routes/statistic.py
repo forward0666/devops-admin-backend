@@ -69,7 +69,7 @@ async def sync_statistic(body: dict):
             sum {
               requests
               cachedRequests
-              bandwidth
+              bytes
               threats
               pageViews
             }
@@ -130,7 +130,7 @@ async def sync_statistic(body: dict):
                     "total": total,
                     "cached": cached,
                     "uncached": total - cached,
-                    "bandwidth": s.get("bandwidth", 0),
+                    "bandwidth": s.get("bytes", 0),
                     "threats": s.get("threats", 0),
                     "pageViews": s.get("pageViews", 0),
                     "uniqueVisitor": u.get("uniques", 0),
