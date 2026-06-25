@@ -74,11 +74,7 @@ async def sync_statistic(body: dict):
               uniques
             }
           }
-          byCountry: httpRequests1dGroups(filter: { date: $date }, limit: 10) {
-            sum { requests }
-            uniq { uniques }
-            dimensions { clientCountryName }
-          }
+
         }
       }
     }
@@ -118,7 +114,6 @@ async def sync_statistic(body: dict):
                 if not zones_data:
                     continue
 
-                logger.info(f"[Statistic] {zone_name}: response keys={list(zones_data[0].keys())}")
                 totals_data = zones_data[0].get("totals") or []
                 if not totals_data:
                     continue
@@ -127,23 +122,6 @@ async def sync_statistic(body: dict):
                 u = totals_data[0].get("uniq") or {}
                 total = s.get("requests", 0)
                 cached = s.get("cachedRequests", 0)
-
-                # Country breakdown
-                country_groups = zones_data[0].get("byCountry") or []
-                if country_groups:
-                    logger.info(f"[Statistic] {zone_name}: {len(country_groups)} country entries")
-                top_countries = []
-                for cg in country_groups:
-                    cs = cg.get("sum") or {}
-                    cu = cg.get("uniq") or {}
-                    dim = cg.get("dimensions") or {}
-                    country = dim.get("clientCountryName", "")
-                    if country and country != "XX":
-                        top_countries.append({
-                            "country": country,
-                            "requests": cs.get("requests", 0),
-                            "uniqueVisitor": cu.get("uniques", 0),
-                        })
 
                 record = {
                     "zoneId": zone_id,
@@ -156,7 +134,6 @@ async def sync_statistic(body: dict):
                     "threats": s.get("threats", 0),
                     "pageViews": s.get("pageViews", 0),
                     "uniqueVisitor": u.get("uniques", 0),
-                    "topCountries": top_countries,
                     "syncedAt": datetime.now(timezone.utc).isoformat(),
                 }
                 results.append(record)
