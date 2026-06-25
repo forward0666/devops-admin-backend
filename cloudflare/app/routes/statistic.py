@@ -69,7 +69,6 @@ async def sync_statistic(body: dict):
             sum {
               requests
               cachedRequests
-              cachedBandwidth
               bandwidth
               threats
               pageViews
