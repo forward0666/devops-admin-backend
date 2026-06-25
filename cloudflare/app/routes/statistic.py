@@ -141,12 +141,12 @@ async def sync_statistic(body: dict):
             except Exception as e:
                 logger.warning(f"[Statistic] {zone_name}: {e}")
 
-    # Fetch country breakdown (account-level, per zone)
+    # Fetch country + ASN breakdown (account-level, per zone)
     country_query = """
     query($accountTag: String!, $date: String!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          httpRequests1dGroups(
+          countries: httpRequests1dGroups(
             filter: { date: $date }
             limit: 1000
             dimensions: [clientCountryName, zoneTag]
@@ -155,14 +155,23 @@ async def sync_statistic(body: dict):
             uniq { uniques }
             dimensions { clientCountryName zoneTag }
           }
+          asns: httpRequests1dGroups(
+            filter: { date: $date }
+            limit: 1000
+            dimensions: [clientASN, zoneTag]
+          ) {
+            sum { requests }
+            uniq { uniques }
+            dimensions { clientASN zoneTag }
+          }
         }
       }
     }
     """
 
     # Build zone -> account map
-    zone_account_map = {z["zone_id"]: str(z.get("account_id", "")) for z in all_zones}
     country_by_zone: dict[str, list[dict]] = {}
+    asn_by_zone: dict[str, list[dict]] = {}
 
     async with httpx.AsyncClient(timeout=60) as client:
         for acc in accounts:
@@ -178,15 +187,15 @@ async def sync_statistic(body: dict):
                     continue
                 data = resp.json()
                 if data.get("errors"):
-                    logger.warning(f"[Statistic] country query account {account_id}: {data['errors'][:1]}")
+                    logger.warning(f"[Statistic] breakdown query account {account_id}: {data['errors'][:1]}")
                     continue
 
                 accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
                 if not accounts_data:
                     continue
 
-                groups = accounts_data[0].get("httpRequests1dGroups") or []
-                for g in groups:
+                # Country data
+                for g in (accounts_data[0].get("countries") or []):
                     dim = g.get("dimensions") or {}
                     zid = dim.get("zoneTag", "")
                     country = dim.get("clientCountryName", "")
@@ -198,20 +207,33 @@ async def sync_statistic(body: dict):
                     cu = g.get("uniq") or {}
                     if zid not in country_by_zone:
                         country_by_zone[zid] = []
-                    country_by_zone[zid].append({
-                        "country": country,
-                        "requests": cs.get("requests", 0),
-                        "uniqueVisitor": cu.get("uniques", 0),
-                    })
-            except Exception as e:
-                logger.warning(f"[Statistic] country query account {account_id}: {e}")
+                    country_by_zone[zid].append({"country": country, "requests": cs.get("requests", 0), "uniqueVisitor": cu.get("uniques", 0)})
 
-    # Merge country data into results
+                # ASN data
+                for g in (accounts_data[0].get("asns") or []):
+                    dim = g.get("dimensions") or {}
+                    zid = dim.get("zoneTag", "")
+                    asn = dim.get("clientASN", 0)
+                    if not zid or not asn:
+                        continue
+                    if zone_id_set and zid not in zone_id_set:
+                        continue
+                    cs = g.get("sum") or {}
+                    if zid not in asn_by_zone:
+                        asn_by_zone[zid] = []
+                    asn_by_zone[zid].append({"asn": asn, "requests": cs.get("requests", 0)})
+            except Exception as e:
+                logger.warning(f"[Statistic] breakdown query account {account_id}: {e}")
+
+    # Merge country + ASN data into results
     for r in results:
         zid = r["zoneId"]
         countries = country_by_zone.get(zid, [])
         countries.sort(key=lambda x: x["requests"], reverse=True)
         r["topCountries"] = countries[:10]
+        asns = asn_by_zone.get(zid, [])
+        asns.sort(key=lambda x: x["requests"], reverse=True)
+        r["topAsns"] = asns[:10]
 
     # Delete old data for this date, then insert new
     if results:
