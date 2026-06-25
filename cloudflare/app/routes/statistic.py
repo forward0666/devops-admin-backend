@@ -90,16 +90,19 @@ async def sync_statistic(body: dict):
                     continue
 
                 data = resp.json()
-                zones_data = data.get("data", {}).get("viewer", {}).get("zones", [])
+                viewer = (data.get("data") or {}).get("viewer")
+                if not viewer:
+                    continue
+                zones_data = viewer.get("zones") or []
                 if not zones_data:
                     continue
 
-                http_data = zones_data[0].get("httpRequests1dGroups", [])
+                http_data = zones_data[0].get("httpRequests1dGroups") or []
                 if not http_data:
                     continue
 
-                s = http_data[0].get("sum", {})
-                u = http_data[0].get("uniq", {})
+                s = http_data[0].get("sum") or {}
+                u = http_data[0].get("uniq") or {}
                 record = {
                     "zoneId": zone_id,
                     "domain": zone_name,
