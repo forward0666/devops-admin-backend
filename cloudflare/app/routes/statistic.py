@@ -15,28 +15,40 @@ COLLECTION = "domain_statistic"
 async def sync_statistic(body: dict):
     """POST /statistic/sync - Sync zone analytics from CF GraphQL to MongoDB."""
     date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    zone_ids_filter = body.get("zoneIds") or []  # empty = all zones
-    logger.info(f"[Statistic] Sync request: date={date}, zoneIds={len(zone_ids_filter)} filter")
+    group_id = body.get("groupId") or ""
+    logger.info(f"[Statistic] Sync request: date={date}, groupId={group_id or 'all'}")
 
     import httpx
+    from app.config import MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD, MONGODB_AUTH_DB
+    from motor.motor_asyncio import AsyncIOMotorClient
 
     db = await get_db()
     accounts = await query_all("SELECT id, api_key FROM account")
     if not accounts:
         raise HTTPException(status_code=400, detail="No CF accounts found")
 
+    # Get zoneIds from domain.domain_meta if groupId specified
+    zone_id_set = None
+    if group_id:
+        domain_uri = f"mongodb://{MONGODB_USER}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}/domain?authSource={MONGODB_AUTH_DB}"
+        domain_client = AsyncIOMotorClient(domain_uri)
+        meta_cursor = domain_client["domain"]["domain_meta"].find({"groupId": group_id}, {"zoneId": 1})
+        meta_list = await meta_cursor.to_list(length=5000)
+        zone_id_set = {m["zoneId"] for m in meta_list if m.get("zoneId")}
+        domain_client.close()
+        logger.info(f"[Statistic] Group {group_id}: {len(zone_id_set)} zone_ids")
+        if not zone_id_set:
+            return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
+
     # Collect zones from MongoDB
     cf_db = await get_db()
     all_zones = []
     collections = await cf_db.list_collection_names()
-    zone_id_set = set(zone_ids_filter) if zone_ids_filter else None
-    if zone_id_set:
-        logger.info(f"[Statistic] Filtering by {len(zone_id_set)} zone_ids")
     for col_name in collections:
         if col_name.endswith("_zones"):
             col = cf_db[col_name]
-            query = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
-            async for zone in col.find(query, {"zone_id": 1, "name": 1, "account_id": 1}):
+            q = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
+            async for zone in col.find(q, {"zone_id": 1, "name": 1, "account_id": 1}):
                 if zone.get("zone_id") and zone.get("name"):
                     all_zones.append(zone)
 
