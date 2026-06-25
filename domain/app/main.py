@@ -4,7 +4,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import domain, dns_domain, sync_domain
+from app.routes import domain, dns_domain, sync_domain, statistic
 from app.services.mongodb import close_db, get_db
 from app.services.db import get_pool, close_pool
 
@@ -40,6 +40,7 @@ async def log_requests(request: Request, call_next):
 app.include_router(domain.router, tags=["Domain"])
 app.include_router(dns_domain.router, prefix="/domain", tags=["DNS Domain"])
 app.include_router(sync_domain.router, prefix="/sync_domain", tags=["Sync Domain"])
+app.include_router(statistic.router, prefix="/statistic", tags=["Statistic"])
 
 
 @app.get("/health")

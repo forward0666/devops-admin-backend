@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
 from app.services.mongodb import get_db
@@ -9,15 +9,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 COLLECTION = "domain_statistic"
-
-
-@router.get("")
-async def get_statistic(date: str = Query(...)):
-    """GET /statistic?date=2026-06-26 - Read cached stats from MongoDB."""
-    db = await get_db()
-    cursor = db[COLLECTION].find({"date": date}, {"_id": 0}).sort("total", -1)
-    rows = await cursor.to_list(length=10000)
-    return {"code": 200, "data": rows}
 
 
 @router.post("/sync")
