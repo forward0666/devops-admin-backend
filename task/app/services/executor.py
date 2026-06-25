@@ -326,8 +326,8 @@ async def run_sync_project_domain(task: dict):
     config = task.get("config", {})
     rule_ids = config.get("sync_project_domain_rule_ids", [])
 
-    cf_url = await get_service_url("cloudflare")
-    url = f"{cf_url}/sync_domain/rules"
+    domain_url = await get_service_url("domain")
+    url = f"{domain_url}/sync_domain/rules"
     logger.info(f"[Task] sync_project_domain: GET {url}")
 
     async with httpx.AsyncClient(timeout=300) as client:
@@ -349,7 +349,7 @@ async def run_sync_project_domain(task: dict):
             synced_total = 0
             for rule in rules_to_run:
                 rule_id = rule["id"]
-                check_url = f"{cf_url}/sync_domain/rules/{rule_id}/check"
+                check_url = f"{domain_url}/sync_domain/rules/{rule_id}/check"
                 try:
                     r = await client.post(check_url)
                     if r.status_code == 200:
