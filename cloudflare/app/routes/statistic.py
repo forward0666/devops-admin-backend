@@ -16,6 +16,7 @@ async def sync_statistic(body: dict):
     """POST /statistic/sync - Sync zone analytics from CF GraphQL to MongoDB."""
     date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     zone_ids_filter = body.get("zoneIds") or []  # empty = all zones
+    logger.info(f"[Statistic] Sync request: date={date}, zoneIds={len(zone_ids_filter)} filter")
 
     import httpx
 
@@ -29,6 +30,8 @@ async def sync_statistic(body: dict):
     all_zones = []
     collections = await cf_db.list_collection_names()
     zone_id_set = set(zone_ids_filter) if zone_ids_filter else None
+    if zone_id_set:
+        logger.info(f"[Statistic] Filtering by {len(zone_id_set)} zone_ids")
     for col_name in collections:
         if col_name.endswith("_zones"):
             col = cf_db[col_name]
