@@ -15,8 +15,7 @@ COLLECTION = "domain_statistic"
 async def sync_statistic(body: dict):
     """POST /statistic/sync - Sync zone analytics from CF GraphQL to MongoDB."""
     date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if not date:
-        raise HTTPException(status_code=400, detail="date is required")
+    zone_ids_filter = body.get("zoneIds") or []  # empty = all zones
 
     import httpx
 
@@ -25,14 +24,16 @@ async def sync_statistic(body: dict):
     if not accounts:
         raise HTTPException(status_code=400, detail="No CF accounts found")
 
-    # Collect all zones from MongoDB
+    # Collect zones from MongoDB
     cf_db = await get_db()
     all_zones = []
     collections = await cf_db.list_collection_names()
+    zone_id_set = set(zone_ids_filter) if zone_ids_filter else None
     for col_name in collections:
         if col_name.endswith("_zones"):
             col = cf_db[col_name]
-            async for zone in col.find({}, {"zone_id": 1, "name": 1, "account_id": 1}):
+            query = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
+            async for zone in col.find(query, {"zone_id": 1, "name": 1, "account_id": 1}):
                 if zone.get("zone_id") and zone.get("name"):
                     all_zones.append(zone)
 
