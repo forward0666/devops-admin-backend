@@ -77,7 +77,7 @@ async def sync_statistic(body: dict):
           byCountry: httpRequests1dGroups(filter: { date: $date }, limit: 10) {
             sum { requests }
             uniq { uniques }
-            dimensions { country }
+            dimensions { clientCountryName }
           }
         }
       }
@@ -137,7 +137,7 @@ async def sync_statistic(body: dict):
                     cs = cg.get("sum") or {}
                     cu = cg.get("uniq") or {}
                     dim = cg.get("dimensions") or {}
-                    country = dim.get("country", "")
+                    country = dim.get("clientCountryName", "")
                     if country and country != "XX":
                         top_countries.append({
                             "country": country,
