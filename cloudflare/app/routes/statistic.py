@@ -141,6 +141,78 @@ async def sync_statistic(body: dict):
             except Exception as e:
                 logger.warning(f"[Statistic] {zone_name}: {e}")
 
+    # Fetch country breakdown (account-level, per zone)
+    country_query = """
+    query($accountTag: String!, $date: String!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          httpRequests1dGroups(
+            filter: { date: $date }
+            limit: 1000
+            dimensions: [clientCountryName, zoneTag]
+          ) {
+            sum { requests }
+            uniq { uniques }
+            dimensions { clientCountryName zoneTag }
+          }
+        }
+      }
+    }
+    """
+
+    # Build zone -> account map
+    zone_account_map = {z["zone_id"]: str(z.get("account_id", "")) for z in all_zones}
+    country_by_zone: dict[str, list[dict]] = {}
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        for acc in accounts:
+            account_id = str(acc["id"])
+            api_key = acc["api_key"]
+            try:
+                resp = await client.post(
+                    "https://api.cloudflare.com/client/v4/graphql",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={"query": country_query, "variables": {"accountTag": account_id, "date": date}},
+                )
+                if resp.status_code != 200:
+                    continue
+                data = resp.json()
+                if data.get("errors"):
+                    logger.warning(f"[Statistic] country query account {account_id}: {data['errors'][:1]}")
+                    continue
+
+                accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
+                if not accounts_data:
+                    continue
+
+                groups = accounts_data[0].get("httpRequests1dGroups") or []
+                for g in groups:
+                    dim = g.get("dimensions") or {}
+                    zid = dim.get("zoneTag", "")
+                    country = dim.get("clientCountryName", "")
+                    if not zid or not country or country == "XX":
+                        continue
+                    if zone_id_set and zid not in zone_id_set:
+                        continue
+                    cs = g.get("sum") or {}
+                    cu = g.get("uniq") or {}
+                    if zid not in country_by_zone:
+                        country_by_zone[zid] = []
+                    country_by_zone[zid].append({
+                        "country": country,
+                        "requests": cs.get("requests", 0),
+                        "uniqueVisitor": cu.get("uniques", 0),
+                    })
+            except Exception as e:
+                logger.warning(f"[Statistic] country query account {account_id}: {e}")
+
+    # Merge country data into results
+    for r in results:
+        zid = r["zoneId"]
+        countries = country_by_zone.get(zid, [])
+        countries.sort(key=lambda x: x["requests"], reverse=True)
+        r["topCountries"] = countries[:10]
+
     # Delete old data for this date, then insert new
     if results:
         await db[COLLECTION].delete_many({"date": date})
