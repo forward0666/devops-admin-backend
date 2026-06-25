@@ -74,7 +74,7 @@ async def sync_statistic(body: dict):
               uniques
             }
           }
-          byCountry: httpRequests1dGroups(filter: { date: $date }, limit: 10, orderBy: [requests_DESC]) {
+          byCountry: httpRequests1dGroups(filter: { date: $date }, limit: 10) {
             sum { requests }
             uniq { uniques }
             dimensions { country }
