@@ -58,6 +58,9 @@ async def sync_statistic(body: dict):
               threats
               pageViews
             }
+            uniq {
+              uniques
+            }
           }
         }
       }
@@ -96,6 +99,7 @@ async def sync_statistic(body: dict):
                     continue
 
                 s = http_data[0].get("sum", {})
+                u = http_data[0].get("uniq", {})
                 record = {
                     "zoneId": zone_id,
                     "domain": zone_name,
@@ -106,6 +110,7 @@ async def sync_statistic(body: dict):
                     "bandwidth": s.get("bytes", 0),
                     "threats": s.get("threats", 0),
                     "pageViews": s.get("pageViews", 0),
+                    "uniqueVisitor": u.get("uniques", 0),
                     "syncedAt": datetime.now(timezone.utc).isoformat(),
                 }
                 results.append(record)
