@@ -57,12 +57,12 @@ async def sync_statistic(body: dict):
     # Build account_id -> api_key map
     account_keys = {str(a["id"]): a["api_key"] for a in accounts}
 
-    # GraphQL query for daily stats (zone-level)
+    # GraphQL query for daily stats (zone-level + country breakdown)
     query = """
     query($zoneTag: String!, $date: String!) {
       viewer {
         zones(filter: { zoneTag: $zoneTag }) {
-          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
+          totals: httpRequests1dGroups(filter: { date: $date }, limit: 1) {
             sum {
               requests
               cachedRequests
@@ -73,6 +73,11 @@ async def sync_statistic(body: dict):
             uniq {
               uniques
             }
+          }
+          byCountry: httpRequests1dGroups(filter: { date: $date }, limit: 10, orderBy: [requests_DESC]) {
+            sum { requests }
+            uniq { uniques }
+            dimensions { country }
           }
         }
       }
@@ -113,14 +118,30 @@ async def sync_statistic(body: dict):
                 if not zones_data:
                     continue
 
-                http_data = zones_data[0].get("httpRequests1dGroups") or []
-                if not http_data:
+                totals_data = zones_data[0].get("totals") or []
+                if not totals_data:
                     continue
 
-                s = http_data[0].get("sum") or {}
-                u = http_data[0].get("uniq") or {}
+                s = totals_data[0].get("sum") or {}
+                u = totals_data[0].get("uniq") or {}
                 total = s.get("requests", 0)
                 cached = s.get("cachedRequests", 0)
+
+                # Country breakdown
+                country_groups = zones_data[0].get("byCountry") or []
+                top_countries = []
+                for cg in country_groups:
+                    cs = cg.get("sum") or {}
+                    cu = cg.get("uniq") or {}
+                    dim = cg.get("dimensions") or {}
+                    country = dim.get("country", "")
+                    if country and country != "XX":
+                        top_countries.append({
+                            "country": country,
+                            "requests": cs.get("requests", 0),
+                            "uniqueVisitor": cu.get("uniques", 0),
+                        })
+
                 record = {
                     "zoneId": zone_id,
                     "domain": zone_name,
@@ -132,6 +153,7 @@ async def sync_statistic(body: dict):
                     "threats": s.get("threats", 0),
                     "pageViews": s.get("pageViews", 0),
                     "uniqueVisitor": u.get("uniques", 0),
+                    "topCountries": top_countries,
                     "syncedAt": datetime.now(timezone.utc).isoformat(),
                 }
                 results.append(record)
