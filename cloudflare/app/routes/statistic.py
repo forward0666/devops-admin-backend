@@ -118,6 +118,7 @@ async def sync_statistic(body: dict):
                 if not zones_data:
                     continue
 
+                logger.info(f"[Statistic] {zone_name}: response keys={list(zones_data[0].keys())}")
                 totals_data = zones_data[0].get("totals") or []
                 if not totals_data:
                     continue
@@ -129,6 +130,8 @@ async def sync_statistic(body: dict):
 
                 # Country breakdown
                 country_groups = zones_data[0].get("byCountry") or []
+                if country_groups:
+                    logger.info(f"[Statistic] {zone_name}: {len(country_groups)} country entries")
                 top_countries = []
                 for cg in country_groups:
                     cs = cg.get("sum") or {}
