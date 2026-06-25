@@ -5,7 +5,7 @@ import time
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 
-from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, ratelimit, sync_rules, ddos, managed, lists
+from app.routes import accounts, zones, dns, security, ssl, cache, cache_rule, ratelimit, sync_rules, ddos, managed, lists, statistic
 from app.services.db import close_pool, get_pool
 from app.services.redis import close_redis
 from app.services.mongodb import close_db, get_db
@@ -60,6 +60,7 @@ app.include_router(ddos.zone_router, prefix="/zones/{zone_id}/ddos", tags=["DDoS
 app.include_router(managed.router, prefix="/managed", tags=["Managed"])
 app.include_router(managed.zone_router, prefix="/zones/{zone_id}/managed", tags=["Managed"])
 app.include_router(lists.router, prefix="/configurations/lists", tags=["Lists"])
+app.include_router(statistic.router, prefix="/statistic", tags=["Statistic"])
 
 
 
