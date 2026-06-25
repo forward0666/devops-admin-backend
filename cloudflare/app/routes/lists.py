@@ -121,13 +121,7 @@ async def sync_all_items(account_id: int = Query(None)):
     # 2. Fetch items per account (parallel across accounts) and store to MongoDB
     import asyncio
 
-    # Clear MongoDB first
-    try:
-        db = await get_db()
-        db.cf_list_items.drop()
-        logger.info("[Sync All] MongoDB collection cleared")
-    except Exception as e:
-        logger.error(f"[Sync All] MongoDB clear error: {e}")
+    db = await get_db()
 
     total_items = 0
 
@@ -146,11 +140,12 @@ async def sync_all_items(account_id: int = Query(None)):
                     d["list_id"] = lst["id"]
                     d["list_kind"] = lst.get("kind", "ip")
                     batch.append(d)
-                # Write this list's items to MongoDB
+                # Replace items for this list: delete old, insert new
                 if batch:
                     try:
                         db = await get_db()
-                        db.cf_list_items.insert_many(batch)
+                        await db.cf_list_items.delete_many({"list_id": lst["id"]})
+                        await db.cf_list_items.insert_many(batch)
                     except Exception as e:
                         logger.error(f"[Sync All] MongoDB insert list_id={lst['id']} error: {e}")
                 total_items += len(batch)
