@@ -150,5 +150,88 @@ async def sync_statistic(body: dict):
         await db[COLLECTION].create_index("date")
         await db[COLLECTION].create_index("zoneId")
 
+    # Fetch country breakdown using httpRequestsAdaptiveGroups
+    country_query = """
+    query($accountTag: String!, $filter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          series: httpRequestsAdaptiveGroups(limit: 5000, filter: $filter) {
+            sum { requests }
+            dimensions { clientCountryName }
+          }
+        }
+      }
+    }
+    """
+
+    from datetime import timedelta
+    dt_start = f"{date}T00:00:00Z"
+    dt_end = f"{date}T23:59:59Z"
+
+    country_by_zone: dict[str, list[dict]] = {}
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        for acc in accounts:
+            account_id = str(acc["id"])
+            api_key = acc["api_key"]
+            for zone in [z for z in all_zones if str(z.get("account_id")) == account_id]:
+                zone_id = zone["zone_id"]
+                try:
+                    resp = await client.post(
+                        "https://api.cloudflare.com/client/v4/graphql",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "query": country_query,
+                            "variables": {
+                                "accountTag": account_id,
+                                "filter": {
+                                    "AND": [
+                                        {"datetime_geq": dt_start, "datetime_leq": dt_end},
+                                        {"zoneTag": zone_id},
+                                    ]
+                                }
+                            }
+                        },
+                    )
+                    if resp.status_code != 200:
+                        continue
+                    data = resp.json()
+                    if data.get("errors"):
+                        logger.warning(f"[Statistic] country query {zone["name"]}: {data['errors'][:1]}")
+                        continue
+
+                    accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
+                    if not accounts_data:
+                        continue
+
+                    series = accounts_data[0].get("series") or []
+                    for s in series:
+                        dim = s.get("dimensions") or {}
+                        country = dim.get("clientCountryName", "")
+                        if not country or country == "XX":
+                            continue
+                        cs = s.get("sum") or {}
+                        if zone_id not in country_by_zone:
+                            country_by_zone[zone_id] = []
+                        country_by_zone[zone_id].append({"country": country, "requests": cs.get("requests", 0)})
+                except Exception as e:
+                    logger.warning(f"[Statistic] country query {zone["name"]}: {e}")
+
+    # Merge country data into results
+    for r in results:
+        zid = r["zoneId"]
+        countries = country_by_zone.get(zid, [])
+        countries.sort(key=lambda x: x["requests"], reverse=True)
+        r["topCountries"] = countries[:10]
+
+    logger.info(f"[Statistic] Country data: {len(country_by_zone)} zones")
+
+    # Delete old data for this date, then insert new
+    if results:
+        await db[COLLECTION].delete_many({"date": date})
+        await db[COLLECTION].insert_many(results)
+        await db[COLLECTION].create_index("date")
+        await db[COLLECTION].create_index("zoneId")
+
     logger.info(f"[Statistic] Done: {synced} zones synced for {date}")
     return {"code": 200, "data": {"synced": synced}, "message": f"Synced {synced} zone stat for {date}"}
