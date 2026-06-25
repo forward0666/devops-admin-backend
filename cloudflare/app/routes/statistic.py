@@ -102,10 +102,12 @@ async def sync_statistic(body: dict):
                     json={"query": query, "variables": {"zoneTag": zone_id, "date": date}},
                 )
                 if resp.status_code != 200:
-                    logger.warning(f"[Statistic] {zone_name}: GraphQL returned {resp.status_code}")
+                    logger.warning(f"[Statistic] {zone_name}: GraphQL returned {resp.status_code} {resp.text[:200]}")
                     continue
 
                 data = resp.json()
+                if data.get("errors"):
+                    logger.warning(f"[Statistic] {zone_name}: GraphQL errors: {data['errors'][:2]}")
                 viewer = (data.get("data") or {}).get("viewer")
                 if not viewer:
                     continue
@@ -115,6 +117,7 @@ async def sync_statistic(body: dict):
 
                 http_data = zones_data[0].get("httpRequests1dGroups") or []
                 if not http_data:
+                    logger.info(f"[Statistic] {zone_name}: no httpRequests1dGroups data")
                     continue
 
                 s = http_data[0].get("sum") or {}
