@@ -235,6 +235,8 @@ async def sync_statistic(body: dict):
         asns.sort(key=lambda x: x["requests"], reverse=True)
         r["topAsns"] = asns[:10]
 
+    logger.info(f"[Statistic] Country data: {len(country_by_zone)} zones, ASN data: {len(asn_by_zone)} zones")
+
     # Delete old data for this date, then insert new
     if results:
         await db[COLLECTION].delete_many({"date": date})
