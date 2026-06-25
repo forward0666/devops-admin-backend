@@ -40,32 +40,23 @@ async def sync_statistic(body: dict):
         if not zone_id_set:
             return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
 
-    # Collect zones from MongoDB
+    # Collect all zones for name mapping
     cf_db = await get_db()
-    all_zones = []
+    zone_name_map = {}
     collections = await cf_db.list_collection_names()
     for col_name in collections:
         if col_name.endswith("_zones"):
             col = cf_db[col_name]
-            q = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
-            async for zone in col.find(q, {"zone_id": 1, "name": 1, "account_id": 1}):
+            async for zone in col.find({}, {"zone_id": 1, "name": 1}):
                 if zone.get("zone_id") and zone.get("name"):
-                    all_zones.append(zone)
+                    zone_name_map[zone["zone_id"]] = zone["name"]
 
-    if not all_zones:
-        raise HTTPException(status_code=400, detail="No zones synced. Please sync zones first.")
-
-    logger.info(f"[Statistic] Syncing {len(all_zones)} zones for date={date}")
-
-    # Build account_id -> api_key map
-    account_keys = {str(a["id"]): a["api_key"] for a in accounts}
-
-    # GraphQL query for daily stats (zone-level)
+    # GraphQL query: account-level analytics (all zones in one request)
     query = """
-    query($zoneTag: String!, $date: String!) {
+    query($accountTag: String!, $date: String!) {
       viewer {
-        zones(filter: { zoneTag: $zoneTag }) {
-          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
+        accounts(filter: { accountTag: $accountTag }) {
+          httpRequests1dGroups(filter: { date: $date }, limit: 10000, orderBy: [requests_DESC]) {
             sum {
               requests
               cachedRequests
@@ -76,6 +67,9 @@ async def sync_statistic(body: dict):
             uniq {
               uniques
             }
+            dimensions {
+              zoneTag
+            }
           }
         }
       }
@@ -85,61 +79,57 @@ async def sync_statistic(body: dict):
     synced = 0
     results = []
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        for zone in all_zones:
-            zone_id = zone["zone_id"]
-            zone_name = zone["name"]
-            account_id = str(zone.get("account_id", ""))
-            api_key = account_keys.get(account_id)
-            if not api_key:
-                continue
-
+    async with httpx.AsyncClient(timeout=60) as client:
+        for acc in accounts:
+            account_id = str(acc["id"])
+            api_key = acc["api_key"]
             try:
                 resp = await client.post(
                     "https://api.cloudflare.com/client/v4/graphql",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"query": query, "variables": {"zoneTag": zone_id, "date": date}},
+                    json={"query": query, "variables": {"accountTag": account_id, "date": date}},
                 )
                 if resp.status_code != 200:
-                    logger.warning(f"[Statistic] {zone_name}: GraphQL returned {resp.status_code} {resp.text[:200]}")
+                    logger.warning(f"[Statistic] account {account_id}: GraphQL returned {resp.status_code}")
                     continue
 
                 data = resp.json()
                 if data.get("errors"):
-                    logger.warning(f"[Statistic] {zone_name}: GraphQL errors: {data['errors'][:2]}")
-                viewer = (data.get("data") or {}).get("viewer")
-                if not viewer:
-                    continue
-                zones_data = viewer.get("zones") or []
-                if not zones_data:
+                    logger.warning(f"[Statistic] account {account_id}: GraphQL errors: {data['errors'][:2]}")
                     continue
 
-                http_data = zones_data[0].get("httpRequests1dGroups") or []
-                if not http_data:
-                    logger.info(f"[Statistic] {zone_name}: no httpRequests1dGroups data")
+                accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
+                if not accounts_data:
                     continue
 
-                s = http_data[0].get("sum") or {}
-                u = http_data[0].get("uniq") or {}
-                total = s.get("requests", 0)
-                cached = s.get("cachedRequests", 0)
-                record = {
-                    "zoneId": zone_id,
-                    "domain": zone_name,
-                    "date": date,
-                    "total": total,
-                    "cached": cached,
-                    "uncached": total - cached,
-                    "bandwidth": s.get("bytes", 0),
-                    "threats": s.get("threats", 0),
-                    "pageViews": s.get("pageViews", 0),
-                    "uniqueVisitor": u.get("uniques", 0),
-                    "syncedAt": datetime.now(timezone.utc).isoformat(),
-                }
-                results.append(record)
-                synced += 1
+                groups = accounts_data[0].get("httpRequests1dGroups") or []
+                logger.info(f"[Statistic] account {account_id}: {len(groups)} zones with data")
+
+                for g in groups:
+                    zone_id = (g.get("dimensions") or {}).get("zoneTag", "")
+                    if zone_id_set and zone_id not in zone_id_set:
+                        continue
+                    s = g.get("sum") or {}
+                    u = g.get("uniq") or {}
+                    total = s.get("requests", 0)
+                    cached = s.get("cachedRequests", 0)
+                    record = {
+                        "zoneId": zone_id,
+                        "domain": zone_name_map.get(zone_id, zone_id),
+                        "date": date,
+                        "total": total,
+                        "cached": cached,
+                        "uncached": total - cached,
+                        "bandwidth": s.get("bytes", 0),
+                        "threats": s.get("threats", 0),
+                        "pageViews": s.get("pageViews", 0),
+                        "uniqueVisitor": u.get("uniques", 0),
+                        "syncedAt": datetime.now(timezone.utc).isoformat(),
+                    }
+                    results.append(record)
+                    synced += 1
             except Exception as e:
-                logger.warning(f"[Statistic] {zone_name}: {e}")
+                logger.warning(f"[Statistic] account {account_id}: {e}")
 
     # Delete old data for this date, then insert new
     if results:
@@ -149,4 +139,4 @@ async def sync_statistic(body: dict):
         await db[COLLECTION].create_index("zoneId")
 
     logger.info(f"[Statistic] Done: {synced} zones synced for {date}")
-    return {"code": 200, "data": {"synced": synced}, "message": f"Synced {synced} zone stats for {date}"}
+    return {"code": 200, "data": {"synced": synced}, "message": f"Synced {synced} zone stat for {date}"}
