@@ -370,6 +370,80 @@ async def run_sync_project_domain(task: dict):
     logger.info(f"[Task] ✅ sync_project_domain '{task_name}' completed in {elapsed}s")
 
 
+async def run_sync_statistic(task: dict):
+    """Sync Cloudflare statistic (table + chart) for today or a specific date"""
+    start_time = time.monotonic()
+    task_id = task.get("id")
+    task_name = task.get("name", "")
+    config = task.get("config", {})
+    date = config.get("date", "")
+    group_id = config.get("group_id", "")
+
+    cf_url = await get_service_url("cloudflare")
+    body = {"groupId": group_id}
+    if date:
+        body["date"] = date
+
+    failed = 0
+    async with httpx.AsyncClient(timeout=600) as client:
+        for endpoint in ["/statistic/sync", "/statistic/sync/chart"]:
+            url = f"{cf_url}{endpoint}"
+            try:
+                logger.info(f"[Task] sync_statistic '{task_name}': POST {url}")
+                resp = await client.post(url, json=body)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    logger.info(f"[Task] sync_statistic '{task_name}': {endpoint} synced={data.get('synced', 0)}")
+                else:
+                    failed += 1
+                    logger.warning(f"[Task] sync_statistic '{task_name}': {endpoint} returned {resp.status_code}")
+            except Exception as e:
+                failed += 1
+                logger.error(f"[Task] sync_statistic '{task_name}': {endpoint} failed: {e}")
+
+    status = "success" if failed == 0 else f"failed {failed}/2"
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", (status, task_id))
+    elapsed = round(time.monotonic() - start_time, 2)
+    logger.info(f"[Task] ✅ sync_statistic '{task_name}' completed in {elapsed}s, status={status}")
+
+
+async def run_sync_statistic_month(task: dict):
+    """Sync Cloudflare statistic month (table + chart) for a specific month"""
+    start_time = time.monotonic()
+    task_id = task.get("id")
+    task_name = task.get("name", "")
+    config = task.get("config", {})
+    month = config.get("month", "")
+    group_id = config.get("group_id", "")
+
+    cf_url = await get_service_url("cloudflare")
+    body = {"groupId": group_id}
+    if month:
+        body["month"] = month
+
+    failed = 0
+    async with httpx.AsyncClient(timeout=600) as client:
+        for endpoint in ["/statistic/sync/month", "/statistic/sync/chart/month"]:
+            url = f"{cf_url}{endpoint}"
+            try:
+                logger.info(f"[Task] sync_statistic_month '{task_name}': POST {url}")
+                resp = await client.post(url, json=body)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    logger.info(f"[Task] sync_statistic_month '{task_name}': {endpoint} synced={data.get('synced', 0)} skipped={data.get('skipped', 0)}")
+                else:
+                    failed += 1
+                    logger.warning(f"[Task] sync_statistic_month '{task_name}': {endpoint} returned {resp.status_code}")
+            except Exception as e:
+                failed += 1
+                logger.error(f"[Task] sync_statistic_month '{task_name}': {endpoint} failed: {e}")
+
+    status = "success" if failed == 0 else f"failed {failed}/2"
+    await execute("UPDATE task SET last_run_at=UTC_TIMESTAMP(), last_status=%s WHERE id=%s", (status, task_id))
+    elapsed = round(time.monotonic() - start_time, 2)
+    logger.info(f"[Task] ✅ sync_statistic_month '{task_name}' completed in {elapsed}s, status={status}")
+
+
 # Registry: task type -> executor
 TASK_EXECUTORS = {
     "check_domain": run_check_domain,
@@ -380,6 +454,8 @@ TASK_EXECUTORS = {
     "sync_domain": run_sync_domain,
     "sync_rule": run_sync_rule,
     "sync_project_domain": run_sync_project_domain,
+    "sync_statistic": run_sync_statistic,
+    "sync_statistic_month": run_sync_statistic_month,
 }
 
 
