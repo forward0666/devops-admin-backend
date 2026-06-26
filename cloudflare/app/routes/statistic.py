@@ -118,6 +118,7 @@ async def sync_statistic(body: dict):
         async def _fetch_one(client, zone):
             nonlocal acc_ok
             zone_id = zone["zone_id"]
+            zone_name = zone["name"]
             async with sem:
                 try:
                     resp = await client.get(
@@ -126,6 +127,12 @@ async def sync_statistic(body: dict):
                         params={"since": rest_since, "until": rest_until, "continuous": "true"},
                     )
                     if resp.status_code != 200:
+                        if resp.status_code == 403:
+                            logger.warning(f"[Statistic] REST {zone_name}: 403 - token may lack zone analytics permission")
+                        elif resp.status_code == 429:
+                            logger.warning(f"[Statistic] REST {zone_name}: 429 rate limited")
+                        else:
+                            logger.warning(f"[Statistic] REST {zone_name}: HTTP {resp.status_code}")
                         return
                     data = resp.json().get("result", {})
                     totals = data.get("totals", {})
