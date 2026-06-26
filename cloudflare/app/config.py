@@ -33,6 +33,7 @@ MONGODB_PORT = int(os.getenv("MONGODB_PORT", "27017"))
 MONGODB_USER = os.getenv("MONGODB_USERNAME", "root")
 MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "root123")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "cloudflare")
+DOMAIN_MONGODB_DATABASE = os.getenv("DOMAIN_MONGODB_DATABASE", "domain")
 MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 
 # Service-to-service auth
