@@ -128,8 +128,14 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         else:
             logger.info(f"[Statistic] Day {date}: {day_col} not found")
             rows = []
-        await _cache_set(f"stat:{date}", rows)
-        return {"code": 200, "data": rows}
+        # Also fetch account-level data
+        account_col = f"account_statistic_{date.replace('-', '_')}"
+        account_data = []
+        if account_col in cols:
+            async for doc in db[account_col].find({}, {"_id": 0}):
+                account_data.append(doc)
+        await _cache_set(f"stat:{date}", {"records": rows, "account": account_data})
+        return {"code": 200, "data": {"records": rows, "account": account_data}}
 
     return {"code": 200, "data": []}
 
@@ -269,29 +275,6 @@ async def debug_statistic(date: str = Query(None), month: str = Query(None)):
         result["chart_count"] = await db[chart_col].count_documents({}) if chart_col in cols else 0
     result["all_statistic_cols"] = [c for c in cols if c.startswith("statistic")]
     return {"code": 200, "data": result}
-
-
-@router.get("/account")
-async def get_account_statistic(date: str = Query(None)):
-    """GET /statistic/account?date=2026-06-26 - Get account-level analytics with all breakdowns."""
-    db = await get_db()
-
-    if date:
-        cached = await _cache_get(f"account:{date}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
-        day_col = f"account_statistic_{date.replace('-', '_')}"
-        cols = await db.list_collection_names()
-        if day_col in cols:
-            cursor = db[day_col].find({}, {"_id": 0})
-            rows = await cursor.to_list(length=100)
-        else:
-            rows = []
-        await _cache_set(f"account:{date}", rows)
-        return {"code": 200, "data": rows}
-
-    return {"code": 200, "data": []}
 
 
 @router.post("/cache/clear")
