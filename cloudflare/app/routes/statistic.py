@@ -475,6 +475,7 @@ async def sync_statistic_account(body: dict):
     """
 
     day_col = f"account_statistic_{date.replace('-', '_')}"
+    logger.info(f"[Statistic] Account sync: db={db.name}, col={day_col}")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     cols = await db.list_collection_names()
