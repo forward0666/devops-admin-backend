@@ -429,6 +429,114 @@ async def sync_statistic_chart(body: dict):
     return {"code": 200, "data": {"synced": len(results)}, "message": f"Synced {len(results)} chart data for {date}"}
 
 
+@router.post("/sync/account")
+async def sync_statistic_account(body: dict):
+    """POST /statistic/sync/account - Sync account-level analytics (all breakdowns) from CF to MongoDB.
+    Uses AccountHttpRequests1dGroupsSum which has all map fields in 1 request per account."""
+    date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    logger.info(f"[Statistic] Account sync start: date={date}")
+
+    import httpx
+
+    db = await get_domain_db()
+    accounts = await query_all("SELECT id, api_key, cf_account_id FROM account")
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No CF accounts found")
+
+    account_query = """
+    query($accountTag: String!, $date: String!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          httpRequests1dGroups(limit: 1, filter: { date: $date }) {
+            sum {
+              requests cachedRequests cachedBytes bytes pageViews threats
+              encryptedRequests encryptedBytes edgeRequestBytes
+              countryMap { clientCountryName requests cachedRequests bytes threats }
+              responseStatusMap { edgeResponseStatus requests }
+              clientHTTPVersionMap { clientHTTPVersion requests }
+              browserMap { uaBrowserFamily requests }
+              contentTypeMap { edgeResponseContentTypeName requests bytes }
+              clientSSLMap { clientSSLProtocol requests }
+              ipClassMap { ipType requests }
+              threatPathingMap { threatPathingTagName requests }
+            }
+            uniq { uniques }
+          }
+        }
+      }
+    }
+    """
+
+    day_col = f"account_statistic_{date.replace('-', '_')}"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cols = await db.list_collection_names()
+    if date != today and day_col in cols:
+        existing_count = await db[day_col].count_documents({})
+        if existing_count > 0:
+            logger.info(f"[Statistic] Account {date} already has {existing_count} docs -> SKIP")
+            return {"code": 200, "data": {"synced": 0}, "message": f"Account {date} already exists"}
+    if date == today and day_col in cols:
+        await db[day_col].drop()
+
+    results = []
+    async with httpx.AsyncClient(timeout=60) as client:
+        for acc in accounts:
+            api_key = acc["api_key"]
+            cf_account_id = acc.get("cf_account_id", "")
+            if not cf_account_id:
+                continue
+            try:
+                resp = await _cf_post(
+                    client, "https://api.cloudflare.com/client/v4/graphql",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={"query": account_query, "variables": {"accountTag": cf_account_id, "date": date}},
+                )
+                if resp.status_code != 200:
+                    logger.warning(f"[Statistic] Account {cf_account_id}: HTTP {resp.status_code}")
+                    continue
+                data = resp.json()
+                if data.get("errors"):
+                    logger.warning(f"[Statistic] Account {cf_account_id}: {data['errors'][0].get('message', '')}")
+                    continue
+                groups = (((data.get("data") or {}).get("viewer") or {}).get("accounts") or [{}])[0].get("httpRequests1dGroups") or []
+                if not groups:
+                    continue
+                s = groups[0].get("sum") or {}
+                u = groups[0].get("uniq") or {}
+                total = s.get("requests", 0)
+                cached = s.get("cachedRequests", 0)
+                results.append({
+                    "accountId": cf_account_id, "date": date,
+                    "total": total, "cached": cached, "uncached": total - cached,
+                    "bandwidth": s.get("bytes", 0), "cachedBandwidth": s.get("cachedBytes", 0),
+                    "threats": s.get("threats", 0), "pageViews": s.get("pageViews", 0),
+                    "uniqueVisitor": u.get("uniques", 0),
+                    "encryptedRequests": s.get("encryptedRequests", 0),
+                    "encryptedBytes": s.get("encryptedBytes", 0),
+                    "edgeRequestBytes": s.get("edgeRequestBytes", 0),
+                    "countries": [{"country": m.get("clientCountryName", ""), "requests": m.get("requests", 0), "cached": m.get("cachedRequests", 0), "bandwidth": m.get("bytes", 0), "threats": m.get("threats", 0)} for m in (s.get("countryMap") or [])],
+                    "statusCodes": [{"status": m.get("edgeResponseStatus", 0), "requests": m.get("requests", 0)} for m in (s.get("responseStatusMap") or [])],
+                    "httpVersions": [{"version": m.get("clientHTTPVersion", ""), "requests": m.get("requests", 0)} for m in (s.get("clientHTTPVersionMap") or [])],
+                    "browsers": [{"browser": m.get("uaBrowserFamily", ""), "requests": m.get("requests", 0)} for m in (s.get("browserMap") or [])],
+                    "contentTypes": [{"type": m.get("edgeResponseContentTypeName", ""), "requests": m.get("requests", 0), "bandwidth": m.get("bytes", 0)} for m in (s.get("contentTypeMap") or [])],
+                    "sslVersions": [{"version": m.get("clientSSLProtocol", ""), "requests": m.get("requests", 0)} for m in (s.get("clientSSLMap") or [])],
+                    "ipClasses": [{"class": m.get("ipType", ""), "requests": m.get("requests", 0)} for m in (s.get("ipClassMap") or [])],
+                    "threats_map": [{"threat": m.get("threatPathingTagName", ""), "requests": m.get("requests", 0)} for m in (s.get("threatPathingMap") or [])],
+                    "syncedAt": datetime.now(timezone.utc).isoformat(),
+                })
+                logger.info(f"[Statistic] Account {cf_account_id}: total={total} countries={len(s.get('countryMap') or [])} statuses={len(s.get('responseStatusMap') or [])}")
+            except Exception as e:
+                logger.warning(f"[Statistic] Account {cf_account_id}: {e}")
+
+    if results:
+        await db[day_col].insert_many(results)
+        logger.info(f"[Statistic] Account sync: wrote {len(results)} docs -> {day_col}")
+    else:
+        logger.info(f"[Statistic] Account sync: no data")
+
+    return {"code": 200, "data": {"synced": len(results)}, "message": f"Synced {len(results)} account stats for {date}"}
+
+
 async def _get_zone_ids(group_id: str):
     """Get zoneIds from domain.domain_meta for a group."""
     if not group_id or group_id == "all":

@@ -271,6 +271,29 @@ async def debug_statistic(date: str = Query(None), month: str = Query(None)):
     return {"code": 200, "data": result}
 
 
+@router.get("/account")
+async def get_account_statistic(date: str = Query(None)):
+    """GET /statistic/account?date=2026-06-26 - Get account-level analytics with all breakdowns."""
+    db = await get_db()
+
+    if date:
+        cached = await _cache_get(f"account:{date}")
+        if cached is not None:
+            return {"code": 200, "data": cached}
+
+        day_col = f"account_statistic_{date.replace('-', '_')}"
+        cols = await db.list_collection_names()
+        if day_col in cols:
+            cursor = db[day_col].find({}, {"_id": 0})
+            rows = await cursor.to_list(length=100)
+        else:
+            rows = []
+        await _cache_set(f"account:{date}", rows)
+        return {"code": 200, "data": rows}
+
+    return {"code": 200, "data": []}
+
+
 @router.post("/cache/clear")
 async def clear_cache():
     count = await _cache_clear()
