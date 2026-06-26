@@ -464,12 +464,8 @@ async def sync_statistic_account(body: dict):
               encryptedRequests encryptedBytes edgeRequestBytes
               countryMap { clientCountryName requests bytes threats }
               responseStatusMap { edgeResponseStatus requests }
-              clientHTTPVersionMap { clientHTTPVersion requests }
               browserMap { uaBrowserFamily requests }
               contentTypeMap { edgeResponseContentTypeName requests bytes }
-              clientSSLMap { clientSSLProtocol requests }
-              ipClassMap { ipType requests }
-              threatPathingMap { threatPathingTagName requests }
             }
             uniq { uniques }
           }
@@ -530,12 +526,8 @@ async def sync_statistic_account(body: dict):
                     "edgeRequestBytes": s.get("edgeRequestBytes", 0),
                     "countries": [{"country": m.get("clientCountryName", ""), "requests": m.get("requests", 0), "bandwidth": m.get("bytes", 0), "threats": m.get("threats", 0)} for m in (s.get("countryMap") or [])],
                     "statusCodes": [{"status": m.get("edgeResponseStatus", 0), "requests": m.get("requests", 0)} for m in (s.get("responseStatusMap") or [])],
-                    "httpVersions": [{"version": m.get("clientHTTPVersion", ""), "requests": m.get("requests", 0)} for m in (s.get("clientHTTPVersionMap") or [])],
                     "browsers": [{"browser": m.get("uaBrowserFamily", ""), "requests": m.get("requests", 0)} for m in (s.get("browserMap") or [])],
                     "contentTypes": [{"type": m.get("edgeResponseContentTypeName", ""), "requests": m.get("requests", 0), "bandwidth": m.get("bytes", 0)} for m in (s.get("contentTypeMap") or [])],
-                    "sslVersions": [{"version": m.get("clientSSLProtocol", ""), "requests": m.get("requests", 0)} for m in (s.get("clientSSLMap") or [])],
-                    "ipClasses": [{"class": m.get("ipType", ""), "requests": m.get("requests", 0)} for m in (s.get("ipClassMap") or [])],
-                    "threats_map": [{"threat": m.get("threatPathingTagName", ""), "requests": m.get("requests", 0)} for m in (s.get("threatPathingMap") or [])],
                     "syncedAt": datetime.now(timezone.utc).isoformat(),
                 })
                 logger.info(f"[Statistic] Account {cf_account_id}: total={total} countries={len(s.get('countryMap') or [])} statuses={len(s.get('responseStatusMap') or [])}")
