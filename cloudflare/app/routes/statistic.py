@@ -134,7 +134,7 @@ async def sync_statistic(body: dict):
 
     async def _fetch_account(acc_id, zones, api_key):
         """Fetch all zones for one account with concurrent requests."""
-        sem = asyncio.Semaphore(20)
+        sem = asyncio.Semaphore(10)
         acc_ok = 0
 
         async def _fetch_one(client, zone):
@@ -351,7 +351,7 @@ async def sync_statistic_chart(body: dict):
         ip_lock = asyncio.Lock()
 
         async def _fetch_ips_account(acc_id, zones, api_key, cf_account_id):
-            sem = asyncio.Semaphore(20)
+            sem = asyncio.Semaphore(10)
             acc_processed = 0
 
             async def _fetch_one(client, zone):
