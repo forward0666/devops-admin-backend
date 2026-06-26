@@ -213,21 +213,3 @@ async def debug_statistic(date: str = Query(None), month: str = Query(None)):
     return {"code": 200, "data": result}
 
 
-@router.get("/account")
-async def get_account_statistic(date: str = Query(None)):
-    """GET /statistic/account?date=2026-06-27 - Get account-level analytics."""
-    db = await get_db()
-
-    if date:
-        day_col = f"account_statistic_{date.replace('-', '_')}"
-        cols = await db.list_collection_names()
-        logger.info(f"[Statistic] Account query: db={db.name}, col={day_col}, exists={day_col in cols}")
-        if day_col in cols:
-            cursor = db[day_col].find({}, {"_id": 0})
-            rows = await cursor.to_list(length=100)
-            logger.info(f"[Statistic] Account query: found {len(rows)} docs")
-        else:
-            rows = []
-        return {"code": 200, "data": rows}
-
-    return {"code": 200, "data": []}
