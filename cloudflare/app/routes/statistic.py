@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
@@ -95,46 +95,24 @@ async def sync_statistic(body: dict):
         all_zones = [z for z in all_zones if z["zone_id"] not in existing_zones]
         logger.info(f"[Statistic] Step 5: {before} total, {len(all_zones)} missing, {len(existing_zones)} exist")
 
-    # Skip zones with 0 traffic yesterday (likely inactive)
-    yesterday = (datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-    yesterday_col = f"{TABLE_COLLECTION}_{yesterday.replace('-', '_')}"
-    cols = await db.list_collection_names()
-    zero_zones = set()
-    if yesterday_col in cols:
-        async for doc in db[yesterday_col].find({"total": 0}, {"zoneId": 1}):
-            zero_zones.add(doc.get("zoneId"))
-        if zero_zones:
-            before = len(all_zones)
-            all_zones = [z for z in all_zones if z["zone_id"] not in zero_zones]
-            logger.info(f"[Statistic] Step 5: Skipping {before - len(all_zones)} zero-traffic zones (from yesterday), {len(all_zones)} remaining")
-
     # Group zones by account for parallel processing
     acc_zones = {}  # account_db_id -> list of zones
     for z in all_zones:
         aid = str(z.get("account_id", ""))
         acc_zones.setdefault(aid, []).append(z)
 
-    table_query = """
-    query($zoneTag: String!, $date: String!) {
-      viewer {
-        zones(filter: { zoneTag: $zoneTag }) {
-          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
-            sum { requests cachedRequests bytes threats pageViews }
-            uniq { uniques }
-          }
-        }
-      }
-    }
-    """
+    # Use REST API for table sync (higher rate limits than GraphQL)
+    rest_since = f"{date}T00:00:00Z"
+    rest_until = f"{date}T23:59:59Z"
 
-    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones across {len(acc_zones)} accounts...")
+    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones via REST API across {len(acc_zones)} accounts...")
 
     cf_data = {}  # zone_id -> {total, cached, ...}
     lock = asyncio.Lock()
 
     async def _fetch_account(acc_id, zones, api_key):
-        """Fetch all zones for one account with concurrent requests."""
-        sem = asyncio.Semaphore(10)
+        """Fetch all zones for one account with concurrent REST requests."""
+        sem = asyncio.Semaphore(20)
         acc_ok = 0
 
         async def _fetch_one(client, zone):
@@ -142,31 +120,27 @@ async def sync_statistic(body: dict):
             zone_id = zone["zone_id"]
             async with sem:
                 try:
-                    resp = await _cf_post(
-                        client, "https://api.cloudflare.com/client/v4/graphql",
-                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                        json={"query": table_query, "variables": {"zoneTag": zone_id, "date": date}},
+                    resp = await client.get(
+                        f"https://api.cloudflare.com/client/v4/zones/{zone_id}/analytics/dashboard",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        params={"since": rest_since, "until": rest_until, "continuous": "true"},
                     )
                     if resp.status_code != 200:
                         return
-                    data = resp.json()
-                    if data.get("errors"):
-                        return
-                    zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
-                    if not zones_data:
-                        return
-                    http_data = zones_data[0].get("httpRequests1dGroups") or []
-                    if not http_data:
-                        return
-                    s = http_data[0].get("sum") or {}
-                    u = http_data[0].get("uniq") or {}
-                    total = s.get("requests", 0)
-                    cached = s.get("cachedRequests", 0)
+                    data = resp.json().get("result", {})
+                    totals = data.get("totals", {})
+                    req = totals.get("requests", {})
+                    bw = totals.get("bandwidth", {})
+                    threats = totals.get("threats", {})
+                    pv = totals.get("pageviews", {})
+                    unq = totals.get("uniques", {})
+                    total = req.get("all", 0)
+                    cached = req.get("cached", 0)
                     async with lock:
                         cf_data[zone_id] = {
-                            "total": total, "cached": cached, "uncached": total - cached,
-                            "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
-                            "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
+                            "total": total, "cached": cached, "uncached": req.get("uncached", total - cached),
+                            "bandwidth": bw.get("all", 0), "threats": threats.get("all", 0),
+                            "pageViews": pv.get("all", 0), "uniqueVisitor": unq.get("all", 0),
                         }
                         acc_ok += 1
                 except Exception:
@@ -175,12 +149,12 @@ async def sync_statistic(body: dict):
         async with httpx.AsyncClient(timeout=30) as client:
             tasks = [_fetch_one(client, zone) for zone in zones]
             await asyncio.gather(*tasks)
-        logger.info(f"[Statistic] Account {acc_id}: {acc_ok}/{len(zones)} zones fetched")
+        logger.info(f"[Statistic] REST Account {acc_id}: {acc_ok}/{len(zones)} zones")
 
     # Run all accounts in parallel (separate rate limit pools)
     acc_tasks = [_fetch_account(aid, zones, account_map.get(aid, {}).get("api_key", "")) for aid, zones in acc_zones.items()]
     await asyncio.gather(*acc_tasks)
-    logger.info(f"[Statistic] Step 5: {len(cf_data)} zones with data from CF")
+    logger.info(f"[Statistic] Step 5: {len(cf_data)} zones with data from REST API")
 
     # Build results: merge zone metadata with CF data
     results = []
@@ -351,7 +325,7 @@ async def sync_statistic_chart(body: dict):
         ip_lock = asyncio.Lock()
 
         async def _fetch_ips_account(acc_id, zones, api_key, cf_account_id):
-            sem = asyncio.Semaphore(10)
+            sem = asyncio.Semaphore(20)
             acc_processed = 0
 
             async def _fetch_one(client, zone):
