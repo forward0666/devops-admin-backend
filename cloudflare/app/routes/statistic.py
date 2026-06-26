@@ -94,14 +94,14 @@ async def sync_statistic(body: dict):
         aid = str(z.get("account_id", ""))
         acc_zones.setdefault(aid, []).append(z)
 
+    # Use zone-level httpRequests1dGroups (has sum fields), batch requests per account
     table_query = """
-    query($accountTag: String!, $dateStart: String!, $dateEnd: String!) {
+    query($zoneTag: String!, $date: String!) {
       viewer {
-        accounts(filter: { accountTag: $accountTag }) {
-          httpRequestsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $dateStart, datetime_leq: $dateEnd }) {
+        zones(filter: { zoneTag: $zoneTag }) {
+          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
             sum { requests cachedRequests bytes threats pageViews }
             uniq { uniques }
-            dimensions { zoneTag }
           }
         }
       }
@@ -110,47 +110,52 @@ async def sync_statistic(body: dict):
     dt_start = f"{date}T00:00:00Z"
     dt_end = f"{date}T23:59:59Z"
 
-    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones via {len(acc_zones)} account-level queries...")
+    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones with 10 concurrent workers...")
 
     cf_data = {}  # zone_id -> {total, cached, ...}
-    async with httpx.AsyncClient(timeout=60) as client:
-        for aid, zones in acc_zones.items():
-            acc = account_map.get(aid)
-            if not acc or not acc.get("cf_account_id"):
-                continue
+    sem = asyncio.Semaphore(10)
+    lock = asyncio.Lock()
+
+    async def _fetch_table(client, zone):
+        zone_id = zone["zone_id"]
+        acc = account_map.get(str(zone.get("account_id", "")))
+        if not acc:
+            return
+        async with sem:
             try:
                 resp = await _cf_post(
                     client, "https://api.cloudflare.com/client/v4/graphql",
                     headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                    json={"query": table_query, "variables": {
-                        "accountTag": acc["cf_account_id"],
-                        "dateStart": dt_start, "dateEnd": dt_end,
-                    }},
+                    json={"query": table_query, "variables": {"zoneTag": zone_id, "date": date}},
                 )
                 if resp.status_code != 200:
-                    logger.warning(f"[Statistic] Account {aid}: HTTP {resp.status_code}")
-                    continue
+                    return
                 data = resp.json()
                 if data.get("errors"):
-                    logger.warning(f"[Statistic] Account {aid}: {data['errors'][0].get('message', '')}")
-                    continue
-                groups = (((data.get("data") or {}).get("viewer") or {}).get("accounts") or [{}])[0].get("httpRequestsAdaptiveGroups") or []
-                for g in groups:
-                    zid = (g.get("dimensions") or {}).get("zoneTag", "")
-                    if not zid:
-                        continue
-                    s = g.get("sum") or {}
-                    u = g.get("uniq") or {}
-                    total = s.get("requests", 0)
-                    cached = s.get("cachedRequests", 0)
-                    cf_data[zid] = {
+                    return
+                zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
+                if not zones_data:
+                    return
+                http_data = zones_data[0].get("httpRequests1dGroups") or []
+                if not http_data:
+                    return
+                s = http_data[0].get("sum") or {}
+                u = http_data[0].get("uniq") or {}
+                total = s.get("requests", 0)
+                cached = s.get("cachedRequests", 0)
+                async with lock:
+                    cf_data[zone_id] = {
                         "total": total, "cached": cached, "uncached": total - cached,
                         "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
                         "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
                     }
-                logger.info(f"[Statistic] Account {aid}: {len(groups)} zone rows from CF ({len(zones)} zones expected)")
-            except Exception as e:
-                logger.warning(f"[Statistic] Account {aid}: {e}")
+            except Exception:
+                pass
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        tasks = [_fetch_table(client, zone) for zone in all_zones]
+        await asyncio.gather(*tasks)
+    logger.info(f"[Statistic] Step 5: {len(cf_data)} zones with data from CF")
 
     # Build results: merge zone metadata with CF data
     results = []
