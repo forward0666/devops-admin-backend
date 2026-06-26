@@ -462,7 +462,7 @@ async def sync_statistic_account(body: dict):
             sum {
               requests cachedRequests cachedBytes bytes pageViews threats
               encryptedRequests encryptedBytes edgeRequestBytes
-              countryMap { clientCountryName requests cachedRequests bytes threats }
+              countryMap { clientCountryName requests bytes threats }
               responseStatusMap { edgeResponseStatus requests }
               clientHTTPVersionMap { clientHTTPVersion requests }
               browserMap { uaBrowserFamily requests }
