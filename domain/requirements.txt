@@ -4,3 +4,4 @@ motor>=3.3.0
 pymongo>=4.3.0
 httpx>=0.24.0
 aiomysql>=0.2.0
+redis

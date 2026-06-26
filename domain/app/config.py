@@ -22,6 +22,12 @@ MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 # Source MongoDB
 CLOUDFLARE_MONGODB_DATABASE = os.getenv("CLOUDFLARE_MONGODB_DATABASE", "cloudflare")
 
+# Redis
+REDIS_HOST = os.getenv("REDIS_HOST", "192.168.86.9")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "root123")
+REDIS_DATABASE = int(os.getenv("REDIS_DATABASE", "0"))
+
 # MySQL
 MYSQL_HOST = os.getenv("MYSQL_HOST", "192.168.86.9")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))

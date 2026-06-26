@@ -3,7 +3,7 @@ from datetime import datetime
 from bson import ObjectId
 import logging
 
-from app.services.mongodb import get_db
+from app.services.mongodb import get_db, get_source_db
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,25 @@ META_COLLECTION = "domain_meta"
 def _serialize(doc: dict) -> dict:
     doc["id"] = str(doc.pop("_id"))
     return doc
+
+
+# ==================== Zones ====================
+
+@router.get("/zones")
+async def list_zones():
+    """Read zones from cloudflare MongoDB (account_X_zones collections)."""
+    db = await get_source_db()
+    all_zones = []
+    cols = await db.list_collection_names()
+    for col_name in cols:
+        if col_name.endswith("_zones"):
+            account_id = col_name.replace("account_", "").replace("_zones", "")
+            async for zone in db[col_name].find({}, {"_id": 0, "zone_id": 1, "name": 1, "status": 1, "account_id": 1}):
+                if zone.get("zone_id") and zone.get("name"):
+                    zone["accountName"] = f"Account {account_id}"
+                    all_zones.append(zone)
+    all_zones.sort(key=lambda x: x.get("name", ""))
+    return {"code": 200, "data": all_zones}
 
 
 # ==================== Groups ====================

@@ -33,10 +33,20 @@ app = FastAPI(title="Cloudflare Manager API", version="1.0.0", lifespan=lifespan
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.monotonic()
+    # Read body for POST/PUT requests
+    body_str = ""
+    if request.method in ("POST", "PUT"):
+        try:
+            body = await request.body()
+            if body:
+                import json
+                body_str = f" body={json.loads(body)}"
+        except Exception:
+            pass
     response = await call_next(request)
     elapsed = round((time.monotonic() - start) * 1000, 2)
     client = request.client.host if request.client else "unknown"
-    logger.info(f"{request.method} {request.url.path}?{request.query_params} [{response.status_code}] {elapsed}ms client={client}")
+    logger.info(f"{request.method} {request.url.path}?{request.query_params}{body_str} [{response.status_code}] {elapsed}ms client={client}")
     return response
 
 
