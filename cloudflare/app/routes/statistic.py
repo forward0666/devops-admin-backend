@@ -460,7 +460,7 @@ async def sync_statistic_account(body: dict):
         accounts(filter: { accountTag: $accountTag }) {
           httpRequests1dGroups(limit: 1, filter: { date: $date }) {
             sum {
-              requests cachedRequests cachedBytes bytes pageViews threats
+              requests cachedBytes bytes pageViews threats
               encryptedRequests encryptedBytes edgeRequestBytes
               countryMap { clientCountryName requests bytes threats }
               responseStatusMap { edgeResponseStatus requests }
@@ -518,17 +518,17 @@ async def sync_statistic_account(body: dict):
                 s = groups[0].get("sum") or {}
                 u = groups[0].get("uniq") or {}
                 total = s.get("requests", 0)
-                cached = s.get("cachedRequests", 0)
+                cached = s.get("cachedBytes", 0)
                 results.append({
                     "accountId": cf_account_id, "date": date,
-                    "total": total, "cached": cached, "uncached": total - cached,
+                    "total": total, "cached": 0, "uncached": total,
                     "bandwidth": s.get("bytes", 0), "cachedBandwidth": s.get("cachedBytes", 0),
                     "threats": s.get("threats", 0), "pageViews": s.get("pageViews", 0),
                     "uniqueVisitor": u.get("uniques", 0),
                     "encryptedRequests": s.get("encryptedRequests", 0),
                     "encryptedBytes": s.get("encryptedBytes", 0),
                     "edgeRequestBytes": s.get("edgeRequestBytes", 0),
-                    "countries": [{"country": m.get("clientCountryName", ""), "requests": m.get("requests", 0), "cached": m.get("cachedRequests", 0), "bandwidth": m.get("bytes", 0), "threats": m.get("threats", 0)} for m in (s.get("countryMap") or [])],
+                    "countries": [{"country": m.get("clientCountryName", ""), "requests": m.get("requests", 0), "bandwidth": m.get("bytes", 0), "threats": m.get("threats", 0)} for m in (s.get("countryMap") or [])],
                     "statusCodes": [{"status": m.get("edgeResponseStatus", 0), "requests": m.get("requests", 0)} for m in (s.get("responseStatusMap") or [])],
                     "httpVersions": [{"version": m.get("clientHTTPVersion", ""), "requests": m.get("requests", 0)} for m in (s.get("clientHTTPVersionMap") or [])],
                     "browsers": [{"browser": m.get("uaBrowserFamily", ""), "requests": m.get("requests", 0)} for m in (s.get("browserMap") or [])],
