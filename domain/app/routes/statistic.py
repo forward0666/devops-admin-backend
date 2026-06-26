@@ -18,9 +18,25 @@ def _month_col(base: str, month: str) -> str:
     return f"{base}_{month.replace('-', '_')}"
 
 
+async def _get_group_zone_ids(db, group_id: str):
+    """Get zoneIds for a group from domain_meta collection."""
+    if not group_id or group_id == "all":
+        return None
+    meta_cursor = db["domain_meta"].find({"groupId": group_id}, {"zoneId": 1})
+    meta_list = await meta_cursor.to_list(length=5000)
+    zone_ids = {m["zoneId"] for m in meta_list if m.get("zoneId")}
+    return zone_ids if zone_ids else set()
+
+
 @router.get("")
-async def get_statistic(date: str = Query(None), month: str = Query(None), year: str = Query(None)):
+async def get_statistic(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None)):
     db = await get_db()
+    group_zone_ids = await _get_group_zone_ids(db, groupId)
+
+    # Build zone filter
+    zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
+    if group_zone_ids is not None and not group_zone_ids:
+        return {"code": 200, "data": []}
 
     if year:
         prefix = f"{TABLE_COLLECTION}_{year}_"
@@ -29,7 +45,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         logger.info(f"[Statistic] Year {year}: found {len(day_cols)} day collections")
         merged = {}
         for col_name in day_cols:
-            async for r in db[col_name].find({}, {"_id": 0}):
+            async for r in db[col_name].find(zone_filter, {"_id": 0}):
                 d = (r.get("domain", "") or "").strip()
                 if not d:
                     continue
@@ -49,7 +65,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         month_col = _month_col(TABLE_COLLECTION, month)
         cols = await db.list_collection_names()
         if month_col in cols:
-            cursor = db[month_col].find({}, {"_id": 0}).sort("total", -1)
+            cursor = db[month_col].find(zone_filter, {"_id": 0}).sort("total", -1)
             rows = await cursor.to_list(length=10000)
         else:
             prefix = f"{TABLE_COLLECTION}_{month.replace('-', '_')}_"
@@ -57,9 +73,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
             logger.info(f"[Statistic] Month {month}: found {len(day_cols)} day collections")
             merged = {}
             for col_name in day_cols:
-                count = await db[col_name].count_documents({})
-                logger.info(f"[Statistic]   {col_name}: {count} docs")
-                async for r in db[col_name].find({}, {"_id": 0}):
+                async for r in db[col_name].find(zone_filter, {"_id": 0}):
                     d = (r.get("domain", "") or "").strip()
                     if not d:
                         continue
@@ -79,9 +93,9 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         day_col = _day_col(TABLE_COLLECTION, date)
         cols = await db.list_collection_names()
         if day_col in cols:
-            count = await db[day_col].count_documents({})
+            count = await db[day_col].count_documents(zone_filter)
             logger.info(f"[Statistic] Day {date}: {day_col} has {count} docs")
-            cursor = db[day_col].find({}, {"_id": 0}).sort("total", -1)
+            cursor = db[day_col].find(zone_filter, {"_id": 0}).sort("total", -1)
             rows = await cursor.to_list(length=10000)
         else:
             logger.info(f"[Statistic] Day {date}: {day_col} not found")
@@ -92,8 +106,12 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
 
 
 @router.get("/chart")
-async def get_statistic_chart(date: str = Query(None), month: str = Query(None), year: str = Query(None)):
+async def get_statistic_chart(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None)):
     db = await get_db()
+    group_zone_ids = await _get_group_zone_ids(db, groupId)
+    zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
+    if group_zone_ids is not None and not group_zone_ids:
+        return {"code": 200, "data": []}
 
     if year:
         prefix = f"{CHART_COLLECTION}_{year}_"
@@ -102,7 +120,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         logger.info(f"[Statistic] Chart year {year}: found {len(day_cols)} day collections")
         merged = {}
         for col_name in day_cols:
-            async for r in db[col_name].find({}, {"_id": 0}):
+            async for r in db[col_name].find(zone_filter, {"_id": 0}):
                 d = (r.get("domain", "") or "").strip()
                 if not d:
                     continue
@@ -129,7 +147,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         month_col = _month_col(CHART_COLLECTION, month)
         cols = await db.list_collection_names()
         if month_col in cols:
-            cursor = db[month_col].find({}, {"_id": 0}).sort("domain", 1)
+            cursor = db[month_col].find(zone_filter, {"_id": 0}).sort("domain", 1)
             rows = await cursor.to_list(length=10000)
         else:
             prefix = f"{CHART_COLLECTION}_{month.replace('-', '_')}_"
@@ -139,7 +157,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             for col_name in day_cols:
                 count = await db[col_name].count_documents({})
                 logger.info(f"[Statistic]   {col_name}: {count} docs")
-                async for r in db[col_name].find({}, {"_id": 0}):
+                async for r in db[col_name].find(zone_filter, {"_id": 0}):
                     d = (r.get("domain", "") or "").strip()
                     if not d:
                         continue
@@ -167,9 +185,9 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         day_col = _day_col(CHART_COLLECTION, date)
         cols = await db.list_collection_names()
         if day_col in cols:
-            count = await db[day_col].count_documents({})
+            count = await db[day_col].count_documents(zone_filter)
             logger.info(f"[Statistic] Chart day {date}: {day_col} has {count} docs")
-            cursor = db[day_col].find({}, {"_id": 0}).sort("domain", 1)
+            cursor = db[day_col].find(zone_filter, {"_id": 0}).sort("domain", 1)
             rows = await cursor.to_list(length=10000)
         else:
             logger.info(f"[Statistic] Chart day {date}: {day_col} not found")
