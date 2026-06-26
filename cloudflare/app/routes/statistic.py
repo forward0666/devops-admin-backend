@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
@@ -14,21 +14,28 @@ TABLE_COLLECTION = "statistic"
 CHART_COLLECTION = "statistic_chart"
 
 
-async def _cf_post(client, url, headers=None, json=None, max_retries=3):
-    """Post to CF GraphQL with retry on rate limit."""
+async def _cf_post(client, url, headers=None, json=None, max_retries=5):
+    """Post to CF GraphQL with exponential backoff on rate limit."""
     for attempt in range(max_retries):
         resp = await client.post(url, headers=headers, json=json)
         if resp.status_code == 200:
             data = resp.json()
             errors = data.get("errors") or []
-            if any("budget" in e.get("extensions", {}).get("code", "") or "Rate limiter" in e.get("message", "") for e in errors):
-                wait = (attempt + 1) * 30
-                logger.warning(f"[Statistic] Rate limited, wait {wait}s (attempt {attempt + 1}/{max_retries})")
+            rate_limited = any(
+                "budget" in e.get("extensions", {}).get("code", "") or
+                "Rate limiter" in e.get("message", "") or
+                "rate" in e.get("message", "").lower()
+                for e in errors
+            )
+            if rate_limited:
+                wait = min((attempt + 1) * 15, 90)
+                logger.warning(f"[Statistic] Rate limited (GraphQL), wait {wait}s (attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(wait)
                 continue
             return resp
         if resp.status_code == 429:
-            wait = (attempt + 1) * 30
+            retry_after = int(resp.headers.get("Retry-After", (attempt + 1) * 15))
+            wait = min(retry_after, 90)
             logger.warning(f"[Statistic] HTTP 429, wait {wait}s (attempt {attempt + 1}/{max_retries})")
             await asyncio.sleep(wait)
             continue
@@ -88,13 +95,25 @@ async def sync_statistic(body: dict):
         all_zones = [z for z in all_zones if z["zone_id"] not in existing_zones]
         logger.info(f"[Statistic] Step 5: {before} total, {len(all_zones)} missing, {len(existing_zones)} exist")
 
-    # Group zones by account for batch querying
+    # Skip zones with 0 traffic yesterday (likely inactive)
+    yesterday = (datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday_col = f"{TABLE_COLLECTION}_{yesterday.replace('-', '_')}"
+    cols = await db.list_collection_names()
+    zero_zones = set()
+    if yesterday_col in cols:
+        async for doc in db[yesterday_col].find({"total": 0}, {"zoneId": 1}):
+            zero_zones.add(doc.get("zoneId"))
+        if zero_zones:
+            before = len(all_zones)
+            all_zones = [z for z in all_zones if z["zone_id"] not in zero_zones]
+            logger.info(f"[Statistic] Step 5: Skipping {before - len(all_zones)} zero-traffic zones (from yesterday), {len(all_zones)} remaining")
+
+    # Group zones by account for parallel processing
     acc_zones = {}  # account_db_id -> list of zones
     for z in all_zones:
         aid = str(z.get("account_id", ""))
         acc_zones.setdefault(aid, []).append(z)
 
-    # Use zone-level httpRequests1dGroups (has sum fields), batch requests per account
     table_query = """
     query($zoneTag: String!, $date: String!) {
       viewer {
@@ -107,54 +126,60 @@ async def sync_statistic(body: dict):
       }
     }
     """
-    dt_start = f"{date}T00:00:00Z"
-    dt_end = f"{date}T23:59:59Z"
 
-    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones with 10 concurrent workers...")
+    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones across {len(acc_zones)} accounts...")
 
     cf_data = {}  # zone_id -> {total, cached, ...}
-    sem = asyncio.Semaphore(10)
     lock = asyncio.Lock()
 
-    async def _fetch_table(client, zone):
-        zone_id = zone["zone_id"]
-        acc = account_map.get(str(zone.get("account_id", "")))
-        if not acc:
-            return
-        async with sem:
-            try:
-                resp = await _cf_post(
-                    client, "https://api.cloudflare.com/client/v4/graphql",
-                    headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                    json={"query": table_query, "variables": {"zoneTag": zone_id, "date": date}},
-                )
-                if resp.status_code != 200:
-                    return
-                data = resp.json()
-                if data.get("errors"):
-                    return
-                zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
-                if not zones_data:
-                    return
-                http_data = zones_data[0].get("httpRequests1dGroups") or []
-                if not http_data:
-                    return
-                s = http_data[0].get("sum") or {}
-                u = http_data[0].get("uniq") or {}
-                total = s.get("requests", 0)
-                cached = s.get("cachedRequests", 0)
-                async with lock:
-                    cf_data[zone_id] = {
-                        "total": total, "cached": cached, "uncached": total - cached,
-                        "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
-                        "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
-                    }
-            except Exception:
-                pass
+    async def _fetch_account(acc_id, zones, api_key):
+        """Fetch all zones for one account with concurrent requests."""
+        sem = asyncio.Semaphore(20)
+        acc_ok = 0
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        tasks = [_fetch_table(client, zone) for zone in all_zones]
-        await asyncio.gather(*tasks)
+        async def _fetch_one(client, zone):
+            nonlocal acc_ok
+            zone_id = zone["zone_id"]
+            async with sem:
+                try:
+                    resp = await _cf_post(
+                        client, "https://api.cloudflare.com/client/v4/graphql",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={"query": table_query, "variables": {"zoneTag": zone_id, "date": date}},
+                    )
+                    if resp.status_code != 200:
+                        return
+                    data = resp.json()
+                    if data.get("errors"):
+                        return
+                    zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
+                    if not zones_data:
+                        return
+                    http_data = zones_data[0].get("httpRequests1dGroups") or []
+                    if not http_data:
+                        return
+                    s = http_data[0].get("sum") or {}
+                    u = http_data[0].get("uniq") or {}
+                    total = s.get("requests", 0)
+                    cached = s.get("cachedRequests", 0)
+                    async with lock:
+                        cf_data[zone_id] = {
+                            "total": total, "cached": cached, "uncached": total - cached,
+                            "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
+                            "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
+                        }
+                        acc_ok += 1
+                except Exception:
+                    pass
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            tasks = [_fetch_one(client, zone) for zone in zones]
+            await asyncio.gather(*tasks)
+        logger.info(f"[Statistic] Account {acc_id}: {acc_ok}/{len(zones)} zones fetched")
+
+    # Run all accounts in parallel (separate rate limit pools)
+    acc_tasks = [_fetch_account(aid, zones, account_map.get(aid, {}).get("api_key", "")) for aid, zones in acc_zones.items()]
+    await asyncio.gather(*acc_tasks)
     logger.info(f"[Statistic] Step 5: {len(cf_data)} zones with data from CF")
 
     # Build results: merge zone metadata with CF data
@@ -316,61 +341,69 @@ async def sync_statistic_chart(body: dict):
         }
         """
 
+        # Group zones by account for parallel IP fetching
+        ip_acc_zones = {}
+        for z in all_zones:
+            aid = str(z.get("account_id", ""))
+            ip_acc_zones.setdefault(aid, []).append(z)
+
         results = []
-        processed = 0
-        sem = asyncio.Semaphore(10)
-        lock = asyncio.Lock()
+        ip_lock = asyncio.Lock()
 
-        async def _fetch_ips(client, zone):
-            nonlocal processed
-            zone_id = zone["zone_id"]
-            zone_name = zone["name"]
-            acc = account_map.get(str(zone.get("account_id", "")))
-            if not acc or not acc.get("cf_account_id"):
-                return
-            zone_filter = {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
-            async with sem:
-                top_ips = []
-                try:
-                    resp = await _cf_post(
-                        client, "https://api.cloudflare.com/client/v4/graphql",
-                        headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                        json={"query": ip_query, "variables": {
-                            "accountTag": acc["cf_account_id"],
-                            "ipFilter": zone_filter,
-                        }},
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if not data.get("errors"):
-                            accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
-                            if accounts_data:
-                                ip_merged = {}
-                                for s in (accounts_data[0].get("ips") or []):
-                                    dim = s.get("dimensions") or {}
-                                    ip = dim.get("clientIP", "")
-                                    if ip:
-                                        if ip in ip_merged:
-                                            ip_merged[ip]["requests"] += s.get("count", 0)
-                                        else:
-                                            ip_merged[ip] = {"ip": ip, "country": dim.get("clientCountryName", ""), "requests": s.get("count", 0)}
-                                top_ips = sorted(ip_merged.values(), key=lambda x: x["requests"], reverse=True)[:50]
-                except Exception:
-                    pass
-                async with lock:
-                    results.append({
-                        "zoneId": zone_id, "domain": zone_name, "date": date,
-                        "topCountries": zone_countries.get(zone_id, []),
-                        "topIPs": top_ips,
-                        "syncedAt": datetime.now(timezone.utc).isoformat(),
-                    })
-                    processed += 1
-                    if processed % 100 == 0:
-                        logger.info(f"[Statistic]   IP progress: {processed}/{len(all_zones)} zones")
+        async def _fetch_ips_account(acc_id, zones, api_key, cf_account_id):
+            sem = asyncio.Semaphore(20)
+            acc_processed = 0
 
-        logger.info(f"[Statistic] Step 5b: Fetching IPs for {len(all_zones)} zones with 10 concurrent workers...")
-        tasks = [_fetch_ips(client, zone) for zone in all_zones]
-        await asyncio.gather(*tasks)
+            async def _fetch_one(client, zone):
+                nonlocal acc_processed
+                zone_id = zone["zone_id"]
+                zone_name = zone["name"]
+                zone_filter = {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
+                async with sem:
+                    top_ips = []
+                    try:
+                        resp = await _cf_post(
+                            client, "https://api.cloudflare.com/client/v4/graphql",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json={"query": ip_query, "variables": {
+                                "accountTag": cf_account_id,
+                                "ipFilter": zone_filter,
+                            }},
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            if not data.get("errors"):
+                                accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
+                                if accounts_data:
+                                    ip_merged = {}
+                                    for s in (accounts_data[0].get("ips") or []):
+                                        dim = s.get("dimensions") or {}
+                                        ip = dim.get("clientIP", "")
+                                        if ip:
+                                            if ip in ip_merged:
+                                                ip_merged[ip]["requests"] += s.get("count", 0)
+                                            else:
+                                                ip_merged[ip] = {"ip": ip, "country": dim.get("clientCountryName", ""), "requests": s.get("count", 0)}
+                                    top_ips = sorted(ip_merged.values(), key=lambda x: x["requests"], reverse=True)[:50]
+                    except Exception:
+                        pass
+                    async with ip_lock:
+                        results.append({
+                            "zoneId": zone_id, "domain": zone_name, "date": date,
+                            "topCountries": zone_countries.get(zone_id, []),
+                            "topIPs": top_ips,
+                            "syncedAt": datetime.now(timezone.utc).isoformat(),
+                        })
+                        acc_processed += 1
+
+            async with httpx.AsyncClient(timeout=60) as client:
+                tasks = [_fetch_one(client, zone) for zone in zones]
+                await asyncio.gather(*tasks)
+            logger.info(f"[Statistic] IP account {acc_id}: {acc_processed}/{len(zones)} zones")
+
+        logger.info(f"[Statistic] Step 5b: Fetching IPs for {len(all_zones)} zones across {len(ip_acc_zones)} accounts...")
+        ip_tasks = [_fetch_ips_account(aid, zones, account_map.get(aid, {}).get("api_key", ""), account_map.get(aid, {}).get("cf_account_id", "")) for aid, zones in ip_acc_zones.items()]
+        await asyncio.gather(*ip_tasks)
 
     # Fill zones with no data
     fetched_zone_ids = {r["zoneId"] for r in results}
@@ -382,7 +415,7 @@ async def sync_statistic_chart(body: dict):
                 "topIPs": [],
                 "syncedAt": datetime.now(timezone.utc).isoformat(),
             })
-    logger.info(f"[Statistic] Step 5c: {processed} with IP data, {len(results)} total")
+    logger.info(f"[Statistic] Step 5c: {len(results)} zones with chart data")
 
     if results:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
