@@ -131,9 +131,11 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         # Also fetch account-level data
         account_col = f"account_statistic_{date.replace('-', '_')}"
         account_data = []
+        logger.info(f"[Statistic] Account query: db={db.name}, col={account_col}, exists={account_col in cols}")
         if account_col in cols:
             async for doc in db[account_col].find({}, {"_id": 0}):
                 account_data.append(doc)
+            logger.info(f"[Statistic] Account query: found {len(account_data)} docs")
         await _cache_set(f"stat:{date}", {"records": rows, "account": account_data})
         return {"code": 200, "data": {"records": rows, "account": account_data}}
 
