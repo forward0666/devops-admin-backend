@@ -1,41 +1,13 @@
 import logging
-import json
 from fastapi import APIRouter, Query
 
 from app.services.mongodb import get_db
-from app.services.redis import get_redis
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 TABLE_COLLECTION = "statistic"
 CHART_COLLECTION = "statistic_chart"
-CACHE_TTL = 60
-CACHE_PREFIX = "stat:"
-
-
-async def _cache_get(key: str):
-    r = await get_redis()
-    val = await r.get(f"{CACHE_PREFIX}{key}")
-    if val:
-        return json.loads(val)
-    return None
-
-
-async def _cache_set(key: str, data, ttl: int = CACHE_TTL):
-    r = await get_redis()
-    await r.set(f"{CACHE_PREFIX}{key}", json.dumps(data, ensure_ascii=False), ex=ttl)
-
-
-async def _cache_clear(pattern: str = "*"):
-    r = await get_redis()
-    keys = []
-    async for k in r.scan_iter(f"{CACHE_PREFIX}{pattern}"):
-        keys.append(k)
-    if keys:
-        await r.delete(*keys)
-        logger.info(f"[Cache] Cleared {len(keys)} keys")
-    return len(keys)
 
 
 def _day_col(base: str, date: str) -> str:
@@ -51,10 +23,6 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
     db = await get_db()
 
     if year:
-        cached = await _cache_get(f"stat:{year}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         prefix = f"{TABLE_COLLECTION}_{year}_"
         cols = await db.list_collection_names()
         day_cols = sorted([c for c in cols if c.startswith(prefix)])
@@ -75,14 +43,9 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
                 merged[d]["pageViews"] += r.get("pageViews", 0)
                 merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
         rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
-        await _cache_set(f"stat:{year}", rows)
         return {"code": 200, "data": rows}
 
     elif month:
-        cached = await _cache_get(f"stat:{month}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         month_col = _month_col(TABLE_COLLECTION, month)
         cols = await db.list_collection_names()
         if month_col in cols:
@@ -110,14 +73,9 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
                     merged[d]["pageViews"] += r.get("pageViews", 0)
                     merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
             rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
-        await _cache_set(f"stat:{month}", rows)
         return {"code": 200, "data": rows}
 
     elif date:
-        cached = await _cache_get(f"stat:{date}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         day_col = _day_col(TABLE_COLLECTION, date)
         cols = await db.list_collection_names()
         if day_col in cols:
@@ -128,7 +86,6 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         else:
             logger.info(f"[Statistic] Day {date}: {day_col} not found")
             rows = []
-        await _cache_set(f"stat:{date}", rows)
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}
@@ -139,10 +96,6 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
     db = await get_db()
 
     if year:
-        cached = await _cache_get(f"chart:{year}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         prefix = f"{CHART_COLLECTION}_{year}_"
         cols = await db.list_collection_names()
         day_cols = sorted([c for c in cols if c.startswith(prefix)])
@@ -170,14 +123,9 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             ips = sorted(v["topIPs"].values(), key=lambda x: x["requests"], reverse=True)
             result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips[:50]})
         result.sort(key=lambda x: x["domain"])
-        await _cache_set(f"chart:{year}", result)
         return {"code": 200, "data": result}
 
     elif month:
-        cached = await _cache_get(f"chart:{month}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         month_col = _month_col(CHART_COLLECTION, month)
         cols = await db.list_collection_names()
         if month_col in cols:
@@ -213,14 +161,9 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
                 result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips[:50]})
             result.sort(key=lambda x: x["domain"])
             rows = result
-        await _cache_set(f"chart:{month}", rows)
         return {"code": 200, "data": rows}
 
     elif date:
-        cached = await _cache_get(f"chart:{date}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         day_col = _day_col(CHART_COLLECTION, date)
         cols = await db.list_collection_names()
         if day_col in cols:
@@ -231,7 +174,6 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         else:
             logger.info(f"[Statistic] Chart day {date}: {day_col} not found")
             rows = []
-        await _cache_set(f"chart:{date}", rows)
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}
@@ -277,10 +219,6 @@ async def get_account_statistic(date: str = Query(None)):
     db = await get_db()
 
     if date:
-        cached = await _cache_get(f"account:{date}")
-        if cached is not None:
-            return {"code": 200, "data": cached}
-
         day_col = f"account_statistic_{date.replace('-', '_')}"
         cols = await db.list_collection_names()
         logger.info(f"[Statistic] Account query: db={db.name}, col={day_col}, exists={day_col in cols}")
@@ -290,13 +228,6 @@ async def get_account_statistic(date: str = Query(None)):
             logger.info(f"[Statistic] Account query: found {len(rows)} docs")
         else:
             rows = []
-        await _cache_set(f"account:{date}", rows)
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}
-
-
-@router.post("/cache/clear")
-async def clear_cache():
-    count = await _cache_clear()
-    return {"code": 200, "message": f"Cleared {count} cache keys"}
