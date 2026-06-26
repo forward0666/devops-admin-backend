@@ -1,9 +1,11 @@
 import logging
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
 from app.services.mongodb import get_db, get_domain_db
+from app.services.redis import get_redis
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -12,512 +14,398 @@ TABLE_COLLECTION = "statistic"
 CHART_COLLECTION = "statistic_chart"
 
 
+async def _cf_post(client, url, headers=None, json=None, max_retries=3):
+    """Post to CF GraphQL with retry on rate limit."""
+    for attempt in range(max_retries):
+        resp = await client.post(url, headers=headers, json=json)
+        if resp.status_code == 200:
+            data = resp.json()
+            errors = data.get("errors") or []
+            if any("budget" in e.get("extensions", {}).get("code", "") or "Rate limiter" in e.get("message", "") for e in errors):
+                wait = (attempt + 1) * 30
+                logger.warning(f"[Statistic] Rate limited, wait {wait}s (attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(wait)
+                continue
+            return resp
+        if resp.status_code == 429:
+            wait = (attempt + 1) * 30
+            logger.warning(f"[Statistic] HTTP 429, wait {wait}s (attempt {attempt + 1}/{max_retries})")
+            await asyncio.sleep(wait)
+            continue
+        return resp
+    return resp
+
+
 @router.post("/sync")
 async def sync_statistic(body: dict):
-    """POST /statistic/sync - Sync zone basic stats from CF GraphQL to MongoDB."""
+    """POST /statistic/sync - Sync zone basic stats from CF GraphQL to MongoDB.
+    Uses account-level httpRequestsAdaptiveGroups grouped by zoneTag → 1 request per account."""
     date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     group_id = body.get("groupId") or ""
-    logger.info(f"[Statistic] Sync request: date={date}, groupId={group_id or 'all'}")
+    logger.info(f"[Statistic] Step 1: Day sync start: date={date}")
 
     import httpx
 
     db = await get_domain_db()
+    logger.info(f"[Statistic] Step 2: MongoDB connected")
+
     accounts = await query_all("SELECT id, api_key, cf_account_id FROM account")
     if not accounts:
         raise HTTPException(status_code=400, detail="No CF accounts found")
+    logger.info(f"[Statistic] Step 3: Found {len(accounts)} accounts")
 
     zone_id_set = await _get_zone_ids(group_id)
     if zone_id_set is not None and not zone_id_set:
         return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
 
     all_zones = await _get_zones(zone_id_set)
-    logger.info(f"[Statistic] Syncing {len(all_zones)} zones for date={date}")
-
     account_map = {str(a["id"]): {"api_key": a["api_key"], "cf_account_id": a.get("cf_account_id", "")} for a in accounts}
+    logger.info(f"[Statistic] Step 4: Found {len(all_zones)} zones")
 
-    query = """
-    query($zoneTag: String!, $date: String!) {
+    # Check BEFORE fetching
+    day_col = f"{TABLE_COLLECTION}_{date.replace('-', '_')}"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cols = await db.list_collection_names()
+    if date != today and day_col in cols:
+        existing_zone_ids = set()
+        async for doc in db[day_col].find({}, {"zoneId": 1}):
+            existing_zone_ids.add(doc.get("zoneId"))
+        required_zone_ids = {z["zone_id"] for z in all_zones}
+        missing = required_zone_ids - existing_zone_ids
+        logger.info(f"[Statistic] Step 5: {day_col} has {len(existing_zone_ids)} zones, missing {len(missing)}")
+        if not missing:
+            logger.info(f"[Statistic] Step 5: all zones present -> SKIP")
+            return {"code": 200, "data": {"synced": 0}, "message": f"{date} already exists"}
+    if date == today and day_col in cols:
+        await db[day_col].drop()
+        logger.info(f"[Statistic] Step 5: Today → DROP {day_col}")
+    # Filter out zones that already have data
+    if day_col in cols:
+        existing_zones = set()
+        async for doc in db[day_col].find({}, {"zoneId": 1}):
+            existing_zones.add(doc.get("zoneId"))
+        before = len(all_zones)
+        all_zones = [z for z in all_zones if z["zone_id"] not in existing_zones]
+        logger.info(f"[Statistic] Step 5: {before} total, {len(all_zones)} missing, {len(existing_zones)} exist")
+
+    # Group zones by account for batch querying
+    acc_zones = {}  # account_db_id -> list of zones
+    for z in all_zones:
+        aid = str(z.get("account_id", ""))
+        acc_zones.setdefault(aid, []).append(z)
+
+    table_query = """
+    query($accountTag: String!, $dateStart: String!, $dateEnd: String!) {
       viewer {
-        zones(filter: { zoneTag: $zoneTag }) {
-          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
+        accounts(filter: { accountTag: $accountTag }) {
+          httpRequestsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $dateStart, datetime_leq: $dateEnd }) {
             sum { requests cachedRequests bytes threats pageViews }
             uniq { uniques }
+            dimensions { zoneTag }
           }
         }
       }
     }
     """
+    dt_start = f"{date}T00:00:00Z"
+    dt_end = f"{date}T23:59:59Z"
 
-    synced = 0
-    results = []
+    logger.info(f"[Statistic] Step 5: Fetching {len(all_zones)} zones via {len(acc_zones)} account-level queries...")
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        for zone in all_zones:
-            zone_id = zone["zone_id"]
-            zone_name = zone["name"]
-            acc = account_map.get(str(zone.get("account_id", "")))
-            if not acc:
+    cf_data = {}  # zone_id -> {total, cached, ...}
+    async with httpx.AsyncClient(timeout=60) as client:
+        for aid, zones in acc_zones.items():
+            acc = account_map.get(aid)
+            if not acc or not acc.get("cf_account_id"):
                 continue
             try:
-                resp = await client.post(
-                    "https://api.cloudflare.com/client/v4/graphql",
+                resp = await _cf_post(
+                    client, "https://api.cloudflare.com/client/v4/graphql",
                     headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                    json={"query": query, "variables": {"zoneTag": zone_id, "date": date}},
+                    json={"query": table_query, "variables": {
+                        "accountTag": acc["cf_account_id"],
+                        "dateStart": dt_start, "dateEnd": dt_end,
+                    }},
                 )
                 if resp.status_code != 200:
+                    logger.warning(f"[Statistic] Account {aid}: HTTP {resp.status_code}")
                     continue
                 data = resp.json()
                 if data.get("errors"):
-                    logger.warning(f"[Statistic] {zone_name}: {data['errors'][:1]}")
+                    logger.warning(f"[Statistic] Account {aid}: {data['errors'][0].get('message', '')}")
                     continue
-
-                zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
-                if not zones_data:
-                    continue
-                http_data = zones_data[0].get("httpRequests1dGroups") or []
-                if not http_data:
-                    continue
-
-                s = http_data[0].get("sum") or {}
-                u = http_data[0].get("uniq") or {}
-                total = s.get("requests", 0)
-                cached = s.get("cachedRequests", 0)
-                results.append({
-                    "zoneId": zone_id, "domain": zone_name, "date": date,
-                    "total": total, "cached": cached, "uncached": total - cached,
-                    "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
-                    "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
-                    "syncedAt": datetime.now(timezone.utc).isoformat(),
-                })
-                synced += 1
-            except Exception as e:
-                logger.warning(f"[Statistic] {zone_name}: {e}")
-
-    if results:
-        day_col = f"{TABLE_COLLECTION}_{date.replace('-', '_')}"
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if date == today:
-            await db[day_col].drop()
-        else:
-            cols = await db.list_collection_names()
-            if day_col in cols and await db[day_col].count_documents({}) > 0:
-                logger.info(f"[Statistic] {date} already has data, skip")
-                return {"code": 200, "data": {"synced": 0}, "message": f"{date} already exists"}
-        await db[day_col].insert_many(results)
-        await db[day_col].create_index("domain")
-
-    logger.info(f"[Statistic] Done: {synced} zones synced for {date}")
-    return {"code": 200, "data": {"synced": synced}, "message": f"Synced {synced} zone stat for {date}"}
-
-
-@router.post("/sync/month")
-async def sync_statistic_month(body: dict):
-    """POST /statistic/sync/month - Sync all days in a month and aggregate."""
-    from calendar import monthrange
-
-    month = body.get("month") or datetime.now(timezone.utc).strftime("%Y-%m")
-    group_id = body.get("groupId") or ""
-    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
-    _, days_in_month = monthrange(year, mon)
-    logger.info(f"[Statistic] Month sync: {month} ({days_in_month} days)")
-
-    import httpx
-
-    db = await get_domain_db()
-    accounts = await query_all("SELECT id, api_key, cf_account_id FROM account")
-    if not accounts:
-        raise HTTPException(status_code=400, detail="No CF accounts found")
-
-    zone_id_set = await _get_zone_ids(group_id)
-    if zone_id_set is not None and not zone_id_set:
-        return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
-
-    all_zones = await _get_zones(zone_id_set)
-    account_map = {str(a["id"]): {"api_key": a["api_key"], "cf_account_id": a.get("cf_account_id", "")} for a in accounts}
-
-    query = """
-    query($zoneTag: String!, $date: String!) {
-      viewer {
-        zones(filter: { zoneTag: $zoneTag }) {
-          httpRequests1dGroups(filter: { date: $date }, limit: 1) {
-            sum { requests cachedRequests bytes threats pageViews }
-            uniq { uniques }
-          }
-        }
-      }
-    }
-    """
-
-    total_synced = 0
-    skipped = 0
-    cols = await db.list_collection_names()
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        for day in range(1, days_in_month + 1):
-            date = f"{month}-{day:02d}"
-            day_col = f"{TABLE_COLLECTION}_{date.replace('-', '_')}"
-
-            # Skip if day already has data (except last day)
-            is_last_day = (day == days_in_month)
-            if not is_last_day and day_col in cols and await db[day_col].count_documents({}) > 0:
-                skipped += 1
-                continue
-            if is_last_day and day_col in cols:
-                await db[day_col].drop()
-
-            # Fetch from CF for this day
-            day_results = []
-            for zone in all_zones:
-                zone_id = zone["zone_id"]
-                zone_name = zone["name"]
-                acc = account_map.get(str(zone.get("account_id", "")))
-                if not acc:
-                    continue
-                try:
-                    resp = await client.post(
-                        "https://api.cloudflare.com/client/v4/graphql",
-                        headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                        json={"query": query, "variables": {"zoneTag": zone_id, "date": date}},
-                    )
-                    if resp.status_code != 200:
+                groups = (((data.get("data") or {}).get("viewer") or {}).get("accounts") or [{}])[0].get("httpRequestsAdaptiveGroups") or []
+                for g in groups:
+                    zid = (g.get("dimensions") or {}).get("zoneTag", "")
+                    if not zid:
                         continue
-                    data = resp.json()
-                    if data.get("errors"):
-                        continue
-                    zones_data = ((data.get("data") or {}).get("viewer") or {}).get("zones") or []
-                    if not zones_data:
-                        continue
-                    http_data = zones_data[0].get("httpRequests1dGroups") or []
-                    if not http_data:
-                        continue
-                    s = http_data[0].get("sum") or {}
-                    u = http_data[0].get("uniq") or {}
+                    s = g.get("sum") or {}
+                    u = g.get("uniq") or {}
                     total = s.get("requests", 0)
                     cached = s.get("cachedRequests", 0)
-                    day_results.append({
-                        "zoneId": zone_id, "domain": zone_name, "date": date,
+                    cf_data[zid] = {
                         "total": total, "cached": cached, "uncached": total - cached,
                         "bandwidth": s.get("bytes", 0), "threats": s.get("threats", 0),
                         "pageViews": s.get("pageViews", 0), "uniqueVisitor": u.get("uniques", 0),
-                        "syncedAt": datetime.now(timezone.utc).isoformat(),
-                    })
-                    total_synced += 1
-                except Exception as e:
-                    logger.warning(f"[Statistic] month {zone_name} {date}: {e}")
+                    }
+                logger.info(f"[Statistic] Account {aid}: {len(groups)} zone rows from CF ({len(zones)} zones expected)")
+            except Exception as e:
+                logger.warning(f"[Statistic] Account {aid}: {e}")
 
-            # Write daily collection
-            if day_results:
-                await db[day_col].insert_many(day_results)
-                await db[day_col].create_index("domain")
-                logger.info(f"[Statistic] Wrote {day_col}: {len(day_results)} docs")
+    # Build results: merge zone metadata with CF data
+    results = []
+    synced = 0
+    for zone in all_zones:
+        zid = zone["zone_id"]
+        d = cf_data.get(zid)
+        if d:
+            results.append({"zoneId": zid, "domain": zone["name"], "date": date, **d,
+                            "syncedAt": datetime.now(timezone.utc).isoformat()})
+            synced += 1
+        else:
+            results.append({"zoneId": zid, "domain": zone["name"], "date": date,
+                            "total": 0, "cached": 0, "uncached": 0, "bandwidth": 0, "threats": 0,
+                            "pageViews": 0, "uniqueVisitor": 0,
+                            "syncedAt": datetime.now(timezone.utc).isoformat()})
+    logger.info(f"[Statistic] Step 5b: {synced} with data, {len(results)} total (incl zeros)")
 
-    logger.info(f"[Statistic] Month done: {total_synced} synced, {skipped} skipped")
-    return {"code": 200, "data": {"synced": total_synced, "skipped": skipped}, "message": f"Month {month}: {total_synced} synced, {skipped} skipped"}
+    if results:
+        # Clear Redis cache for today
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if date == today:
+            month_prefix = date[:7]
+            r = await get_redis()
+            keys = []
+            async for k in r.scan_iter(f"stat:*{date}*"):
+                keys.append(k)
+            async for k in r.scan_iter(f"stat:*{month_prefix}*"):
+                keys.append(k)
+            if keys:
+                await r.delete(*keys)
+                logger.info(f"[Statistic] Step 6: Cleared {len(keys)} cache keys")
+        await db[day_col].insert_many(results)
+        await db[day_col].create_index("domain")
+        await db[day_col].create_index([("zoneId", 1)], unique=True)
+        logger.info(f"[Statistic] Step 6: Wrote {len(results)} docs -> {day_col}")
+    else:
+        logger.info(f"[Statistic] Step 6: No data from CF")
 
-
-@router.post("/sync/chart/month")
-async def sync_statistic_chart_month(body: dict):
-    """POST /statistic/sync/chart/month - Sync chart data for all days in a month."""
-    from calendar import monthrange
-
-    month = body.get("month") or datetime.now(timezone.utc).strftime("%Y-%m")
-    group_id = body.get("groupId") or ""
-    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
-    _, days_in_month = monthrange(year, mon)
-    logger.info(f"[Statistic] Chart month sync: {month}")
-
-    import httpx
-
-    db = await get_domain_db()
-    accounts = await query_all("SELECT id, api_key, cf_account_id FROM account")
-    if not accounts:
-        raise HTTPException(status_code=400, detail="No CF accounts found")
-
-    zone_id_set = await _get_zone_ids(group_id)
-    if zone_id_set is not None and not zone_id_set:
-        return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
-
-    all_zones = await _get_zones(zone_id_set)
-    account_map = {str(a["id"]): {"api_key": a["api_key"], "cf_account_id": a.get("cf_account_id", "")} for a in accounts}
-    country_query = """
-    query($accountTag: String!, $filter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
-      viewer {
-        accounts(filter: { accountTag: $accountTag }) {
-          series: httpRequestsAdaptiveGroups(limit: 5000, filter: $filter) {
-            count
-            dimensions { clientCountryName }
-          }
-        }
-      }
-    }
-    """
-
-    ip_query = """
-    query($accountTag: String!, $filter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
-      viewer {
-        accounts(filter: { accountTag: $accountTag }) {
-          series: httpRequestsAdaptiveGroups(limit: 5000, filter: $filter) {
-            count
-            dimensions { clientIP clientCountryName }
-          }
-        }
-      }
-    }
-    """
-
-    total_synced = 0
-    skipped = 0
-    cols = await db.list_collection_names()
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        for day in range(1, days_in_month + 1):
-            date = f"{month}-{day:02d}"
-            day_col = f"{CHART_COLLECTION}_{date.replace('-', '_')}"
-
-            is_last_day = (day == days_in_month)
-            if not is_last_day and day_col in cols and await db[day_col].count_documents({}) > 0:
-                skipped += 1
-                continue
-            if is_last_day and day_col in cols:
-                await db[day_col].drop()
-
-            dt_start = f"{date}T00:00:00Z"
-            dt_end = f"{date}T23:59:59Z"
-            day_results = []
-
-            for zone in all_zones:
-                zone_id = zone["zone_id"]
-                zone_name = zone["name"]
-                acc = account_map.get(str(zone.get("account_id", "")))
-                if not acc or not acc["cf_account_id"]:
-                    continue
-                try:
-                    resp = await client.post(
-                        "https://api.cloudflare.com/client/v4/graphql",
-                        headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                        json={"query": country_query, "variables": {
-                            "accountTag": acc["cf_account_id"],
-                            "filter": {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
-                        }},
-                    )
-                    top_countries = []
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if not data.get("errors"):
-                            accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
-                            for s in (accounts_data[0].get("series") if accounts_data else []):
-                                dim = s.get("dimensions") or {}
-                                country = dim.get("clientCountryName", "")
-                                if country and country != "XX":
-                                    top_countries.append({"country": country, "requests": s.get("count", 0)})
-                            top_countries.sort(key=lambda x: x["requests"], reverse=True)
-
-                    top_ips = []
-                    try:
-                        ip_resp = await client.post(
-                            "https://api.cloudflare.com/client/v4/graphql",
-                            headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                            json={"query": ip_query, "variables": {
-                                "accountTag": acc["cf_account_id"],
-                                "filter": {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
-                            }},
-                        )
-                        if ip_resp.status_code == 200:
-                            ip_data = ip_resp.json()
-                            if not ip_data.get("errors"):
-                                ip_accounts = ((ip_data.get("data") or {}).get("viewer") or {}).get("accounts") or []
-                                for s in (ip_accounts[0].get("series") if ip_accounts else []):
-                                    dim = s.get("dimensions") or {}
-                                    ip = dim.get("clientIP", "")
-                                    if ip:
-                                        top_ips.append({"ip": ip, "country": dim.get("clientCountryName", ""), "requests": s.get("count", 0)})
-                                ip_merged: dict = {}
-                                for item in top_ips:
-                                    k = item["ip"]
-                                    if k in ip_merged:
-                                        ip_merged[k]["requests"] += item["requests"]
-                                    else:
-                                        ip_merged[k] = {"ip": item["ip"], "country": item["country"], "requests": item["requests"]}
-                                top_ips = sorted(ip_merged.values(), key=lambda x: x["requests"], reverse=True)
-                    except Exception:
-                        pass
-
-                    day_results.append({
-                        "zoneId": zone_id, "domain": zone_name, "date": date,
-                        "topCountries": top_countries[:10],
-                        "topIPs": top_ips[:50],
-                        "syncedAt": datetime.now(timezone.utc).isoformat(),
-                    })
-                    total_synced += 1
-                except Exception as e:
-                    logger.warning(f"[Statistic] chart month {zone_name} {date}: {e}")
-
-            if day_results:
-                await db[day_col].insert_many(day_results)
-                await db[day_col].create_index("domain")
-
-    logger.info(f"[Statistic] Chart month done: {total_synced} synced, {skipped} skipped")
-    return {"code": 200, "data": {"synced": total_synced, "skipped": skipped}, "message": f"Chart {month}: {total_synced} synced, {skipped} skipped"}
+    logger.info(f"[Statistic] Step 7: Done: {synced} zones synced for {date}")
+    return {"code": 200, "data": {"synced": synced}, "message": f"Synced {synced} zone stat for {date}"}
 
 
 @router.post("/sync/chart")
 async def sync_statistic_chart(body: dict):
-    """POST /statistic/sync/chart - Sync country breakdown from CF to MongoDB."""
+    """POST /statistic/sync/chart - Sync country+IP breakdown from CF to MongoDB.
+    Countries: account-level query grouped by zoneTag+clientCountryName (1 request per account).
+    IPs: per-zone query (volume too high for account-level batching)."""
     date = body.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     group_id = body.get("groupId") or ""
-    logger.info(f"[Statistic] Chart sync: date={date}, groupId={group_id or 'all'}")
+    logger.info(f"[Statistic] Step 1: Chart day sync start: date={date}")
 
     import httpx
 
     db = await get_domain_db()
+    logger.info(f"[Statistic] Step 2: MongoDB connected")
+
     accounts = await query_all("SELECT id, api_key, cf_account_id FROM account")
     if not accounts:
         raise HTTPException(status_code=400, detail="No CF accounts found")
+    logger.info(f"[Statistic] Step 3: Found {len(accounts)} accounts")
 
     zone_id_set = await _get_zone_ids(group_id)
+    logger.info(f"[Statistic] Step 4a: groupId={group_id or 'ALL'}, zone_id_set={len(zone_id_set) if zone_id_set is not None else 'ALL'}")
     if zone_id_set is not None and not zone_id_set:
         return {"code": 200, "data": {"synced": 0}, "message": "No zones in group"}
 
     all_zones = await _get_zones(zone_id_set)
-    logger.info(f"[Statistic] Chart: {len(all_zones)} zones for date={date}")
-
     account_map = {str(a["id"]): {"api_key": a["api_key"], "cf_account_id": a.get("cf_account_id", "")} for a in accounts}
+    logger.info(f"[Statistic] Step 4b: Found {len(all_zones)} zones")
+
     dt_start = f"{date}T00:00:00Z"
     dt_end = f"{date}T23:59:59Z"
 
+    # Check if data already exists
+    day_col = f"{CHART_COLLECTION}_{date.replace('-', '_')}"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cols = await db.list_collection_names()
+    logger.info(f"[Statistic] Step 5: Chart {date}, today={today}, col={day_col}, exists={day_col in cols}")
+    if date != today and day_col in cols:
+        existing_count = await db[day_col].count_documents({})
+        if existing_count > 0:
+            logger.info(f"[Statistic] Step 5: Chart {date} has {existing_count} docs -> SKIP")
+            return {"code": 200, "data": {"synced": 0}, "message": f"Chart {date} already exists"}
+    if date == today and day_col in cols:
+        await db[day_col].drop()
+        logger.info(f"[Statistic] Step 5: Today -> DROP {day_col}")
+
+    # Group zones by account
+    acc_zones = {}
+    for z in all_zones:
+        aid = str(z.get("account_id", ""))
+        acc_zones.setdefault(aid, []).append(z)
+
+    # --- Phase 1: Fetch countries via account-level batch query (1 request per account) ---
     country_query = """
-    query($accountTag: String!, $filter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
+    query($accountTag: String!, $dateStart: String!, $dateEnd: String!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          series: httpRequestsAdaptiveGroups(limit: 5000, filter: $filter) {
+          httpRequestsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $dateStart, datetime_leq: $dateEnd }) {
             count
-            dimensions { clientCountryName }
+            dimensions { zoneTag clientCountryName }
           }
         }
       }
     }
     """
 
-    ip_query = """
-    query($accountTag: String!, $filter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
-      viewer {
-        accounts(filter: { accountTag: $accountTag }) {
-          series: httpRequestsAdaptiveGroups(limit: 5000, filter: $filter) {
-            count
-            dimensions { clientIP clientCountryName }
-          }
-        }
-      }
-    }
-    """
-
-    results = []
-
+    zone_countries = {}  # zone_id -> [{country, requests}]
     async with httpx.AsyncClient(timeout=60) as client:
-        for zone in all_zones:
-            zone_id = zone["zone_id"]
-            zone_name = zone["name"]
-            acc = account_map.get(str(zone.get("account_id", "")))
-            if not acc or not acc["cf_account_id"]:
-                logger.warning(f"[Statistic] chart {zone_name}: no cf_account_id for account_id={zone.get('account_id')}")
+        for aid, zones in acc_zones.items():
+            acc = account_map.get(aid)
+            if not acc or not acc.get("cf_account_id"):
                 continue
             try:
-                resp = await client.post(
-                    "https://api.cloudflare.com/client/v4/graphql",
+                resp = await _cf_post(
+                    client, "https://api.cloudflare.com/client/v4/graphql",
                     headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                    json={
-                        "query": country_query,
-                        "variables": {
-                            "accountTag": acc["cf_account_id"],
-                            "filter": {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
-                        }
-                    },
+                    json={"query": country_query, "variables": {
+                        "accountTag": acc["cf_account_id"],
+                        "dateStart": dt_start, "dateEnd": dt_end,
+                    }},
                 )
                 if resp.status_code != 200:
+                    logger.warning(f"[Statistic] Chart countries account {aid}: HTTP {resp.status_code}")
                     continue
                 data = resp.json()
                 if data.get("errors"):
-                    logger.warning(f"[Statistic] chart {zone_name}: {data['errors'][:1]}")
+                    logger.warning(f"[Statistic] Chart countries account {aid}: {data['errors'][0].get('message', '')}")
                     continue
-
-                accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
-                if not accounts_data:
-                    continue
-
-                top_countries = []
-                for s in (accounts_data[0].get("series") or []):
-                    dim = s.get("dimensions") or {}
+                groups = (((data.get("data") or {}).get("viewer") or {}).get("accounts") or [{}])[0].get("httpRequestsAdaptiveGroups") or []
+                for g in groups:
+                    dim = g.get("dimensions") or {}
+                    zid = dim.get("zoneTag", "")
                     country = dim.get("clientCountryName", "")
-                    if not country or country == "XX":
-                        continue
-                    top_countries.append({"country": country, "requests": s.get("count", 0)})
+                    if zid and country and country != "XX":
+                        zone_countries.setdefault(zid, []).append({"country": country, "requests": g.get("count", 0)})
+                logger.info(f"[Statistic] Chart countries account {aid}: {len(groups)} zone\u00d7country rows")
+            except Exception as e:
+                logger.warning(f"[Statistic] Chart countries account {aid}: {e}")
 
-                top_countries.sort(key=lambda x: x["requests"], reverse=True)
+        # Sort and cap per-zone country lists
+        for zid in zone_countries:
+            zone_countries[zid].sort(key=lambda x: x["requests"], reverse=True)
+            zone_countries[zid] = zone_countries[zid][:10]
 
-                # Query client IPs
+        # --- Phase 2: Fetch IPs per-zone (volume too high for batch) ---
+        ip_query = """
+        query($accountTag: String!, $ipFilter: ZoneHttpRequestsAdaptiveGroupsFilter_InputObject) {
+          viewer {
+            accounts(filter: { accountTag: $accountTag }) {
+              ips: httpRequestsAdaptiveGroups(limit: 5000, filter: $ipFilter) {
+                count
+                dimensions { clientIP clientCountryName }
+              }
+            }
+          }
+        }
+        """
+
+        results = []
+        processed = 0
+        sem = asyncio.Semaphore(10)
+        lock = asyncio.Lock()
+
+        async def _fetch_ips(client, zone):
+            nonlocal processed
+            zone_id = zone["zone_id"]
+            zone_name = zone["name"]
+            acc = account_map.get(str(zone.get("account_id", "")))
+            if not acc or not acc.get("cf_account_id"):
+                return
+            zone_filter = {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
+            async with sem:
                 top_ips = []
                 try:
-                    ip_resp = await client.post(
-                        "https://api.cloudflare.com/client/v4/graphql",
+                    resp = await _cf_post(
+                        client, "https://api.cloudflare.com/client/v4/graphql",
                         headers={"Authorization": f"Bearer {acc['api_key']}", "Content-Type": "application/json"},
-                        json={
-                            "query": ip_query,
-                            "variables": {
-                                "accountTag": acc["cf_account_id"],
-                                "filter": {"AND": [{"datetime_geq": dt_start, "datetime_leq": dt_end}, {"zoneTag": zone_id}]}
-                            }
-                        },
+                        json={"query": ip_query, "variables": {
+                            "accountTag": acc["cf_account_id"],
+                            "ipFilter": zone_filter,
+                        }},
                     )
-                    if ip_resp.status_code == 200:
-                        ip_data = ip_resp.json()
-                        if not ip_data.get("errors"):
-                            ip_accounts = ((ip_data.get("data") or {}).get("viewer") or {}).get("accounts") or []
-                            for s in (ip_accounts[0].get("series") if ip_accounts else []):
-                                dim = s.get("dimensions") or {}
-                                ip = dim.get("clientIP", "")
-                                if ip:
-                                    top_ips.append({"ip": ip, "country": dim.get("clientCountryName", ""), "requests": s.get("count", 0)})
-                            # Merge same IPs (may appear with different countries)
-                            ip_merged: dict = {}
-                            for item in top_ips:
-                                k = item["ip"]
-                                if k in ip_merged:
-                                    ip_merged[k]["requests"] += item["requests"]
-                                else:
-                                    ip_merged[k] = {"ip": item["ip"], "country": item["country"], "requests": item["requests"]}
-                            top_ips = sorted(ip_merged.values(), key=lambda x: x["requests"], reverse=True)
-                except Exception as e:
-                    logger.warning(f"[Statistic] IP query {zone_name}: {e}")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if not data.get("errors"):
+                            accounts_data = ((data.get("data") or {}).get("viewer") or {}).get("accounts") or []
+                            if accounts_data:
+                                ip_merged = {}
+                                for s in (accounts_data[0].get("ips") or []):
+                                    dim = s.get("dimensions") or {}
+                                    ip = dim.get("clientIP", "")
+                                    if ip:
+                                        if ip in ip_merged:
+                                            ip_merged[ip]["requests"] += s.get("count", 0)
+                                        else:
+                                            ip_merged[ip] = {"ip": ip, "country": dim.get("clientCountryName", ""), "requests": s.get("count", 0)}
+                                top_ips = sorted(ip_merged.values(), key=lambda x: x["requests"], reverse=True)[:50]
+                except Exception:
+                    pass
+                async with lock:
+                    results.append({
+                        "zoneId": zone_id, "domain": zone_name, "date": date,
+                        "topCountries": zone_countries.get(zone_id, []),
+                        "topIPs": top_ips,
+                        "syncedAt": datetime.now(timezone.utc).isoformat(),
+                    })
+                    processed += 1
+                    if processed % 100 == 0:
+                        logger.info(f"[Statistic]   IP progress: {processed}/{len(all_zones)} zones")
 
-                results.append({
-                    "zoneId": zone_id, "domain": zone_name, "date": date,
-                    "topCountries": top_countries[:10],
-                    "topIPs": top_ips[:50],
-                    "syncedAt": datetime.now(timezone.utc).isoformat(),
-                })
-            except Exception as e:
-                logger.warning(f"[Statistic] chart {zone_name}: {e}")
+        logger.info(f"[Statistic] Step 5b: Fetching IPs for {len(all_zones)} zones with 10 concurrent workers...")
+        tasks = [_fetch_ips(client, zone) for zone in all_zones]
+        await asyncio.gather(*tasks)
+
+    # Fill zones with no data
+    fetched_zone_ids = {r["zoneId"] for r in results}
+    for zone in all_zones:
+        if zone["zone_id"] not in fetched_zone_ids:
+            results.append({
+                "zoneId": zone["zone_id"], "domain": zone["name"], "date": date,
+                "topCountries": zone_countries.get(zone["zone_id"], []),
+                "topIPs": [],
+                "syncedAt": datetime.now(timezone.utc).isoformat(),
+            })
+    logger.info(f"[Statistic] Step 5c: {processed} with IP data, {len(results)} total")
 
     if results:
-        day_col = f"{CHART_COLLECTION}_{date.replace('-', '_')}"
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if date == today:
-            await db[day_col].drop()
-        else:
-            cols = await db.list_collection_names()
-            if day_col in cols and await db[day_col].count_documents({}) > 0:
-                logger.info(f"[Statistic] Chart {date} already has data, skip")
-                return {"code": 200, "data": {"synced": 0}, "message": f"Chart {date} already exists"}
+            month_prefix = date[:7]
+            r = await get_redis()
+            keys = []
+            async for k in r.scan_iter(f"stat:*{date}*"):
+                keys.append(k)
+            async for k in r.scan_iter(f"stat:*{month_prefix}*"):
+                keys.append(k)
+            if keys:
+                await r.delete(*keys)
+                logger.info(f"[Statistic] Step 6: Cleared {len(keys)} cache keys")
         await db[day_col].insert_many(results)
         await db[day_col].create_index("domain")
+        await db[day_col].create_index([("zoneId", 1)], unique=True)
+        logger.info(f"[Statistic] Step 6: Wrote {len(results)} docs -> {day_col}")
+    else:
+        logger.info(f"[Statistic] Step 6: No data from CF")
 
-    logger.info(f"[Statistic] Chart done: {len(results)} zones for {date}")
+    logger.info(f"[Statistic] Step 7: Chart done: {len(results)} zones for {date}")
     return {"code": 200, "data": {"synced": len(results)}, "message": f"Synced {len(results)} chart data for {date}"}
 
 
 async def _get_zone_ids(group_id: str):
     """Get zoneIds from domain.domain_meta for a group."""
-    if not group_id:
+    if not group_id or group_id == "all":
         return None
     db = await get_domain_db()
     meta_cursor = db["domain_meta"].find({"groupId": group_id}, {"zoneId": 1})
@@ -530,11 +418,12 @@ async def _get_zones(zone_id_set):
     db = await get_db()
     all_zones = []
     collections = await db.list_collection_names()
-    for col_name in collections:
-        if col_name.endswith("_zones"):
-            col = db[col_name]
-            q = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
-            async for zone in col.find(q, {"zone_id": 1, "name": 1, "account_id": 1}):
-                if zone.get("zone_id") and zone.get("name"):
-                    all_zones.append(zone)
+    zone_cols = [c for c in collections if c.endswith("_zones")]
+    logger.info(f"[Statistic] _get_zones: {len(zone_cols)} zone collections, filter={'ALL' if zone_id_set is None else f'{len(zone_id_set)} ids'}")
+    for col_name in zone_cols:
+        col = db[col_name]
+        q = {"zone_id": {"$in": list(zone_id_set)}} if zone_id_set else {}
+        async for zone in col.find(q, {"zone_id": 1, "name": 1, "account_id": 1}):
+            if zone.get("zone_id") and zone.get("name"):
+                all_zones.append(zone)
     return all_zones
