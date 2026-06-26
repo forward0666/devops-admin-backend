@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
@@ -72,8 +72,14 @@ async def sync_statistic(body: dict):
     # Check BEFORE fetching
     day_col = f"{TABLE_COLLECTION}_{date.replace('-', '_')}"
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     cols = await db.list_collection_names()
-    if date != today and day_col in cols:
+    # Today + yesterday: DROP and re-sync (sync may not run at midnight)
+    if date in (today, yesterday) and day_col in cols:
+        await db[day_col].drop()
+        logger.info(f"[Statistic] Step 5: {date} (today/yesterday) → DROP {day_col}")
+    elif day_col in cols:
+        # Older dates: check per-zone missing
         existing_zone_ids = set()
         async for doc in db[day_col].find({}, {"zoneId": 1}):
             existing_zone_ids.add(doc.get("zoneId"))
@@ -83,9 +89,6 @@ async def sync_statistic(body: dict):
         if not missing:
             logger.info(f"[Statistic] Step 5: all zones present -> SKIP")
             return {"code": 200, "data": {"synced": 0}, "message": f"{date} already exists"}
-    if date == today and day_col in cols:
-        await db[day_col].drop()
-        logger.info(f"[Statistic] Step 5: Today → DROP {day_col}")
     # Filter out zones that already have data
     if day_col in cols:
         existing_zones = set()
@@ -243,19 +246,27 @@ async def sync_statistic_chart(body: dict):
     dt_start = f"{date}T00:00:00Z"
     dt_end = f"{date}T23:59:59Z"
 
-    # Check if data already exists
+    # Check if data already exists (same logic as table sync)
     day_col = f"{CHART_COLLECTION}_{date.replace('-', '_')}"
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     cols = await db.list_collection_names()
     logger.info(f"[Statistic] Step 5: Chart {date}, today={today}, col={day_col}, exists={day_col in cols}")
-    if date != today and day_col in cols:
-        existing_count = await db[day_col].count_documents({})
-        if existing_count > 0:
-            logger.info(f"[Statistic] Step 5: Chart {date} has {existing_count} docs -> SKIP")
-            return {"code": 200, "data": {"synced": 0}, "message": f"Chart {date} already exists"}
-    if date == today and day_col in cols:
+    # Today + yesterday: DROP and re-sync
+    if date in (today, yesterday) and day_col in cols:
         await db[day_col].drop()
-        logger.info(f"[Statistic] Step 5: Today -> DROP {day_col}")
+        logger.info(f"[Statistic] Step 5: {date} (today/yesterday) -> DROP {day_col}")
+    elif day_col in cols:
+        # Older dates: check per-zone missing
+        existing_zone_ids = set()
+        async for doc in db[day_col].find({}, {"zoneId": 1}):
+            existing_zone_ids.add(doc.get("zoneId"))
+        required_zone_ids = {z["zone_id"] for z in all_zones}
+        missing = required_zone_ids - existing_zone_ids
+        logger.info(f"[Statistic] Step 5: Chart {day_col} has {len(existing_zone_ids)} zones, missing {len(missing)}")
+        if not missing:
+            logger.info(f"[Statistic] Step 5: all chart zones present -> SKIP")
+            return {"code": 200, "data": {"synced": 0}, "message": f"Chart {date} already exists"}
 
     # Group zones by account
     acc_zones = {}
@@ -469,14 +480,17 @@ async def sync_statistic_account(body: dict):
 
     day_col = f"account_statistic_{date.replace('-', '_')}"
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     cols = await db.list_collection_names()
-    if date != today and day_col in cols:
+    # Today + yesterday: DROP and re-sync
+    if date in (today, yesterday) and day_col in cols:
+        await db[day_col].drop()
+        logger.info(f"[Statistic] Account {date} (today/yesterday) -> DROP")
+    elif day_col in cols:
         existing_count = await db[day_col].count_documents({})
         if existing_count > 0:
             logger.info(f"[Statistic] Account {date} already has {existing_count} docs -> SKIP")
             return {"code": 200, "data": {"synced": 0}, "message": f"Account {date} already exists"}
-    if date == today and day_col in cols:
-        await db[day_col].drop()
 
     results = []
     async with httpx.AsyncClient(timeout=60) as client:
