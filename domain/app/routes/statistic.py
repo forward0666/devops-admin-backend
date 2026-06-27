@@ -1,10 +1,24 @@
 import logging
+import json
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Query
 
 from app.services.mongodb import get_db
+from app.services.redis import get_redis
 
 logger = logging.getLogger(__name__)
+
+CACHE_TTL = 3600  # 1 hour
 router = APIRouter()
+
+
+async def _set_cache(cache_key: str, data):
+    """Set cache, best effort."""
+    try:
+        r = await get_redis()
+        await r.setex(cache_key, CACHE_TTL, json.dumps(data))
+    except Exception:
+        pass
 
 TABLE_COLLECTION = "statistic"
 CHART_COLLECTION = "statistic_chart"
@@ -32,11 +46,19 @@ async def _get_group_zone_ids(db, group_id: str):
 async def get_statistic(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None)):
     db = await get_db()
     group_zone_ids = await _get_group_zone_ids(db, groupId)
-
-    # Build zone filter
     zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
     if group_zone_ids is not None and not group_zone_ids:
         return {"code": 200, "data": []}
+
+    # Check cache
+    cache_key = f"stat:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}"
+    try:
+        r = await get_redis()
+        cached = await r.get(cache_key)
+        if cached:
+            return {"code": 200, "data": json.loads(cached)}
+    except Exception:
+        pass
 
     if year:
         prefix = f"{TABLE_COLLECTION}_{year}_"
@@ -59,6 +81,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
                 merged[d]["pageViews"] += r.get("pageViews", 0)
                 merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
         rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
+        await _set_cache(cache_key, rows)
         return {"code": 200, "data": rows}
 
     elif month:
@@ -87,6 +110,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
                     merged[d]["pageViews"] += r.get("pageViews", 0)
                     merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
             rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
+        await _set_cache(cache_key, rows)
         return {"code": 200, "data": rows}
 
     elif date:
@@ -100,6 +124,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         else:
             logger.info(f"[Statistic] Day {date}: {day_col} not found")
             rows = []
+        await _set_cache(cache_key, rows)
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}
@@ -112,6 +137,16 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
     zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
     if group_zone_ids is not None and not group_zone_ids:
         return {"code": 200, "data": []}
+
+    # Check cache
+    cache_key = f"stat_chart:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}"
+    try:
+        r = await get_redis()
+        cached = await r.get(cache_key)
+        if cached:
+            return {"code": 200, "data": json.loads(cached)}
+    except Exception:
+        pass
 
     if year:
         prefix = f"{CHART_COLLECTION}_{year}_"
@@ -141,6 +176,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             ips = sorted(v["topIPs"].values(), key=lambda x: x["requests"], reverse=True)
             result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips[:50]})
         result.sort(key=lambda x: x["domain"])
+        await _set_cache(cache_key, result)
         return {"code": 200, "data": result}
 
     elif month:
@@ -179,6 +215,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
                 result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips[:50]})
             result.sort(key=lambda x: x["domain"])
             rows = result
+        await _set_cache(cache_key, rows)
         return {"code": 200, "data": rows}
 
     elif date:
@@ -192,6 +229,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         else:
             logger.info(f"[Statistic] Chart day {date}: {day_col} not found")
             rows = []
+        await _set_cache(cache_key, rows)
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}

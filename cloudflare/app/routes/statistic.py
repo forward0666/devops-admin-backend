@@ -5,9 +5,27 @@ from fastapi import APIRouter, HTTPException
 
 from app.services.db import query_all
 from app.services.mongodb import get_db, get_domain_db
+from app.services.redis import get_redis
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _clear_stat_cache(dates: list):
+    """Clear Redis cache for given dates (stat:* and stat_chart:* keys). Best effort."""
+    try:
+        r = await get_redis()
+        keys = []
+        for d in dates:
+            async for k in r.scan_iter(f"stat:*{d}*"):
+                keys.append(k)
+            async for k in r.scan_iter(f"stat_chart:*{d}*"):
+                keys.append(k)
+        if keys:
+            await r.delete(*keys)
+            logger.info(f"[Statistic] Cleared {len(keys)} cache keys for {dates}")
+    except Exception:
+        pass
 
 TABLE_COLLECTION = "statistic"
 CHART_COLLECTION = "statistic_chart"
@@ -214,6 +232,7 @@ async def sync_statistic(body: dict):
             logger.info(f"[Statistic] Step 6 ({sync_date}): No data from CF")
 
     logger.info(f"[Statistic] Step 7: Done: {total_synced} zones synced for {'+'.join(dates_to_sync)}")
+    await _clear_stat_cache(dates_to_sync)
     return {"code": 200, "data": {"synced": total_synced}, "message": f"Synced {'+'.join(dates_to_sync)}: {total_synced} zones"}
 
 
@@ -453,6 +472,7 @@ async def sync_statistic_chart(body: dict):
             logger.info(f"[Statistic] Step 6 ({sync_date}): No missing zones to sync")
 
     logger.info(f"[Statistic] Step 7: Chart done: {total_synced} zones for {'+'.join(dates_to_sync)}")
+    await _clear_stat_cache(dates_to_sync)
     return {"code": 200, "data": {"synced": total_synced}, "message": f"Synced chart {'+'.join(dates_to_sync)}: {total_synced} zones"}
 
 
@@ -619,6 +639,9 @@ async def sync_statistic_month(body: dict):
             total_synced += synced
 
     logger.info(f"[Statistic] Month done: {total_synced} synced, {total_skipped} skipped")
+    # Clear cache for all synced dates
+    synced_dates = [f"{year:04d}-{mon:02d}-{d:02d}" for d in range(1, days_in_month + 1) if f"{year:04d}-{mon:02d}-{d:02d}" <= today]
+    await _clear_stat_cache(synced_dates)
     return {"code": 200, "data": {"synced": total_synced, "skipped": total_skipped},
             "message": f"Month {month}: {total_synced} synced, {total_skipped} skipped"}
 
@@ -832,6 +855,8 @@ async def sync_statistic_chart_month(body: dict):
             total_synced += len(results)
 
     logger.info(f"[Statistic] Chart month done: {total_synced} synced, {total_skipped} skipped")
+    synced_dates = [f"{year:04d}-{mon:02d}-{d:02d}" for d in range(1, days_in_month + 1) if f"{year:04d}-{mon:02d}-{d:02d}" <= today]
+    await _clear_stat_cache(synced_dates)
     return {"code": 200, "data": {"synced": total_synced, "skipped": total_skipped},
             "message": f"Chart month {month}: {total_synced} synced, {total_skipped} skipped"}
 
