@@ -43,7 +43,7 @@ async def _get_group_zone_ids(db, group_id: str):
 
 
 @router.get("")
-async def get_statistic(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None), dateFrom: str = Query(None), dateTo: str = Query(None)):
+async def get_statistic(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None), dateFrom: str = Query(None), dateTo: str = Query(None), monthFrom: str = Query(None), monthTo: str = Query(None)):
     db = await get_db()
     group_zone_ids = await _get_group_zone_ids(db, groupId)
     zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
@@ -51,7 +51,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
         return {"code": 200, "data": []}
 
     # Check cache
-    cache_key = f"stat:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}:{dateFrom or ''}:{dateTo or ''}"
+    cache_key = f"stat:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}:{dateFrom or ''}:{dateTo or ''}:{monthFrom or ''}:{monthTo or ''}"
     try:
         r = await get_redis()
         cached = await r.get(cache_key)
@@ -59,6 +59,52 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
             return {"code": 200, "data": json.loads(cached)}
     except Exception:
         pass
+
+    if monthFrom and monthTo:
+        # Month range query: merge multiple month collections
+        cols = await db.list_collection_names()
+        merged = {}
+        cur_y, cur_m = map(int, monthFrom.split("-"))
+        end_y, end_m = map(int, monthTo.split("-"))
+        while (cur_y, cur_m) <= (end_y, end_m):
+            m_col = f"{TABLE_COLLECTION}_{cur_y:04d}_{cur_m:02d}"
+            prefix = f"{TABLE_COLLECTION}_{cur_y:04d}_{cur_m:02d}_"
+            if m_col in cols:
+                async for r in db[m_col].find(zone_filter, {"_id": 0}):
+                    d = (r.get("domain", "") or "").strip()
+                    if not d: continue
+                    if d not in merged:
+                        merged[d] = {"domain": d, "zoneId": r.get("zoneId", ""), "total": 0, "cached": 0, "uncached": 0, "bandwidth": 0, "threats": 0, "pageViews": 0, "uniqueVisitor": 0}
+                    merged[d]["total"] += r.get("total", 0)
+                    merged[d]["cached"] += r.get("cached", 0)
+                    merged[d]["uncached"] += r.get("uncached", 0)
+                    merged[d]["bandwidth"] += r.get("bandwidth", 0)
+                    merged[d]["threats"] += r.get("threats", 0)
+                    merged[d]["pageViews"] += r.get("pageViews", 0)
+                    merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
+            else:
+                day_cols = sorted([c for c in cols if c.startswith(prefix)])
+                for col_name in day_cols:
+                    async for r in db[col_name].find(zone_filter, {"_id": 0}):
+                        d = (r.get("domain", "") or "").strip()
+                        if not d: continue
+                        if d not in merged:
+                            merged[d] = {"domain": d, "zoneId": r.get("zoneId", ""), "total": 0, "cached": 0, "uncached": 0, "bandwidth": 0, "threats": 0, "pageViews": 0, "uniqueVisitor": 0}
+                        merged[d]["total"] += r.get("total", 0)
+                        merged[d]["cached"] += r.get("cached", 0)
+                        merged[d]["uncached"] += r.get("uncached", 0)
+                        merged[d]["bandwidth"] += r.get("bandwidth", 0)
+                        merged[d]["threats"] += r.get("threats", 0)
+                        merged[d]["pageViews"] += r.get("pageViews", 0)
+                        merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
+            # Advance to next month
+            cur_m += 1
+            if cur_m > 12:
+                cur_m = 1
+                cur_y += 1
+        rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
+        await _set_cache(cache_key, rows)
+        return {"code": 200, "data": rows}
 
     if dateFrom and dateTo:
         # Date range query: merge multiple day collections
@@ -159,7 +205,7 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
 
 
 @router.get("/chart")
-async def get_statistic_chart(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None), dateFrom: str = Query(None), dateTo: str = Query(None)):
+async def get_statistic_chart(date: str = Query(None), month: str = Query(None), year: str = Query(None), groupId: str = Query(None), dateFrom: str = Query(None), dateTo: str = Query(None), monthFrom: str = Query(None), monthTo: str = Query(None)):
     db = await get_db()
     group_zone_ids = await _get_group_zone_ids(db, groupId)
     zone_filter = {"zoneId": {"$in": list(group_zone_ids)}} if group_zone_ids is not None else {}
@@ -167,7 +213,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
         return {"code": 200, "data": []}
 
     # Check cache
-    cache_key = f"stat_chart:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}:{dateFrom or ''}:{dateTo or ''}"
+    cache_key = f"stat_chart:{groupId or 'all'}:{year or ''}:{month or ''}:{date or ''}:{dateFrom or ''}:{dateTo or ''}:{monthFrom or ''}:{monthTo or ''}"
     try:
         r = await get_redis()
         cached = await r.get(cache_key)
@@ -175,6 +221,60 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             return {"code": 200, "data": json.loads(cached)}
     except Exception:
         pass
+
+    if monthFrom and monthTo:
+        # Month range query for chart
+        cols = await db.list_collection_names()
+        merged = {}
+        cur_y, cur_m = map(int, monthFrom.split("-"))
+        end_y, end_m = map(int, monthTo.split("-"))
+        while (cur_y, cur_m) <= (end_y, end_m):
+            m_col = f"{CHART_COLLECTION}_{cur_y:04d}_{cur_m:02d}"
+            prefix = f"{CHART_COLLECTION}_{cur_y:04d}_{cur_m:02d}_"
+            if m_col in cols:
+                async for r in db[m_col].find(zone_filter, {"_id": 0}):
+                    d = (r.get("domain", "") or "").strip()
+                    if not d: continue
+                    if d not in merged:
+                        merged[d] = {"domain": d, "zoneId": r.get("zoneId", ""), "topCountries": {}, "topIPs": {}}
+                    for c in r.get("topCountries", []):
+                        k = c["country"]
+                        merged[d]["topCountries"][k] = merged[d]["topCountries"].get(k, 0) + c["requests"]
+                    for item in r.get("topIPs", []):
+                        k = item["ip"]
+                        if k in merged[d]["topIPs"]:
+                            merged[d]["topIPs"][k]["requests"] += item["requests"]
+                        else:
+                            merged[d]["topIPs"][k] = {"ip": item["ip"], "country": item.get("country", ""), "requests": item["requests"]}
+            else:
+                day_cols = sorted([c for c in cols if c.startswith(prefix)])
+                for col_name in day_cols:
+                    async for r in db[col_name].find(zone_filter, {"_id": 0}):
+                        d = (r.get("domain", "") or "").strip()
+                        if not d: continue
+                        if d not in merged:
+                            merged[d] = {"domain": d, "zoneId": r.get("zoneId", ""), "topCountries": {}, "topIPs": {}}
+                        for c in r.get("topCountries", []):
+                            k = c["country"]
+                            merged[d]["topCountries"][k] = merged[d]["topCountries"].get(k, 0) + c["requests"]
+                        for item in r.get("topIPs", []):
+                            k = item["ip"]
+                            if k in merged[d]["topIPs"]:
+                                merged[d]["topIPs"][k]["requests"] += item["requests"]
+                            else:
+                                merged[d]["topIPs"][k] = {"ip": item["ip"], "country": item.get("country", ""), "requests": item["requests"]}
+            cur_m += 1
+            if cur_m > 12:
+                cur_m = 1
+                cur_y += 1
+        result = []
+        for d, v in merged.items():
+            countries = sorted([{"country": k, "requests": v} for k, v in v["topCountries"].items()], key=lambda x: x["requests"], reverse=True)
+            ips = sorted(v["topIPs"].values(), key=lambda x: x["requests"], reverse=True)
+            result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips})
+        result.sort(key=lambda x: x["domain"])
+        await _set_cache(cache_key, result)
+        return {"code": 200, "data": result}
 
     if dateFrom and dateTo:
         # Date range query for chart: merge multiple day collections
