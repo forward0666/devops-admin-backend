@@ -161,10 +161,11 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
     elif month:
         month_col = _month_col(TABLE_COLLECTION, month)
         cols = await db.list_collection_names()
+        rows = []
         if month_col in cols:
             cursor = db[month_col].find(zone_filter, {"_id": 0}).sort("total", -1)
             rows = await cursor.to_list(length=10000)
-        else:
+        if not rows:
             prefix = f"{TABLE_COLLECTION}_{month.replace('-', '_')}_"
             day_cols = sorted([c for c in cols if c.startswith(prefix)])
             logger.info(f"[Statistic] Month {month}: found {len(day_cols)} day collections")
@@ -345,10 +346,11 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
     elif month:
         month_col = _month_col(CHART_COLLECTION, month)
         cols = await db.list_collection_names()
+        rows = []
         if month_col in cols:
             cursor = db[month_col].find(zone_filter, {"_id": 0}).sort("domain", 1)
             rows = await cursor.to_list(length=10000)
-        else:
+        if not rows:
             prefix = f"{CHART_COLLECTION}_{month.replace('-', '_')}_"
             day_cols = sorted([c for c in cols if c.startswith(prefix)])
             logger.info(f"[Statistic] Chart month {month}: found {len(day_cols)} day collections")
