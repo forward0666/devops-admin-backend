@@ -16,6 +16,7 @@ NACOS_URL = f"http://{NACOS_HOST}:{NACOS_PORT}/nacos/v1"
 CONFIG_MAP = {
     "service.name": ("SERVICE_NAME", str),
     "service.port": ("SERVICE_PORT", int),
+    "service.ip": ("SERVICE_IP", str),
     "mongodb.host": ("MONGODB_HOST", str),
     "mongodb.port": ("MONGODB_PORT", int),
     "mongodb.user": ("MONGODB_USER", str),
@@ -79,9 +80,11 @@ async def fetch_config():
 async def register_service():
     from app.config import SERVICE_PORT
 
+    import app.config as config
+    ip = getattr(config, 'SERVICE_IP', '') or os.getenv("SERVICE_IP") or os.getenv("POD_IP", "127.0.0.1")
     params = {
         "serviceName": SERVICE_NAME,
-        "ip": os.getenv("SERVICE_IP") or os.getenv("POD_IP", "127.0.0.1"),
+        "ip": ip,
         "port": SERVICE_PORT,
         "enabled": "true",
         "healthy": "true",
@@ -106,7 +109,8 @@ async def send_heartbeat():
     from app.config import SERVICE_PORT
     import json
 
-    ip = os.getenv("SERVICE_IP") or os.getenv("POD_IP", "127.0.0.1")
+    import app.config as config
+    ip = getattr(config, 'SERVICE_IP', '') or os.getenv("SERVICE_IP") or os.getenv("POD_IP", "127.0.0.1")
     beat = json.dumps({"ip": ip, "port": SERVICE_PORT, "serviceName": SERVICE_NAME})
     params = {
         "serviceName": SERVICE_NAME,

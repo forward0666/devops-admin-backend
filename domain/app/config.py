@@ -2,6 +2,7 @@ import os
 
 SERVICE_NAME = "domain"
 SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8091"))
+SERVICE_IP = os.getenv("SERVICE_IP", "")
 
 # Nacos
 NACOS_HOST = os.getenv("NACOS_HOST", "192.168.86.9")
