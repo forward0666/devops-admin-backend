@@ -156,9 +156,10 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
                 merged[d]["uniqueVisitor"] += r.get("uniqueVisitor", 0)
         rows = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
         await _set_cache(cache_key, rows)
+        logger.info(f"[Statistic] date={date} group={groupId or 'all'} rows={len(rows)}")
         return {"code": 200, "data": rows}
 
-    elif month:
+    elif month:  # <-- month branch
         month_col = _month_col(TABLE_COLLECTION, month)
         cols = await db.list_collection_names()
         rows = []
@@ -200,8 +201,10 @@ async def get_statistic(date: str = Query(None), month: str = Query(None), year:
             logger.info(f"[Statistic] Day {date}: {day_col} not found")
             rows = []
         await _set_cache(cache_key, rows)
+        logger.info(f"[Statistic] month={month} group={groupId or 'all'} rows={len(rows)}")
         return {"code": 200, "data": rows}
 
+    logger.info(f"[Statistic] no params, returning empty")
     return {"code": 200, "data": []}
 
 
@@ -341,6 +344,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             result.append({"domain": d, "zoneId": v["zoneId"], "topCountries": countries[:10], "topIPs": ips[:50]})
         result.sort(key=lambda x: x["domain"])
         await _set_cache(cache_key, result)
+        logger.info(f"[Statistic] Chart date={date} group={groupId or 'all'} rows={len(result)}")
         return {"code": 200, "data": result}
 
     elif month:
@@ -395,6 +399,7 @@ async def get_statistic_chart(date: str = Query(None), month: str = Query(None),
             logger.info(f"[Statistic] Chart day {date}: {day_col} not found")
             rows = []
         await _set_cache(cache_key, rows)
+        logger.info(f"[Statistic] Chart date={date} group={groupId or 'all'} rows={len(rows)}")
         return {"code": 200, "data": rows}
 
     return {"code": 200, "data": []}
