@@ -12,18 +12,30 @@ router = APIRouter()
 
 
 async def _clear_stat_cache(dates: list):
-    """Clear Redis cache for given dates (stat:* and stat_chart:* keys). Best effort."""
+    """Clear Redis cache for given dates and their months (stat:* and stat_chart:* keys). Best effort."""
     try:
         r = await get_redis()
         keys = []
+        months = set()
         for d in dates:
+            # Clear day-specific cache
             async for k in r.scan_iter(f"stat:*{d}*"):
                 keys.append(k)
             async for k in r.scan_iter(f"stat_chart:*{d}*"):
                 keys.append(k)
+            # Collect month for month-level cache
+            months.add(d[:7])  # "2026-06-27" -> "2026-06"
+        # Clear month-level cache
+        for m in months:
+            async for k in r.scan_iter(f"stat:*{m}*"):
+                if k not in keys:
+                    keys.append(k)
+            async for k in r.scan_iter(f"stat_chart:*{m}*"):
+                if k not in keys:
+                    keys.append(k)
         if keys:
             await r.delete(*keys)
-            logger.info(f"[Statistic] Cleared {len(keys)} cache keys for {dates}")
+            logger.info(f"[Statistic] Cleared {len(keys)} cache keys")
     except Exception:
         pass
 
