@@ -255,6 +255,72 @@ async def _call_llm(model_config: dict, messages: list, tools: list = None) -> d
         return {"error": f"{type(e).__name__}: {e}"}
 
 
+@router.get("/agents/{agent_id}/chat/sessions")
+async def get_chat_sessions(agent_id: int):
+    """Get chat session list for an agent from Redis"""
+    import redis.asyncio as aioredis
+    try:
+        r = aioredis.Redis(
+            host=os.getenv("REDIS_HOST", "192.168.86.9"),
+            port=int(os.getenv("REDIS_PORT", "6379")),
+            password=os.getenv("REDIS_PASSWORD", "root123") or None,
+            db=int(os.getenv("REDIS_DATABASE", "0")),
+            decode_responses=True,
+        )
+        # Get agent type to determine key prefix
+        agent = await query_one(f"SELECT type FROM `{TABLE}` WHERE id = %s", (agent_id,))
+        agent_type = (agent or {}).get("type", "unknown")
+        prefix_map = {"weather": "weather", "cloudflare": "cf", "k8s": "k8s"}
+        prefix = prefix_map.get(agent_type, agent_type)
+
+        # Scan for session keys
+        pattern = f"agent:{prefix}:chat:*"
+        sessions = []
+        async for key in r.scan_iter(match=pattern, count=100):
+            session_id = key.replace(f"agent:{prefix}:chat:", "")
+            # Get first message as title
+            first = await r.lindex(key, 0)
+            title = ""
+            time_str = ""
+            if first:
+                try:
+                    entry = json.loads(first)
+                    title = entry.get("text", "")[:30]
+                    ts = entry.get("ts", 0)
+                    if ts:
+                        from datetime import datetime
+                        time_str = datetime.fromtimestamp(ts).strftime("%m-%d %H:%M")
+                except Exception:
+                    pass
+            sessions.append({"id": session_id, "title": title, "time": time_str})
+        sessions.sort(key=lambda x: x["id"], reverse=True)
+        await r.aclose()
+        return {"code": 200, "data": sessions}
+    except Exception as e:
+        logger.warning(f"Get sessions error: {e}")
+        return {"code": 200, "data": []}
+
+
+@router.get("/agents/{agent_id}/chat/history")
+async def get_chat_history(agent_id: int, session_id: str = "default"):
+    """Get chat history for a session from agent instance"""
+    agent = await query_one(f"SELECT * FROM `{TABLE}` WHERE id = %s", (agent_id,))
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    agent_type = agent.get("type", "")
+    worker_url = await _discover_worker(agent_type)
+    if not worker_url:
+        return {"code": 200, "data": []}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{worker_url}/chat/history", params={"session_id": session_id})
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return {"code": 200, "data": []}
+
+
 @router.post("/agents/{agent_id}/chat")
 async def chat_with_agent(agent_id: int, body: dict):
     message = body.get("message", "").strip()
