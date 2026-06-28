@@ -258,6 +258,7 @@ async def _call_llm(model_config: dict, messages: list, tools: list = None) -> d
 @router.post("/agents/{agent_id}/chat")
 async def chat_with_agent(agent_id: int, body: dict):
     message = body.get("message", "").strip()
+    session_id = body.get("session_id", "default")
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
     logger.info(f"💬 [1/8] Chat: agent={agent_id}, msg='{message[:50]}'")
@@ -296,7 +297,7 @@ async def chat_with_agent(agent_id: int, body: dict):
         logger.info(f"💬 [4/8] Mode: keyword (no model)")
         try:
             async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(f"{worker_url}/chat", json={"message": message})
+                resp = await client.post(f"{worker_url}/chat", json={"message": message, "session_id": session_id})
                 if resp.status_code == 200:
                     await execute(f"UPDATE `{TABLE}` SET last_active_at=UTC_TIMESTAMP() WHERE id=%s", (agent_id,))
                     return resp.json()

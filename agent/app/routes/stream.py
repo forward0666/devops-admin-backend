@@ -203,7 +203,7 @@ async def _discover_worker(agent_type):
 
 
 @router.get("/agents/{agent_id}/chat/stream")
-async def chat_stream(agent_id: int, message: str):
+async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
     """SSE streaming chat endpoint"""
     async def event_generator():
         try:
@@ -227,7 +227,7 @@ async def chat_stream(agent_id: int, message: str):
                 yield _sse("status", "Processing...")
                 try:
                     async with httpx.AsyncClient(timeout=60) as client:
-                        resp = await client.post(worker_url + "/chat", json={"message": message})
+                        resp = await client.post(worker_url + "/chat", json={"message": message, "session_id": session_id})
                         if resp.status_code == 200:
                             data = resp.json()
                             text = data.get("data", {}).get("response", str(data))
