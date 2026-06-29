@@ -39,6 +39,10 @@ def _build_tools_for_type(agent_type):
             {"type": "function", "function": {"name": "get_current_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}, "lang": {"type": "string"}}, "required": ["city"]}}},
             {"type": "function", "function": {"name": "get_weather_forecast", "description": "Get weather forecast", "parameters": {"type": "object", "properties": {"city": {"type": "string"}, "days": {"type": "integer"}, "lang": {"type": "string"}}, "required": ["city"]}}},
         ]
+    elif agent_type == "cloudflare":
+        return [
+            {"type": "function", "function": {"name": "cf_list_accounts", "description": "List all Cloudflare accounts", "parameters": {"type": "object", "properties": {}, "required": []}}},
+        ]
     return []
 
 
