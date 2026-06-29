@@ -10,4 +10,4 @@ ENV TZ=Asia/Shanghai
 RUN chown -R appuser:appuser /app
 USER appuser
 ENTRYPOINT [ "sh", "-c", "python run.py " ]
-EXPOSE 8089 11111
+EXPOSE 8090
