@@ -303,6 +303,32 @@ async def get_chat_sessions(agent_id: int):
         return {"code": 200, "data": []}
 
 
+@router.delete("/agents/{agent_id}/chat/sessions/{session_id}")
+async def delete_chat_session(agent_id: int, session_id: str):
+    """Delete a chat session from Redis and MongoDB"""
+    import redis.asyncio as aioredis
+    try:
+        agent = await query_one(f"SELECT type FROM `{TABLE}` WHERE id = %s", (agent_id,))
+        agent_type = (agent or {}).get("type", "unknown")
+        prefix_map = {"weather": "weather", "cloudflare": "cf", "k8s": "k8s"}
+        prefix = prefix_map.get(agent_type, agent_type)
+        r = aioredis.Redis(
+            host=os.getenv("REDIS_HOST", "192.168.86.9"),
+            port=int(os.getenv("REDIS_PORT", "6379")),
+            password=os.getenv("REDIS_PASSWORD", "root123") or None,
+            db=int(os.getenv("REDIS_DATABASE", "0")),
+            decode_responses=True,
+        )
+        key = f"agent:{prefix}:chat:{session_id}"
+        deleted = await r.delete(key)
+        await r.aclose()
+        logger.info(f"Deleted session: {key} (found={deleted})")
+        return {"code": 200, "data": {"deleted": deleted}}
+    except Exception as e:
+        logger.warning(f"Delete session error: {e}")
+        return {"code": 200, "data": {"deleted": 0}}
+
+
 @router.get("/agents/{agent_id}/chat/history")
 async def get_chat_history(agent_id: int, session_id: str = "default"):
     """Get chat history for a session from agent instance"""
