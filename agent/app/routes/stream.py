@@ -18,33 +18,44 @@ router = APIRouter()
 TABLE = "agent"
 
 
-def _build_tools_for_type(agent_type):
-    if agent_type == "k8s":
-        return [
-            {"type": "function", "function": {"name": "k8s_list_pods", "description": "List Kubernetes pods", "parameters": {"type": "object", "properties": {"namespace": {"type": "string"}}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_get_pod", "description": "Get pod details", "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "namespace": {"type": "string"}}, "required": ["name"]}}},
-            {"type": "function", "function": {"name": "k8s_pod_logs", "description": "Get pod logs", "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "namespace": {"type": "string"}, "tail_lines": {"type": "integer"}, "container": {"type": "string"}}, "required": ["name"]}}},
-            {"type": "function", "function": {"name": "k8s_list_deployments", "description": "List deployments", "parameters": {"type": "object", "properties": {"namespace": {"type": "string"}}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_list_services", "description": "List services", "parameters": {"type": "object", "properties": {"namespace": {"type": "string"}}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_list_nodes", "description": "List cluster nodes", "parameters": {"type": "object", "properties": {}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_list_namespaces", "description": "List namespaces", "parameters": {"type": "object", "properties": {}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_list_events", "description": "List recent events", "parameters": {"type": "object", "properties": {"namespace": {"type": "string"}, "limit": {"type": "integer"}}, "required": []}}},
-            {"type": "function", "function": {"name": "k8s_scale_deployment", "description": "Scale a deployment", "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "replicas": {"type": "integer"}, "namespace": {"type": "string"}}, "required": ["name", "replicas"]}}},
-            {"type": "function", "function": {"name": "k8s_delete_pod", "description": "Delete a pod", "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "namespace": {"type": "string"}}, "required": ["name"]}}},
-            {"type": "function", "function": {"name": "k8s_pod_restart_reason", "description": "Analyze why a pod restarted", "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "namespace": {"type": "string"}}, "required": ["name"]}}},
-            {"type": "function", "function": {"name": "k8s_cluster_summary", "description": "Get cluster resource summary", "parameters": {"type": "object", "properties": {}, "required": []}}},
-        ]
-    elif agent_type == "weather":
-        return [
-            {"type": "function", "function": {"name": "get_current_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}, "lang": {"type": "string"}}, "required": ["city"]}}},
-            {"type": "function", "function": {"name": "get_weather_forecast", "description": "Get weather forecast", "parameters": {"type": "object", "properties": {"city": {"type": "string"}, "days": {"type": "integer"}, "lang": {"type": "string"}}, "required": ["city"]}}},
-        ]
-    elif agent_type == "cloudflare":
-        return [
-            {"type": "function", "function": {"name": "cf_list_accounts", "description": "List all Cloudflare accounts", "parameters": {"type": "object", "properties": {}, "required": []}}},
-            {"type": "function", "function": {"name": "cf_list_zones", "description": "List zones/domains for an account", "parameters": {"type": "object", "properties": {"account_id": {"type": "integer", "description": "Account DB ID"}}, "required": []}}},
-        ]
-    return []
+async def _discover_mcp_tools(agent_type: str) -> list:
+    """Discover tools from MCP server via Nacos"""
+    try:
+        service_name = f"tool-{agent_type}"
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"http://{NACOS_HOST}:{NACOS_PORT}/nacos/v1/ns/instance/list",
+                params={"serviceName": service_name, "namespaceId": NACOS_NAMESPACE, "username": NACOS_USERNAME, "password": NACOS_PASSWORD},
+            )
+            if resp.status_code != 200:
+                return []
+            hosts = resp.json().get("hosts", [])
+            if not hosts:
+                return []
+            mcp_url = f"http://{hosts[0]['ip']}:{hosts[0]['port']}"
+
+        # List tools from MCP server
+        from mcp.client.sse import sse_client
+        from mcp import ClientSession
+        async with sse_client(mcp_url + "/sse") as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools_result = await session.list_tools()
+                openai_tools = []
+                for t in tools_result.tools:
+                    openai_tools.append({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description or t.name,
+                            "parameters": t.inputSchema if t.inputSchema else {"type": "object", "properties": {}, "required": []},
+                        }
+                    })
+                logger.info(f"Discovered {len(openai_tools)} tools from {service_name}")
+                return openai_tools
+    except Exception as e:
+        logger.warning(f"MCP tool discovery failed for {agent_type}: {e}")
+        return []
 
 
 def _sse(event_type, data=None):
@@ -282,7 +293,7 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                 yield _sse("error", "Model not found or disabled")
                 return
 
-            tools = _build_tools_for_type(agent_type)
+            tools = await _discover_mcp_tools(agent_type)
             system_prompt = await _build_system_prompt(agent_id, agent_type, agent.get("name", "Agent"))
 
             # Load chat history from Redis
