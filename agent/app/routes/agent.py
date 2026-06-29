@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import json
 import logging
+import os
 import httpx
 
 from app.services.db import execute, query_one, query_all
