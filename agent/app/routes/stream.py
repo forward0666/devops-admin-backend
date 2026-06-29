@@ -191,11 +191,14 @@ async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) 
     parts = [f"You are {agent_name}, a {agent_type} management assistant."]
     try:
         mongo_url = f"mongodb://{os.getenv('MONGODB_USERNAME','root')}:{os.getenv('MONGODB_PASSWORD','root123')}@{os.getenv('MONGODB_HOST','192.168.86.9')}:{os.getenv('MONGODB_PORT','27017')}/{os.getenv('MONGODB_DATABASE','agent')}?authSource={os.getenv('MONGODB_AUTH_DB','admin')}"
-        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url)
+        logger.info(f"_build_system_prompt: Connecting to MongoDB for agent {agent_id}")
+        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
         db = client[os.getenv('MONGODB_DATABASE', 'agent')]
         doc = await db.agent_tools.find_one({"agent_id": agent_id}, {"_id": 0})
+        logger.info(f"_build_system_prompt: MongoDB doc found: {bool(doc)}, keys: {list(doc.keys()) if doc else 'None'}")
         if doc:
             files = doc.get("files", [])
+            logger.info(f"_build_system_prompt: files count: {len(files)}")
             if not files:
                 # Fallback: build from old tools/prompts format
                 tools = doc.get("tools", [])
@@ -216,10 +219,11 @@ async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) 
                     content = (f.get('content') or '').strip()
                     if content:
                         parts.append(f"\n--- {f['name']} ---\n{content}")
-        logger.info(f"System prompt built for agent {agent_id}: {len(parts)} sections")
+                        logger.info(f"_build_system_prompt: Added {f['name']} ({len(content)} chars)")
+        logger.info(f"System prompt built for agent {agent_id}: {len(parts)} sections, total {len('\n'.join(parts))} chars")
         await client.close()
     except Exception as e:
-        logger.warning(f"Build system prompt error: {e}")
+        logger.error(f"Build system prompt error: {e}", exc_info=True)
     parts.append("\nAlways use the appropriate tool when available. Format results cleanly. Respond in the user's language.")
     return "\n".join(parts)
 
