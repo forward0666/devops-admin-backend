@@ -278,8 +278,40 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
 
             tools = _build_tools_for_type(agent_type)
             system_prompt = await _build_system_prompt(agent_id, agent_type, agent.get("name", "Agent"))
+
+            # Load chat history from Redis
+            import redis.asyncio as aioredis
+            history_messages = []
+            try:
+                r = aioredis.Redis(
+                    host=os.getenv("REDIS_HOST", "192.168.86.9"),
+                    port=int(os.getenv("REDIS_PORT", "6379")),
+                    password=os.getenv("REDIS_PASSWORD", "root123") or None,
+                    db=int(os.getenv("REDIS_DATABASE", "0")),
+                    decode_responses=True,
+                )
+                prefix_map = {"weather": "weather", "cloudflare": "cf", "k8s": "k8s"}
+                prefix = prefix_map.get(agent_type, agent_type)
+                chat_key = f"agent:{prefix}:chat:{session_id}"
+                raw_history = await r.lrange(chat_key, 0, -1)
+                await r.close()
+                # Parse history (skip last user message if it's the current one)
+                for item in reversed(raw_history):
+                    try:
+                        msg = json.loads(item)
+                        if msg.get("role") == "user" and msg.get("content") == message:
+                            continue  # Skip current message
+                        history_messages.insert(0, {"role": msg["role"], "content": msg["content"]})
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+                # Limit history to last 20 messages
+                history_messages = history_messages[-20:]
+            except Exception as e:
+                logger.warning(f"Load chat history error: {e}")
+
             messages = [
                 {"role": "system", "content": system_prompt},
+                *history_messages,
                 {"role": "user", "content": message},
             ]
 
