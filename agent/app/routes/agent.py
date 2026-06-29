@@ -303,6 +303,93 @@ async def get_chat_sessions(agent_id: int):
         return {"code": 200, "data": []}
 
 
+@router.get("/agents/{agent_id}/tools")
+async def get_agent_tools(agent_id: int):
+    """Get tools/prompts for an agent from MongoDB"""
+    try:
+        import motor.motor_asyncio
+        mongo_url = f"mongodb://{os.getenv('MONGODB_USERNAME','root')}:{os.getenv('MONGODB_PASSWORD','root123')}@{os.getenv('MONGODB_HOST','192.168.86.9')}:{os.getenv('MONGODB_PORT','27017')}/{os.getenv('MONGODB_DATABASE','agent')}?authSource={os.getenv('MONGODB_AUTH_DB','admin')}"
+        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url)
+        db = client[os.getenv('MONGODB_DATABASE', 'agent')]
+        doc = await db.agent_tools.find_one({"agent_id": agent_id}, {"_id": 0})
+        if not doc:
+            # Return default tools based on agent type
+            agent = await query_one(f"SELECT type FROM `{TABLE}` WHERE id = %s", (agent_id,))
+            agent_type = (agent or {}).get("type", "")
+            doc = _get_default_tools(agent_type)
+            doc["agent_id"] = agent_id
+            await db.agent_tools.insert_one(doc)
+        return {"code": 200, "data": doc}
+    except Exception as e:
+        logger.warning(f"Get tools error: {e}")
+        return {"code": 200, "data": {"tools": [], "prompts": []}}
+
+
+@router.put("/agents/{agent_id}/tools")
+async def update_agent_tools(agent_id: int, body: dict):
+    """Update tools/prompts for an agent"""
+    try:
+        import motor.motor_asyncio
+        mongo_url = f"mongodb://{os.getenv('MONGODB_USERNAME','root')}:{os.getenv('MONGODB_PASSWORD','root123')}@{os.getenv('MONGODB_HOST','192.168.86.9')}:{os.getenv('MONGODB_PORT','27017')}/{os.getenv('MONGODB_DATABASE','agent')}?authSource={os.getenv('MONGODB_AUTH_DB','admin')}"
+        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url)
+        db = client[os.getenv('MONGODB_DATABASE', 'agent')]
+        body["agent_id"] = agent_id
+        body["updated_at"] = int(__import__('time').time())
+        await db.agent_tools.update_one(
+            {"agent_id": agent_id},
+            {"$set": body},
+            upsert=True
+        )
+        return {"code": 200, "message": "Updated"}
+    except Exception as e:
+        logger.warning(f"Update tools error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_default_tools(agent_type: str) -> dict:
+    """Default tool definitions per agent type"""
+    defaults = {
+        "cloudflare": {
+            "tools": [
+                {"name": "zones", "description": "Zone 列表", "command": "zones", "params": [{"name": "account_id", "label": "Account ID", "type": "string"}]},
+                {"name": "stats", "description": "流量统计", "command": "stats", "params": [{"name": "date", "label": "Date", "type": "string"}, {"name": "group_id", "label": "Group ID", "type": "string"}, {"name": "top", "label": "Top N", "type": "number"}]},
+                {"name": "dns", "description": "DNS 记录", "command": "dns", "params": [{"name": "zone_id", "label": "Zone ID", "type": "string", "required": true}, {"name": "type", "label": "Record Type", "type": "string"}]},
+                {"name": "security", "description": "安全规则", "command": "security", "params": [{"name": "zone_id", "label": "Zone ID", "type": "string", "required": true}]},
+                {"name": "cache", "description": "缓存规则", "command": "cache", "params": [{"name": "zone_id", "label": "Zone ID", "type": "string", "required": true}]},
+                {"name": "purge", "description": "清理缓存", "command": "purge", "params": [{"name": "zone_id", "label": "Zone ID", "type": "string", "required": true}]},
+            ],
+            "prompts": [
+                {"name": "accounts", "description": "账户列表", "command": "accounts", "params": []},
+                {"name": "groups", "description": "域名分组", "command": "groups", "params": []},
+                {"name": "sync rules", "description": "同步规则", "command": "sync rules", "params": [{"name": "account_id", "label": "Account ID", "type": "string"}]},
+                {"name": "list tools", "description": "所有工具", "command": "list tools", "params": []},
+            ],
+        },
+        "weather": {
+            "tools": [
+                {"name": "current", "description": "当前天气", "command": "weather", "params": [{"name": "city", "label": "City", "type": "string", "required": true}]},
+                {"name": "forecast", "description": "天气预报", "command": "forecast", "params": [{"name": "city", "label": "City", "type": "string", "required": true}, {"name": "days", "label": "Days", "type": "number"}]},
+            ],
+            "prompts": [],
+        },
+        "k8s": {
+            "tools": [
+                {"name": "pods", "description": "列出 Pod", "command": "pods", "params": [{"name": "namespace", "label": "Namespace", "type": "string"}]},
+                {"name": "deploy", "description": "列出 Deployment", "command": "deploy", "params": [{"name": "namespace", "label": "Namespace", "type": "string"}]},
+                {"name": "logs", "description": "Pod 日志", "command": "logs", "params": [{"name": "pod", "label": "Pod Name", "type": "string", "required": true}]},
+                {"name": "scale", "description": "扩缩容", "command": "scale", "params": [{"name": "deploy", "label": "Deployment", "type": "string", "required": true}, {"name": "replicas", "label": "Replicas", "type": "number", "required": true}]},
+            ],
+            "prompts": [
+                {"name": "nodes", "description": "节点列表", "command": "nodes", "params": []},
+                {"name": "svc", "description": "Service 列表", "command": "svc", "params": []},
+                {"name": "events", "description": "最近事件", "command": "events", "params": []},
+                {"name": "summary", "description": "集群概览", "command": "summary", "params": []},
+            ],
+        },
+    }
+    return defaults.get(agent_type, {"tools": [], "prompts": []})
+
+
 @router.delete("/agents/{agent_id}/chat/sessions/{session_id}")
 async def delete_chat_session(agent_id: int, session_id: str):
     """Delete a chat session from Redis and MongoDB"""
