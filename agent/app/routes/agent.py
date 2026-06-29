@@ -353,6 +353,7 @@ def _get_default_files(agent_name: str, agent_type: str) -> list:
         {"name": "TOOLS.md", "content": f"# Tools\n\nAvailable tools and their usage for {agent_type} agent.\n"},
         {"name": "IDENTITY.md", "content": f"# Identity\n\n- Name: {agent_name}\n- Type: {agent_type}\n"},
         {"name": "USER.md", "content": f"# User Context\n\nUser-specific settings and preferences.\n"},
+        {"name": "MEMORY.md", "content": f"# Memory\n\nLong-term memory and learnings.\n"},
     ]
 
 
