@@ -3,6 +3,7 @@ SSE streaming endpoint for agent chat
 """
 import json
 import logging
+import os
 import httpx
 
 from fastapi import APIRouter, HTTPException, Request
@@ -184,6 +185,30 @@ async def _call_llm_nonstream(model_config, messages, tools=None):
         return {"error": str(type(e).__name__) + ": " + str(e)}
 
 
+async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) -> str:
+    """Build system prompt from agent's MD files in MongoDB"""
+    import motor.motor_asyncio
+    parts = [f"You are {agent_name}, a {agent_type} management assistant."]
+    try:
+        mongo_url = f"mongodb://{os.getenv('MONGODB_USERNAME','root')}:{os.getenv('MONGODB_PASSWORD','root123')}@{os.getenv('MONGODB_HOST','192.168.86.9')}:{os.getenv('MONGODB_PORT','27017')}/{os.getenv('MONGODB_DATABASE','agent')}?authSource={os.getenv('MONGODB_AUTH_DB','admin')}"
+        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url)
+        db = client[os.getenv('MONGODB_DATABASE', 'agent')]
+        doc = await db.agent_tools.find_one({"agent_id": agent_id}, {"_id": 0, "files": 1})
+        if doc and doc.get("files"):
+            priority = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md', 'MEMORY.md']
+            # Sort: priority files first, then alphabetical
+            files = sorted(doc['files'], key=lambda f: (priority.index(f['name']) if f['name'] in priority else 99, f['name']))
+            for f in files:
+                content = (f.get('content') or '').strip()
+                if content:
+                    parts.append(f"\n--- {f['name']} ---\n{content}")
+        await client.close()
+    except Exception as e:
+        logger.warning(f"Build system prompt error: {e}")
+    parts.append("\nAlways use the appropriate tool when available. Format results cleanly. Respond in the user's language.")
+    return "\n".join(parts)
+
+
 async def _discover_worker(agent_type):
     worker_service = "agent-" + agent_type
     try:
@@ -246,7 +271,7 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                 return
 
             tools = _build_tools_for_type(agent_type)
-            system_prompt = "You are a helpful " + agent_type + " assistant with access to tools. Always use the appropriate tool. Format results cleanly."
+            system_prompt = await _build_system_prompt(agent_id, agent_type, agent.get("name", "Agent"))
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message},
