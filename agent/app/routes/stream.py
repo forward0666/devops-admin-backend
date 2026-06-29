@@ -193,15 +193,30 @@ async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) 
         mongo_url = f"mongodb://{os.getenv('MONGODB_USERNAME','root')}:{os.getenv('MONGODB_PASSWORD','root123')}@{os.getenv('MONGODB_HOST','192.168.86.9')}:{os.getenv('MONGODB_PORT','27017')}/{os.getenv('MONGODB_DATABASE','agent')}?authSource={os.getenv('MONGODB_AUTH_DB','admin')}"
         client = motor.motor_asyncio.AsyncIOMotorClient(mongo_url)
         db = client[os.getenv('MONGODB_DATABASE', 'agent')]
-        doc = await db.agent_tools.find_one({"agent_id": agent_id}, {"_id": 0, "files": 1})
-        if doc and doc.get("files"):
-            priority = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md', 'MEMORY.md']
-            # Sort: priority files first, then alphabetical
-            files = sorted(doc['files'], key=lambda f: (priority.index(f['name']) if f['name'] in priority else 99, f['name']))
-            for f in files:
-                content = (f.get('content') or '').strip()
-                if content:
-                    parts.append(f"\n--- {f['name']} ---\n{content}")
+        doc = await db.agent_tools.find_one({"agent_id": agent_id}, {"_id": 0})
+        if doc:
+            files = doc.get("files", [])
+            if not files:
+                # Fallback: build from old tools/prompts format
+                tools = doc.get("tools", [])
+                prompts = doc.get("prompts", [])
+                if tools or prompts:
+                    tool_desc = []
+                    for t in tools:
+                        p = ', '.join([x.get('name','') for x in t.get('params',[])])
+                        tool_desc.append(f"- {t.get('name','')}: {t.get('description','')} (command: {t.get('command','')}, params: {p})")
+                    for p in prompts:
+                        tool_desc.append(f"- {p.get('name','')}: {p.get('description','')} (command: {p.get('command','')})")
+                    if tool_desc:
+                        parts.append("\nAvailable tools:\n" + '\n'.join(tool_desc))
+            else:
+                priority = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md', 'MEMORY.md']
+                files = sorted(files, key=lambda f: (priority.index(f['name']) if f['name'] in priority else 99, f['name']))
+                for f in files:
+                    content = (f.get('content') or '').strip()
+                    if content:
+                        parts.append(f"\n--- {f['name']} ---\n{content}")
+        logger.info(f"System prompt built for agent {agent_id}: {len(parts)} sections")
         await client.close()
     except Exception as e:
         logger.warning(f"Build system prompt error: {e}")
