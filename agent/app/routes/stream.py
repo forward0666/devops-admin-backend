@@ -74,22 +74,16 @@ async def _call_llm_stream(model_config, messages, tools=None):
     if api_key:
         headers["Authorization"] = "Bearer " + api_key
 
-    system_content = None
     clean_messages = []
     for m in messages:
-        if m.get("role") == "system":
-            system_content = m["content"]
-        else:
-            clean_msg = {"role": m["role"], "content": m.get("content", "")}
-            if m.get("tool_calls"):
-                clean_msg["tool_calls"] = m["tool_calls"]
-            if m.get("tool_call_id"):
-                clean_msg["tool_call_id"] = m["tool_call_id"]
-            clean_messages.append(clean_msg)
+        clean_msg = {"role": m["role"], "content": m.get("content", "")}
+        if m.get("tool_calls"):
+            clean_msg["tool_calls"] = m["tool_calls"]
+        if m.get("tool_call_id"):
+            clean_msg["tool_call_id"] = m["tool_call_id"]
+        clean_messages.append(clean_msg)
 
     payload = {"model": model_name, "messages": clean_messages, "temperature": 0.3, "max_tokens": 4000, "stream": True}
-    if system_content:
-        payload["system"] = system_content
     if tools:
         payload["tools"] = tools
 
@@ -161,17 +155,11 @@ async def _call_llm_nonstream(model_config, messages, tools=None):
     if api_key:
         headers["Authorization"] = "Bearer " + api_key
 
-    system_content = None
     clean_messages = []
     for m in messages:
-        if m.get("role") == "system":
-            system_content = m["content"]
-        else:
-            clean_messages.append({"role": m["role"], "content": m.get("content", "")})
+        clean_messages.append({"role": m["role"], "content": m.get("content", "")})
 
     payload = {"model": model_name, "messages": clean_messages, "temperature": 0.3, "max_tokens": 4000}
-    if system_content:
-        payload["system"] = system_content
     if tools:
         payload["tools"] = tools
 
