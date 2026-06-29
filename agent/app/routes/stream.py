@@ -221,7 +221,6 @@ async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) 
                         parts.append(f"\n--- {f['name']} ---\n{content}")
                         logger.info(f"_build_system_prompt: Added {f['name']} ({len(content)} chars)")
         logger.info(f"System prompt built for agent {agent_id}: {len(parts)} sections, total {len('\n'.join(parts))} chars")
-        await client.close()
     except Exception as e:
         logger.error(f"Build system prompt error: {e}", exc_info=True)
     parts.append("\nAlways use the appropriate tool when available. Format results cleanly. Respond in the user's language.")
