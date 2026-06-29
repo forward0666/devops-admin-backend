@@ -348,7 +348,7 @@ async def update_agent_tools(agent_id: int, body: dict):
 def _get_default_files(agent_name: str, agent_type: str) -> list:
     """Default agent files (markdown)"""
     return [
-        {"name": "AGENTS.md", "content": f"# {agent_name}\n\nAgent configuration and behavior rules.\n"},
+        {"name": "AGENTS.md", "content": f"# {agent_name}\n\nAgent configuration and behavior rules.\n\n## 行为规则\n- 展示 tool 返回的精确数据，禁止重命名、翻译或编造任何字段\n- 账户名、zone 名、ID 等必须原样展示，不得修改\n"},
         {"name": "SOUL.md", "content": f"# Soul\n\nDefine the agent's personality and tone.\n"},
         {"name": "TOOLS.md", "content": f"# Tools\n\nAvailable tools and their usage for {agent_type} agent.\n"},
         {"name": "IDENTITY.md", "content": f"# Identity\n\n- Name: {agent_name}\n- Type: {agent_type}\n"},
