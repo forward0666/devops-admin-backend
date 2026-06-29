@@ -42,6 +42,7 @@ def _build_tools_for_type(agent_type):
     elif agent_type == "cloudflare":
         return [
             {"type": "function", "function": {"name": "cf_list_accounts", "description": "List all Cloudflare accounts", "parameters": {"type": "object", "properties": {}, "required": []}}},
+            {"type": "function", "function": {"name": "cf_list_zones", "description": "List zones/domains for an account", "parameters": {"type": "object", "properties": {"account_id": {"type": "integer", "description": "Account DB ID"}}, "required": []}}},
         ]
     return []
 
