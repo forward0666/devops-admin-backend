@@ -215,6 +215,7 @@ async def _build_system_prompt(agent_id: int, agent_type: str, agent_name: str) 
         logger.info(f"System prompt built for agent {agent_id}: {len(parts)} sections, total {len('\n'.join(parts))} chars")
     except Exception as e:
         logger.error(f"Build system prompt error: {e}", exc_info=True)
+    parts.append("\nCRITICAL: When presenting tool results, show the EXACT data returned by the tool. DO NOT rename, translate, or fabricate any fields. Show account names, zone names, IDs exactly as returned. If a name is empty or looks like a raw ID, show it as-is.")
     parts.append("\nAlways use the appropriate tool when available. Format results cleanly. Respond in the user's language.")
     return "\n".join(parts)
 
