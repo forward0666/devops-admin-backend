@@ -6,6 +6,7 @@ import httpx
 
 from app.services.db import execute, query_one, query_all
 from app.config import NACOS_HOST, NACOS_PORT, NACOS_NAMESPACE, NACOS_USERNAME, NACOS_PASSWORD
+from app.routes.stream import _discover_worker
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
