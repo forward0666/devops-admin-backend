@@ -299,8 +299,9 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
             # Load chat history from Redis
             import redis.asyncio as aioredis
             history_messages = []
+            redis_conn = None
             try:
-                r = aioredis.Redis(
+                redis_conn = aioredis.Redis(
                     host=os.getenv("REDIS_HOST", "192.168.86.9"),
                     port=int(os.getenv("REDIS_PORT", "6379")),
                     password=os.getenv("REDIS_PASSWORD", "root123") or None,
@@ -310,21 +311,24 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                 prefix_map = {"weather": "weather", "cloudflare": "cf", "k8s": "k8s"}
                 prefix = prefix_map.get(agent_type, agent_type)
                 chat_key = f"agent:{prefix}:chat:{session_id}"
-                raw_history = await r.lrange(chat_key, 0, -1)
-                await r.close()
+                raw_history = await redis_conn.lrange(chat_key, 0, -1)
                 # Parse history (skip last user message if it's the current one)
                 for item in reversed(raw_history):
                     try:
                         msg = json.loads(item)
-                        if msg.get("role") == "user" and msg.get("content") == message:
+                        if msg.get("role") == "user" and msg.get("text", msg.get("content", "")) == message:
                             continue  # Skip current message
-                        history_messages.insert(0, {"role": msg["role"], "content": msg["content"]})
+                        history_messages.insert(0, {"role": msg["role"], "content": msg.get("text", msg.get("content", ""))})
                     except (json.JSONDecodeError, KeyError):
                         continue
-                # Limit history to last 20 messages
                 history_messages = history_messages[-20:]
+                # Save user message to Redis
+                import time as _time
+                entry = {"session_id": session_id, "role": "user", "text": message, "ts": int(_time.time())}
+                await redis_conn.rpush(chat_key, json.dumps(entry, ensure_ascii=False))
+                await redis_conn.expire(chat_key, 86400)
             except Exception as e:
-                logger.warning(f"Load chat history error: {e}")
+                logger.warning(f"Load/save chat history error: {e}")
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -381,6 +385,15 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                             messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": tool_result})
                         continue
                     elif content_buffer:
+                        # Save assistant response to Redis
+                        if redis_conn and chat_key:
+                            try:
+                                import time as _time
+                                entry = {"session_id": session_id, "role": "assistant", "text": content_buffer, "ts": int(_time.time())}
+                                await redis_conn.rpush(chat_key, json.dumps(entry, ensure_ascii=False))
+                                await redis_conn.expire(chat_key, 86400)
+                            except Exception:
+                                pass
                         yield _sse("done", None)
                         await execute("UPDATE `" + TABLE + "` SET last_active_at=UTC_TIMESTAMP() WHERE id=%s", (agent_id,))
                         return
@@ -395,6 +408,15 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                         content = choice.get("message", {}).get("content", "")
                         if content:
                             yield _sse("response", content)
+                            # Save assistant response to Redis
+                            if redis_conn and chat_key:
+                                try:
+                                    import time as _time
+                                    entry = {"session_id": session_id, "role": "assistant", "text": content, "ts": int(_time.time())}
+                                    await redis_conn.rpush(chat_key, json.dumps(entry, ensure_ascii=False))
+                                    await redis_conn.expire(chat_key, 86400)
+                                except Exception:
+                                    pass
                         await execute("UPDATE `" + TABLE + "` SET last_active_at=UTC_TIMESTAMP() WHERE id=%s", (agent_id,))
                         return
                     else:
@@ -410,6 +432,15 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
                     content = choice.get("message", {}).get("content", "")
                     if content:
                         yield _sse("response", content)
+                        # Save assistant response to Redis
+                        if redis_conn and chat_key:
+                            try:
+                                import time as _time
+                                entry = {"session_id": session_id, "role": "assistant", "text": content, "ts": int(_time.time())}
+                                await redis_conn.rpush(chat_key, json.dumps(entry, ensure_ascii=False))
+                                await redis_conn.expire(chat_key, 86400)
+                            except Exception:
+                                pass
                     await execute("UPDATE `" + TABLE + "` SET last_active_at=UTC_TIMESTAMP() WHERE id=%s", (agent_id,))
                     return
 
