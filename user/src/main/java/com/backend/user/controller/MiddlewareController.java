@@ -153,6 +153,10 @@ public class MiddlewareController {
      * 统一角色解析：优先 X-Tg-Username，其次 JWT
      */
     private String resolveProjectRole(HttpServletRequest request, Long projectId) {
+        // 内部服务调用，跳过角色检查
+        if (Boolean.TRUE.equals(request.getAttribute("internalCall"))) {
+            return "Administrator";
+        }
         String tgUsername = request.getHeader("X-Tg-Username");
         if (tgUsername != null && !tgUsername.isBlank()) {
             ProjectMemberEntity member = projectMemberService.findByProjectIdAndTgUsername(projectId, tgUsername);

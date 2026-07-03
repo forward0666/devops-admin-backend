@@ -41,6 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Skip JWT for direct internal service calls (X-Internal-Call)
         String internalCall = request.getHeader(internalWhitelistHeader);
         if ("true".equals(internalCall)) {
+            request.setAttribute("internalCall", true);
             log.debug("Skipping JWT validation for internal call to path: {}", path);
             filterChain.doFilter(request, response);
             return;

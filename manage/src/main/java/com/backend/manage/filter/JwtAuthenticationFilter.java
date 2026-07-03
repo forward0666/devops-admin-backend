@@ -37,6 +37,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
         String method = request.getMethod();
+        log.info("[AuthFilter] >>> {} {} from={} headers={}",
+                method, path, request.getRemoteAddr(),
+                java.util.Collections.list(request.getHeaderNames()).stream()
+                        .map(h -> h + "=" + request.getHeader(h))
+                        .collect(java.util.stream.Collectors.joining(", ")));
 
         // Skip JWT validation for OPTIONS requests (CORS preflight)
         if ("OPTIONS".equals(method)) {
