@@ -48,6 +48,7 @@ CONFIG_MAP = {
     "redis.password": ("REDIS_PASSWORD", str),
     "redis.database": ("REDIS_DATABASE", int),
     "cf.api.token": ("CF_API_TOKEN", str),
+    "internal_whitelist_header": ("INTERNAL_WHITELIST_HEADER", str),
 }
 
 

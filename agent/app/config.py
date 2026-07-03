@@ -16,3 +16,6 @@ MYSQL_USER = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "root123")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "agent")
 MYSQL_POOL_RECYCLE = int(os.getenv("MYSQL_POOL_RECYCLE", "1800"))
+
+# Internal whitelist header
+INTERNAL_WHITELIST_HEADER = os.getenv("INTERNAL_WHITELIST_HEADER", "X-Internal-Call")

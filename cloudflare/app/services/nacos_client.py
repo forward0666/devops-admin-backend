@@ -37,6 +37,7 @@ CONFIG_MAP = {
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
     "gateway.secret": ("GATEWAY_SECRET", str),
     "user.service.url": ("USER_SERVICE_URL", str),
+    "internal_whitelist_header": ("INTERNAL_WHITELIST_HEADER", str),
 }
 
 

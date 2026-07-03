@@ -68,6 +68,10 @@ async def fetch_config():
                         config.MYSQL_PASSWORD = _resolve(value)
                     elif key == "mysql.database":
                         config.MYSQL_DATABASE = _resolve(value)
+                    elif key == "mysql.pool.recycle":
+                        config.MYSQL_POOL_RECYCLE = _resolve(value, int)
+                    elif key == "internal_whitelist_header":
+                        config.INTERNAL_WHITELIST_HEADER = _resolve(value)
                 logger.info("✅ Loaded config from Nacos: agent.properties")
     except Exception as e:
         logger.warning(f"⚠️ Nacos config fetch failed: {e}")

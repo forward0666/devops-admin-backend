@@ -58,15 +58,20 @@ public class WebClientConfig {
      * 
      * @return 配置好的 WebClient 实例，专用于 Telegram API 调用
      */
+    @Value("${internal_whitelist_header:X-Internal-Call}")
+    private String internalWhitelistHeader;
+
     @Bean("lbWebClientBuilder")
     @LoadBalanced
     public WebClient.Builder lbWebClientBuilder() {
-        return WebClient.builder();
+        return WebClient.builder()
+                .defaultHeader(internalWhitelistHeader, "true");
     }
 
     @Bean("webClientBuilder")
     public WebClient.Builder webClientBuilder() {
-        return WebClient.builder();
+        return WebClient.builder()
+                .defaultHeader(internalWhitelistHeader, "true");
     }
 
     @Bean

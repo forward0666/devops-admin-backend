@@ -6,8 +6,20 @@ from datetime import datetime
 
 from app.services.db import execute
 from app.services.nacos_client import get_service_instance
+from app.config import INTERNAL_WHITELIST_HEADER
 
 logger = logging.getLogger(__name__)
+
+# Internal service call header
+INTERNAL_HEADERS = {INTERNAL_WHITELIST_HEADER: "true"}
+
+
+def _merge_headers(extra: dict = None) -> dict:
+    """Merge internal call headers with extra headers"""
+    headers = dict(INTERNAL_HEADERS)
+    if extra:
+        headers.update(extra)
+    return headers
 
 
 async def get_service_url(service_name: str) -> str:
@@ -25,7 +37,7 @@ async def get_service_url(service_name: str) -> str:
 
 async def get_cf_accounts(cf_url: str) -> list:
     """Fetch all accounts from cloudflare service"""
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, headers=INTERNAL_HEADERS) as client:
         resp = await client.get(f"{cf_url}/accounts", params={"raw": True})
         if resp.status_code == 200:
             return resp.json().get("data", [])
@@ -34,8 +46,8 @@ async def get_cf_accounts(cf_url: str) -> list:
 
 async def get_cf_zones(cf_url: str, account_id: int, api_key: str) -> list:
     """Fetch all zones for an account from cloudflare service"""
-    headers = {"X-Cf-Token": api_key}
-    async with httpx.AsyncClient(timeout=60) as client:
+    headers = _merge_headers({"X-Cf-Token": api_key})
+    async with httpx.AsyncClient(timeout=60, headers=INTERNAL_HEADERS) as client:
         resp = await client.get(f"{cf_url}/zones", headers=headers, params={"account_id": account_id})
         if resp.status_code == 200:
             data = resp.json().get("data", [])
@@ -65,7 +77,7 @@ async def run_check_domain(task: dict):
 
     monitor_url = await get_service_url("monitor")
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         for rule_id in rule_ids:
             try:
                 resp = await client.post(f"{monitor_url}/rules/{rule_id}/check")
@@ -98,7 +110,7 @@ async def run_sync_zone(task: dict):
     if sync_all:
         account_ids = list(account_key_map.keys())
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         async def sync_one(acc_id: int):
             api_key = account_key_map.get(acc_id)
             if not api_key:
@@ -106,7 +118,7 @@ async def run_sync_zone(task: dict):
             url = f"{cf_url}/zones/sync?account_id={acc_id}"
             logger.info(f"[Task] sync_zone: POST {url}")
             try:
-                resp = await client.post(url, headers={"X-Cf-Token": api_key})
+                resp = await client.post(url, headers=_merge_headers({"X-Cf-Token": api_key}))
                 if resp.status_code == 200:
                     data = resp.json().get("data", {})
                     logger.info(f"[Task] sync_zone '{task_name}': account {acc_id} synced {data.get('synced', 0)}/{data.get('total', 0)}")
@@ -139,7 +151,7 @@ async def run_sync_dns(task: dict):
     if sync_all:
         account_ids = list(account_key_map.keys())
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         async def sync_one(acc_id: int):
             api_key = account_key_map.get(acc_id)
             if not api_key:
@@ -147,7 +159,7 @@ async def run_sync_dns(task: dict):
             url = f"{cf_url}/dns/sync?account_id={acc_id}"
             logger.info(f"[Task] sync_dns: POST {url}")
             try:
-                resp = await client.post(url, headers={"X-Cf-Token": api_key})
+                resp = await client.post(url, headers=_merge_headers({"X-Cf-Token": api_key}))
                 if resp.status_code == 200:
                     data = resp.json().get("data", {})
                     logger.info(f"[Task] sync_dns '{task_name}': account {acc_id} synced {data.get('synced', 0)}/{data.get('total', 0)}")
@@ -180,7 +192,7 @@ async def run_sync_security(task: dict):
     if sync_all:
         account_ids = list(account_key_map.keys())
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         async def sync_one_zone(acc_id: int, zone_id: str, headers: dict):
             url = f"{cf_url}/zones/{zone_id}/security/sync?account_id={acc_id}"
             logger.info(f"[Task] sync_security: POST {url}")
@@ -197,7 +209,7 @@ async def run_sync_security(task: dict):
             api_key = account_key_map.get(acc_id)
             if not api_key:
                 return
-            headers = {"X-Cf-Token": api_key}
+            headers = _merge_headers({"X-Cf-Token": api_key})
             zones = await get_cf_zones(cf_url, acc_id, api_key)
             logger.info(f"[Task] sync_security '{task_name}': account {acc_id} has {len(zones)} zones")
             zone_ids = [z.get("zone_id") or z.get("id") if isinstance(z, dict) else z for z in zones]
@@ -227,7 +239,7 @@ async def run_sync_cache(task: dict):
     if sync_all:
         account_ids = list(account_key_map.keys())
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         async def sync_one_zone(acc_id: int, zone_id: str, headers: dict):
             url = f"{cf_url}/zones/{zone_id}/cache/sync?account_id={acc_id}"
             logger.info(f"[Task] sync_cache: POST {url}")
@@ -244,7 +256,7 @@ async def run_sync_cache(task: dict):
             api_key = account_key_map.get(acc_id)
             if not api_key:
                 return
-            headers = {"X-Cf-Token": api_key}
+            headers = _merge_headers({"X-Cf-Token": api_key})
             zones = await get_cf_zones(cf_url, acc_id, api_key)
             logger.info(f"[Task] sync_cache '{task_name}': account {acc_id} has {len(zones)} zones")
             zone_ids = [z.get("zone_id") or z.get("id") if isinstance(z, dict) else z for z in zones]
@@ -271,7 +283,7 @@ async def run_sync_rule(task: dict):
     cf_url = await get_service_url("cloudflare")
     failed = 0
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         for rule_id in sync_rule_ids:
             try:
                 url = f"{cf_url}/syncRules/{rule_id}/push"
@@ -302,7 +314,7 @@ async def run_sync_domain(task: dict):
     url = f"{domain_url}/domain/sync"
     logger.info(f"[Task] sync_domain: POST {url}")
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         try:
             resp = await client.post(url)
             if resp.status_code == 200:
@@ -330,7 +342,7 @@ async def run_sync_project_domain(task: dict):
     url = f"{domain_url}/sync_domain/rules"
     logger.info(f"[Task] sync_project_domain: GET {url}")
 
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with httpx.AsyncClient(timeout=300, headers=INTERNAL_HEADERS) as client:
         try:
             resp = await client.get(url)
             if resp.status_code != 200:
@@ -385,7 +397,7 @@ async def run_sync_statistic(task: dict):
         body["date"] = date
 
     failed = 0
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with httpx.AsyncClient(timeout=600, headers=INTERNAL_HEADERS) as client:
         for endpoint in ["/statistic/sync", "/statistic/sync/chart"]:
             url = f"{cf_url}{endpoint}"
             try:
@@ -422,7 +434,7 @@ async def run_sync_statistic_month(task: dict):
         body["month"] = month
 
     failed = 0
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with httpx.AsyncClient(timeout=600, headers=INTERNAL_HEADERS) as client:
         for endpoint in ["/statistic/sync/month", "/statistic/sync/chart/month"]:
             url = f"{cf_url}{endpoint}"
             try:

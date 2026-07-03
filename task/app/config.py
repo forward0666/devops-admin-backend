@@ -49,6 +49,7 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "root123")
 REDIS_DATABASE = _parse_port("REDIS_DATABASE", "0")
 
 # Service-to-service auth
+INTERNAL_WHITELIST_HEADER = os.getenv("INTERNAL_WHITELIST_HEADER", "X-Internal-Call")
 
 # Monitor service
 

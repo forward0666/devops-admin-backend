@@ -24,6 +24,13 @@ CONFIG_MAP = {
     "mongodb.database": ("MONGODB_DATABASE", str),
     "mongodb.auth-db": ("MONGODB_AUTH_DB", str),
     "cloudflare.source.mongodb.database": ("CLOUDFLARE_MONGODB_DATABASE", str),
+    "internal_whitelist_header": ("INTERNAL_WHITELIST_HEADER", str),
+    "mysql.host": ("MYSQL_HOST", str),
+    "mysql.port": ("MYSQL_PORT", int),
+    "mysql.user": ("MYSQL_USER", str),
+    "mysql.password": ("MYSQL_PASSWORD", str),
+    "mysql.database": ("MYSQL_DATABASE", str),
+    "mysql.pool.recycle": ("MYSQL_POOL_RECYCLE", int),
 }
 
 

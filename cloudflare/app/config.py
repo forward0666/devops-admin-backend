@@ -39,6 +39,7 @@ MONGODB_AUTH_DB = os.getenv("MONGODB_AUTH_DB", "admin")
 # Service-to-service auth
 GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://192.168.86.9:8084")
+INTERNAL_WHITELIST_HEADER = os.getenv("INTERNAL_WHITELIST_HEADER", "X-Internal-Call")
 
 
 

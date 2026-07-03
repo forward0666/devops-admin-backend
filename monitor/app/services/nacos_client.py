@@ -49,6 +49,7 @@ CONFIG_MAP = {
     "http.concurrency": ("HTTP_CONCURRENCY", int),
     "dns.concurrency": ("DNS_CONCURRENCY", int),
     "http.pool.size": ("HTTP_POOL_SIZE", int),
+    "internal_whitelist_header": ("INTERNAL_WHITELIST_HEADER", str),
 }
 
 

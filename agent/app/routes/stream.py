@@ -10,7 +10,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.services.db import execute, query_one
-from app.config import NACOS_HOST, NACOS_PORT, NACOS_NAMESPACE, NACOS_USERNAME, NACOS_PASSWORD
+from app.config import NACOS_HOST, NACOS_PORT, NACOS_NAMESPACE, NACOS_USERNAME, NACOS_PASSWORD, INTERNAL_WHITELIST_HEADER
+
+INTERNAL_HEADERS = {INTERNAL_WHITELIST_HEADER: "true"}
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -70,7 +72,7 @@ def _sse(event_type, data=None):
 
 async def _call_mcp_tool(worker_url, tool_name, arguments):
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=60, headers=INTERNAL_HEADERS) as client:
             resp = await client.post(worker_url + "/chat", json={"message": "[tool:" + tool_name + "] " + json.dumps(arguments)})
             if resp.status_code == 200:
                 data = resp.json()
@@ -274,7 +276,7 @@ async def chat_stream(agent_id: int, message: str, session_id: str = "default"):
             if not model_id:
                 yield _sse("status", "Processing...")
                 try:
-                    async with httpx.AsyncClient(timeout=60) as client:
+                    async with httpx.AsyncClient(timeout=60, headers=INTERNAL_HEADERS) as client:
                         resp = await client.post(worker_url + "/chat", json={"message": message, "session_id": session_id})
                         if resp.status_code == 200:
                             data = resp.json()

@@ -50,6 +50,7 @@ DOMAIN_MONGODB_DATABASE = os.getenv("DOMAIN_MONGODB_DATABASE", "domain")
 # Service-to-service auth
 GATEWAY_SECRET = os.getenv("GATEWAY_SECRET", "")
 CLOUDFLARE_SERVICE_URL = os.getenv("CLOUDFLARE_SERVICE_URL", "http://127.0.0.1:8090")
+INTERNAL_WHITELIST_HEADER = os.getenv("INTERNAL_WHITELIST_HEADER", "X-Internal-Call")
 
 # Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "192.168.86.9")

@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,6 +21,9 @@ import java.util.Map;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${internal_whitelist_header:X-Internal-Call}")
+    private String internalWhitelistHeader;
 
     @Autowired
     private CacheService cacheService;
@@ -33,6 +37,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
         String method = request.getMethod();
+
+        // Skip JWT for direct internal service calls (X-Internal-Call)
+        String internalCall = request.getHeader(internalWhitelistHeader);
+        if ("true".equals(internalCall)) {
+            log.debug("Skipping JWT validation for internal call to path: {}", path);
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // Skip JWT validation for internal Telegram bot calls
         String tgUsername = request.getHeader("X-Tg-Username");

@@ -8,6 +8,7 @@ from app.routes import domain, dns_domain, sync_domain, statistic
 from app.services.mongodb import close_db, get_db
 from app.services.db import get_pool, close_pool
 from app.services.redis import get_redis, close_redis
+from app.config import INTERNAL_WHITELIST_HEADER
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,6 +33,11 @@ app = FastAPI(title="Domain Manager API", version="1.0.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    # Log warning for requests without internal call header
+    internal_call = request.headers.get(INTERNAL_WHITELIST_HEADER)
+    if internal_call != "true":
+        logger.warning(f"Request without X-Internal-Call: {request.method} {request.url.path}")
+
     start = time.monotonic()
     response = await call_next(request)
     elapsed = round((time.monotonic() - start) * 1000, 2)

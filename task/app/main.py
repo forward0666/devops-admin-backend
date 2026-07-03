@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 from app.routes import task
 from app.services.db import get_pool, close_pool
 from app.services.scheduler import start_scheduler, stop_scheduler
+from app.config import INTERNAL_WHITELIST_HEADER
 
 
 @asynccontextmanager
@@ -42,6 +43,13 @@ app = FastAPI(title="Task Service API", version="1.0.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    # Skip auth for internal service calls
+    internal_call = request.headers.get(INTERNAL_WHITELIST_HEADER)
+    if internal_call != "true":
+        # External request without internal header - reject or check auth
+        # For now, just log and pass through (gateway adds the header)
+        logger.warning(f"Request without X-Internal-Call: {request.method} {request.url.path}")
+
     start = time.monotonic()
     response = await call_next(request)
     elapsed = round((time.monotonic() - start) * 1000, 2)
