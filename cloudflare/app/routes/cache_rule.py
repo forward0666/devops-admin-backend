@@ -182,7 +182,7 @@ async def _do_purge(rule: dict, domains: list[str]) -> dict:
         zid = info["zone_id"]
         if zid not in zone_info:
             zone_info[zid] = {"account_id": info["account_id"], "prefixes": []}
-        zone_info[zid]["prefixes"].append(url_path)
+        zone_info[zid]["prefixes"].append(f"{d}{url_path}")
 
     token_cache: dict[str, str] = {}
 
