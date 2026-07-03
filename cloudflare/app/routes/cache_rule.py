@@ -211,7 +211,7 @@ async def _do_purge(rule: dict, domains: list[str]) -> dict:
                 for d in zone_domains.get(zone_id, []):
                     failed.append({"domain": d, "reason": f"account {zinfo['account_id']} not found"})
                 continue
-            logger.info(f"Purge: zone_id={zone_id}, prefixes={zinfo['prefixes']}")
+            logger.info(f"Purge: zone_id={zone_id}, account_id={zinfo['account_id']}, token_prefix={token[:20] if token else 'None'}..., prefixes={zinfo['prefixes']}")
             result = await cf_client.async_purge_by_prefixes(token, zone_id, zinfo["prefixes"])
             logger.info(f"Purge result: {result}")
             succeeded.extend(zone_domains.get(zone_id, []))
