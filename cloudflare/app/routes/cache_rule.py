@@ -123,7 +123,7 @@ async def delete_cache_rule(rule_id: int, projectId: int = Query(...)):
     return {"code": 200, "data": None, "message": "Rule deleted"}
 
 
-async def _do_purge(rule: dict, domains: list[str]) -> dict:
+async def _do_purge(rule: dict, domains: list[str], cf_token: str = None) -> dict:
     """Common purge logic: resolve domains to zones and purge by prefix."""
     from app.services.mongodb import get_db
     db = await get_db()
@@ -187,6 +187,8 @@ async def _do_purge(rule: dict, domains: list[str]) -> dict:
     token_cache: dict[str, str] = {}
 
     async def get_token(account_id: str) -> str:
+        if cf_token:
+            return cf_token
         if account_id in token_cache:
             return token_cache[account_id]
         row = await query_one("SELECT api_key FROM account WHERE id = %s", (int(account_id),))
@@ -235,6 +237,7 @@ async def purge_cache_rule(body: dict):
     """Purge cache by prefix for a rule across given domains."""
     rule_id = body.get("ruleId")
     domains = body.get("domains", [])
+    cf_token = body.get("cfToken")
     if not rule_id or not domains:
         raise HTTPException(status_code=400, detail="ruleId and domains are required")
 
@@ -242,7 +245,7 @@ async def purge_cache_rule(body: dict):
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    return await _do_purge(rule, domains)
+    return await _do_purge(rule, domains, cf_token)
 
 
 @router.post("/purgeEverything")
