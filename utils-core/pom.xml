@@ -94,6 +94,19 @@
             <artifactId>commons-codec</artifactId>
         </dependency>
 
+        <!-- OpenAPI / Swagger (WebMVC) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        </dependency>
+
+        <!-- Logstash Logback encoder for JSON logging -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+
     </dependencies>
 
 </project>

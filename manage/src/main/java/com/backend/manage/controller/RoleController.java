@@ -1,13 +1,13 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
 import com.backend.manage.entity.RoleEntity;
 import com.backend.manage.service.RoleService;
 import com.backend.manage.vo.RoleVo;
+import com.backend.utils.exception.BizException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,44 +17,23 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/role")
+@RequiredArgsConstructor
 public class RoleController {
 
-    @Autowired
-    private RoleService roleService;
+    private final RoleService roleService;
 
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<RoleVo>>> getAllRoles() {
-        log.info("GET /role - Fetching all roles");
-        try {
-            var roles = roleService.getAllRoles();
-            List<RoleVo> result = roles.stream().map(RoleVo::fromEntity).toList();
-            log.info("Successfully retrieved {} roles", roles.size());
-            return ResponseEntity.ok(ApiResponseDto.success("Roles retrieved successfully", result));
-        } catch (Exception e) {
-            log.error("Error retrieving roles", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve roles: " + e.getMessage()));
-        }
+        var roles = roleService.getAllRoles();
+        List<RoleVo> result = roles.stream().map(RoleVo::fromEntity).toList();
+        return ResponseEntity.ok(ApiResponseDto.success("Roles retrieved successfully", result));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseDto<RoleVo>> getRoleById(@PathVariable Long id) {
-        log.info("GET /role/{} - Fetching role by ID", id);
-        try {
-            var role = roleService.getRoleById(id);
-            if (role != null) {
-                log.info("Successfully retrieved role: {}", role.getName());
-                return ResponseEntity.ok(ApiResponseDto.success("Role retrieved successfully", RoleVo.fromEntity(role)));
-            } else {
-                log.warn("Role not found with ID: {}", id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponseDto.error("Role not found"));
-            }
-        } catch (Exception e) {
-            log.error("Error retrieving role with ID: {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to retrieve role: " + e.getMessage()));
-        }
+        var role = roleService.getRoleById(id);
+        if (role == null) throw new BizException(404, "Role not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Role retrieved successfully", RoleVo.fromEntity(role)));
     }
 
     @PostMapping
@@ -65,21 +44,8 @@ public class RoleController {
         description = "创建新角色"
     )
     public ResponseEntity<ApiResponseDto<RoleVo>> createRole(@Valid @RequestBody RoleEntity role) {
-        log.info("POST /role - Creating new role: {}", role.getName());
-        try {
-            var createdRole = roleService.createRole(role);
-            log.info("Successfully created role with ID: {}", createdRole.getId());
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponseDto.success("Role created successfully", RoleVo.fromEntity(createdRole)));
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid role data: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponseDto.error("Invalid role data: " + e.getMessage()));
-        } catch (Exception e) {
-            log.error("Error creating role: {}", role.getName(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to create role: " + e.getMessage()));
-        }
+        var createdRole = roleService.createRole(role);
+        return ResponseEntity.ok(ApiResponseDto.success("Role created successfully", RoleVo.fromEntity(createdRole)));
     }
 
     @PutMapping("/{id}")
@@ -91,27 +57,10 @@ public class RoleController {
         description = "更新角色信息"
     )
     public ResponseEntity<ApiResponseDto<RoleVo>> updateRole(@PathVariable Long id, @Valid @RequestBody RoleEntity role) {
-        log.info("PUT /role/{} - Updating role", id);
-        try {
-            role.setId(id);
-            var updatedRole = roleService.updateRole(role);
-            if (updatedRole != null) {
-                log.info("Successfully updated role: {}", updatedRole.getName());
-                return ResponseEntity.ok(ApiResponseDto.success("Role updated successfully", RoleVo.fromEntity(updatedRole)));
-            } else {
-                log.warn("Role not found for update with ID: {}", id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponseDto.error("Role not found"));
-            }
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid role data for update: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponseDto.error("Invalid role data: " + e.getMessage()));
-        } catch (Exception e) {
-            log.error("Error updating role with ID: {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to update role: " + e.getMessage()));
-        }
+        role.setId(id);
+        var updatedRole = roleService.updateRole(role);
+        if (updatedRole == null) throw new BizException(404, "Role not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Role updated successfully", RoleVo.fromEntity(updatedRole)));
     }
 
     @DeleteMapping("/{id}")
@@ -123,25 +72,8 @@ public class RoleController {
         description = "删除角色"
     )
     public ResponseEntity<ApiResponseDto<Void>> deleteRole(@PathVariable Long id) {
-        log.info("DELETE /role/{} - Deleting role", id);
-        try {
-            boolean deleted = roleService.deleteRole(id);
-            if (deleted) {
-                log.info("Successfully deleted role with ID: {}", id);
-                return ResponseEntity.ok(ApiResponseDto.success("Role deleted successfully", null));
-            } else {
-                log.warn("Role not found for deletion with ID: {}", id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponseDto.error("Role not found"));
-            }
-        } catch (IllegalStateException e) {
-            log.warn("Cannot delete role with ID {}: {}", id, e.getMessage());
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponseDto.error(e.getMessage()));
-        } catch (Exception e) {
-            log.error("Error deleting role with ID: {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDto.error("Failed to delete role: " + e.getMessage()));
-        }
+        boolean deleted = roleService.deleteRole(id);
+        if (!deleted) throw new BizException(404, "Role not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Role deleted successfully", null));
     }
 }

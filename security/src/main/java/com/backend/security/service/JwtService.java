@@ -37,14 +37,14 @@ public class JwtService {
         var expiryDate = Date.from(now.plusSeconds(jwtExpirationInMs));
         
         var builder = Jwts.builder()
-                .setSubject(subject)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(expiryDate)
+                .subject(subject)
+                .issuedAt(Date.from(now))
+                .expiration(expiryDate)
                 .signWith(getSigningKey());
 
         // 使用Java 21的特性处理可选参数
         if (claims != null && !claims.isEmpty()) {
-            builder.addClaims(claims);
+            claims.forEach(builder::claim);
         }
 
         return builder.compact();
@@ -75,11 +75,11 @@ public class JwtService {
      */
     public Claims getClaimsFromToken(String token) {
         // 使用Java 21的特性，更简洁的链式调用
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     /**
@@ -90,10 +90,10 @@ public class JwtService {
     public boolean validateToken(String token) {
         try {
             // 使用Java 21的特性，更简洁的代码
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
+            Jwts.parser()
+                    .verifyWith(getSigningKey())
                     .build()
-                    .parseClaimsJws(token);
+                    .parseSignedClaims(token);
             return true;
         } catch (SecurityException | MalformedJwtException | ExpiredJwtException |
                  UnsupportedJwtException | IllegalArgumentException ex) {

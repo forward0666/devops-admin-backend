@@ -1,13 +1,15 @@
 package com.backend.user.controller;
 
-import com.backend.user.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
 import com.backend.user.entity.ProjectMemberEntity;
 import com.backend.user.service.ProjectMemberService;
 import com.backend.utils.JwtUtil;
+import com.backend.utils.exception.BizException;
 import com.backend.user.vo.ProjectMemberVo;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,13 +17,11 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/projectMember")
+@RequiredArgsConstructor
 public class ProjectMemberController {
 
-    @Autowired
-    private ProjectMemberService projectMemberService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final ProjectMemberService projectMemberService;
+    private final JwtUtil jwtUtil;
 
     private Long getCurrentUserId(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -33,12 +33,10 @@ public class ProjectMemberController {
 
     private void checkPermission(HttpServletRequest request, Long projectId, List<String> allowedRoles) {
         Long userId = getCurrentUserId(request);
-        if (userId == null) {
-            throw new RuntimeException("Unauthorized");
-        }
+        if (userId == null) throw new BizException(401, "Unauthorized");
         ProjectMemberEntity member = projectMemberService.findByProjectIdAndUserId(projectId, userId);
         if (member == null || !allowedRoles.contains(member.getProjectRole())) {
-            throw new RuntimeException("Permission denied");
+            throw new BizException(403, "Permission denied");
         }
     }
 
@@ -49,75 +47,44 @@ public class ProjectMemberController {
     }
 
     @GetMapping
-    public ApiResponseDto<List<ProjectMemberVo>> getMembers(@RequestParam Long projectId) {
-        try {
-            List<ProjectMemberEntity> members = projectMemberService.getMembersByProjectId(projectId);
-            return ApiResponseDto.success("Members retrieved successfully", members.stream().map(ProjectMemberVo::fromEntity).toList());
-        } catch (Exception e) {
-            log.error("Failed to retrieve members", e);
-            return ApiResponseDto.error("Failed to retrieve members");
-        }
+    public ResponseEntity<ApiResponseDto<List<ProjectMemberVo>>> getMembers(@RequestParam Long projectId) {
+        List<ProjectMemberEntity> members = projectMemberService.getMembersByProjectId(projectId);
+        return ResponseEntity.ok(ApiResponseDto.success("Members retrieved successfully",
+            members.stream().map(ProjectMemberVo::fromEntity).toList()));
     }
 
     @PostMapping
-    public ApiResponseDto<ProjectMemberVo> addMember(HttpServletRequest request, @RequestBody ProjectMemberEntity member) {
-        try {
-            checkPermission(request, member.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
-            ProjectMemberEntity created = projectMemberService.addMember(member);
-            return ApiResponseDto.success("Member added successfully", ProjectMemberVo.fromEntity(created));
-        } catch (RuntimeException e) {
-            log.warn("Failed to add member: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to add member", e);
-            return ApiResponseDto.error("Failed to add member");
-        }
+    public ResponseEntity<ApiResponseDto<ProjectMemberVo>> addMember(HttpServletRequest request, @RequestBody ProjectMemberEntity member) {
+        checkPermission(request, member.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
+        ProjectMemberEntity created = projectMemberService.addMember(member);
+        return ResponseEntity.ok(ApiResponseDto.success("Member added successfully", ProjectMemberVo.fromEntity(created)));
     }
 
     @PutMapping("/{id}")
-    public ApiResponseDto<ProjectMemberVo> updateMember(HttpServletRequest request, @PathVariable Long id, @RequestBody ProjectMemberEntity member) {
-        try {
-            ProjectMemberEntity existing = projectMemberService.findById(id);
-            if (existing == null) return ApiResponseDto.error("Member not found");
-            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
-                return ApiResponseDto.error("Leaders cannot edit admin/devops members");
-            }
-            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
-                return ApiResponseDto.error("Leaders cannot remove admin/devops members");
-            }
-            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
-            ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
-            return ApiResponseDto.success("Member updated successfully", ProjectMemberVo.fromEntity(updated));
-        } catch (RuntimeException e) {
-            log.warn("Failed to update member: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to update member: " + id, e);
-            return ApiResponseDto.error("Failed to update member");
+    public ResponseEntity<ApiResponseDto<ProjectMemberVo>> updateMember(HttpServletRequest request, @PathVariable Long id, @RequestBody ProjectMemberEntity member) {
+        ProjectMemberEntity existing = projectMemberService.findById(id);
+        if (existing == null) throw new BizException(404, "Member not found");
+        if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
+            throw new BizException(403, "Leaders cannot edit admin/devops members");
         }
+        checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
+        ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
+        return ResponseEntity.ok(ApiResponseDto.success("Member updated successfully", ProjectMemberVo.fromEntity(updated)));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponseDto<Void> removeMember(HttpServletRequest request, @PathVariable Long id) {
-        try {
-            ProjectMemberEntity existing = projectMemberService.findById(id);
-            if (existing == null) return ApiResponseDto.error("Member not found");
-            if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
-                return ApiResponseDto.error("Leaders cannot remove admin/devops members");
-            }
-            checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
-            Long currentUserId = getCurrentUserId(request);
-            if (existing.getUserId().equals(currentUserId)) {
-                return ApiResponseDto.error("Cannot remove yourself");
-            }
-            boolean deleted = projectMemberService.removeMemberById(id);
-            return ApiResponseDto.success("Member removed successfully", null);
-        } catch (RuntimeException e) {
-            log.warn("Failed to remove member: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to remove member: " + id, e);
-            return ApiResponseDto.error("Failed to remove member");
+    public ResponseEntity<ApiResponseDto<Void>> removeMember(HttpServletRequest request, @PathVariable Long id) {
+        ProjectMemberEntity existing = projectMemberService.findById(id);
+        if (existing == null) throw new BizException(404, "Member not found");
+        if (isLeaderAndTargetIsPrivileged(request, existing.getProjectId(), existing.getProjectRole())) {
+            throw new BizException(403, "Leaders cannot remove admin/devops members");
         }
+        checkPermission(request, existing.getProjectId(), List.of("Administrator", "DevOps", "Leader"));
+        Long currentUserId = getCurrentUserId(request);
+        if (existing.getUserId().equals(currentUserId)) {
+            throw new BizException(400, "Cannot remove yourself");
+        }
+        projectMemberService.removeMemberById(id);
+        return ResponseEntity.ok(ApiResponseDto.success("Member removed successfully", null));
     }
 }

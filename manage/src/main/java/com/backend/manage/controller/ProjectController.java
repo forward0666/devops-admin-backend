@@ -1,12 +1,14 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
 import com.backend.manage.entity.ProjectEntity;
 import com.backend.manage.service.ProjectService;
 import com.backend.manage.vo.ProjectVo;
+import com.backend.utils.exception.BizException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,36 +16,23 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/project")
+@RequiredArgsConstructor
 public class ProjectController {
 
-    @Autowired
-    private ProjectService projectService;
+    private final ProjectService projectService;
 
     @GetMapping
-    public ApiResponseDto<List<ProjectVo>> getAllProjects() {
-        try {
-            List<ProjectEntity> projects = projectService.getAllProjects();
-            List<ProjectVo> result = projects.stream().map(ProjectVo::fromEntity).toList();
-            return ApiResponseDto.success("Projects retrieved successfully", result);
-        } catch (Exception e) {
-            log.error("Failed to retrieve projects", e);
-            return ApiResponseDto.error("Failed to retrieve projects");
-        }
+    public ResponseEntity<ApiResponseDto<List<ProjectVo>>> getAllProjects() {
+        List<ProjectEntity> projects = projectService.getAllProjects();
+        List<ProjectVo> result = projects.stream().map(ProjectVo::fromEntity).toList();
+        return ResponseEntity.ok(ApiResponseDto.success("Projects retrieved successfully", result));
     }
 
     @GetMapping("/{id}")
-    public ApiResponseDto<ProjectVo> getProjectById(@PathVariable Long id) {
-        try {
-            ProjectEntity project = projectService.getProjectById(id);
-            if (project != null) {
-                return ApiResponseDto.success("Project retrieved successfully", ProjectVo.fromEntity(project));
-            } else {
-                return ApiResponseDto.error("Project not found");
-            }
-        } catch (Exception e) {
-            log.error("Failed to retrieve project: " + id, e);
-            return ApiResponseDto.error("Failed to retrieve project");
-        }
+    public ResponseEntity<ApiResponseDto<ProjectVo>> getProjectById(@PathVariable Long id) {
+        ProjectEntity project = projectService.getProjectById(id);
+        if (project == null) throw new BizException(404, "Project not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Project retrieved successfully", ProjectVo.fromEntity(project)));
     }
 
     @PostMapping
@@ -53,20 +42,12 @@ public class ProjectController {
         resourceType = "PROJECT",
         description = "创建新项目"
     )
-    public ApiResponseDto<ProjectVo> createProject(@RequestBody ProjectEntity project) {
-        try {
-            if (project.getName() == null || project.getName().isEmpty()) {
-                return ApiResponseDto.error("Project name is required");
-            }
-            ProjectEntity created = projectService.createProject(project);
-            return ApiResponseDto.success("Project created successfully", ProjectVo.fromEntity(created));
-        } catch (RuntimeException e) {
-            log.warn("Failed to create project: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to create project", e);
-            return ApiResponseDto.error("Failed to create project");
+    public ResponseEntity<ApiResponseDto<ProjectVo>> createProject(@RequestBody ProjectEntity project) {
+        if (project.getName() == null || project.getName().isEmpty()) {
+            throw new BizException(400, "Project name is required");
         }
+        ProjectEntity created = projectService.createProject(project);
+        return ResponseEntity.ok(ApiResponseDto.success("Project created successfully", ProjectVo.fromEntity(created)));
     }
 
     @PutMapping("/{id}")
@@ -77,21 +58,10 @@ public class ProjectController {
         resourceIdIndex = 0,
         description = "更新项目信息"
     )
-    public ApiResponseDto<ProjectVo> updateProject(@PathVariable Long id, @RequestBody ProjectEntity project) {
-        try {
-            ProjectEntity updated = projectService.updateProject(id, project);
-            if (updated != null) {
-                return ApiResponseDto.success("Project updated successfully", ProjectVo.fromEntity(updated));
-            } else {
-                return ApiResponseDto.error("Project not found");
-            }
-        } catch (RuntimeException e) {
-            log.warn("Failed to update project: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to update project: " + id, e);
-            return ApiResponseDto.error("Failed to update project");
-        }
+    public ResponseEntity<ApiResponseDto<ProjectVo>> updateProject(@PathVariable Long id, @RequestBody ProjectEntity project) {
+        ProjectEntity updated = projectService.updateProject(id, project);
+        if (updated == null) throw new BizException(404, "Project not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Project updated successfully", ProjectVo.fromEntity(updated)));
     }
 
     @DeleteMapping("/{id}")
@@ -102,17 +72,9 @@ public class ProjectController {
         resourceIdIndex = 0,
         description = "删除项目"
     )
-    public ApiResponseDto<Void> deleteProject(@PathVariable Long id) {
-        try {
-            boolean deleted = projectService.deleteProject(id);
-            if (deleted) {
-                return ApiResponseDto.success("Project deleted successfully", null);
-            } else {
-                return ApiResponseDto.error("Project not found");
-            }
-        } catch (Exception e) {
-            log.error("Failed to delete project: " + id, e);
-            return ApiResponseDto.error("Failed to delete project");
-        }
+    public ResponseEntity<ApiResponseDto<Void>> deleteProject(@PathVariable Long id) {
+        boolean deleted = projectService.deleteProject(id);
+        if (!deleted) throw new BizException(404, "Project not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Project deleted successfully", null));
     }
 }

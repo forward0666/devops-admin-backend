@@ -70,7 +70,6 @@
                     <source>21</source>
                     <target>21</target>
                     <encoding>UTF-8</encoding>
-                    <compilerArgs>--enable-preview</compilerArgs>
                 </configuration>
             </plugin>
 

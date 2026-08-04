@@ -28,10 +28,4 @@ public class ResponseUtil {
         return ResponseEntity.ok(response);
     }
 
-    public static ResponseEntity<Map<String, Object>> error(String message, int statusCode) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("code", statusCode);
-        errorResponse.put("message", message);
-        return ResponseEntity.status(statusCode).body(errorResponse);
-    }
 }

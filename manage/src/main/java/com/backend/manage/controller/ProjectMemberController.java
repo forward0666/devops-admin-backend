@@ -1,12 +1,14 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
 import com.backend.manage.entity.ProjectMemberEntity;
 import com.backend.manage.service.ProjectMemberService;
 import com.backend.manage.vo.ProjectMemberVo;
+import com.backend.utils.exception.BizException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,21 +16,16 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/projectMember")
+@RequiredArgsConstructor
 public class ProjectMemberController {
 
-    @Autowired
-    private ProjectMemberService projectMemberService;
+    private final ProjectMemberService projectMemberService;
 
     @GetMapping
-    public ApiResponseDto<List<ProjectMemberVo>> getMembers(@RequestParam Long projectId) {
-        try {
-            List<ProjectMemberEntity> members = projectMemberService.getMembersByProjectId(projectId);
-            List<ProjectMemberVo> result = members.stream().map(ProjectMemberVo::fromEntity).toList();
-            return ApiResponseDto.success("Members retrieved successfully", result);
-        } catch (Exception e) {
-            log.error("Failed to retrieve members", e);
-            return ApiResponseDto.error("Failed to retrieve members");
-        }
+    public ResponseEntity<ApiResponseDto<List<ProjectMemberVo>>> getMembers(@RequestParam Long projectId) {
+        List<ProjectMemberEntity> members = projectMemberService.getMembersByProjectId(projectId);
+        List<ProjectMemberVo> result = members.stream().map(ProjectMemberVo::fromEntity).toList();
+        return ResponseEntity.ok(ApiResponseDto.success("Members retrieved successfully", result));
     }
 
     @PostMapping
@@ -38,17 +35,9 @@ public class ProjectMemberController {
         resourceType = "PROJECT_MEMBER",
         description = "添加项目成员"
     )
-    public ApiResponseDto<ProjectMemberVo> addMember(@RequestBody ProjectMemberEntity member) {
-        try {
-            ProjectMemberEntity created = projectMemberService.addMember(member);
-            return ApiResponseDto.success("Member added successfully", ProjectMemberVo.fromEntity(created));
-        } catch (RuntimeException e) {
-            log.warn("Failed to add member: " + e.getMessage());
-            return ApiResponseDto.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("Failed to add member", e);
-            return ApiResponseDto.error("Failed to add member");
-        }
+    public ResponseEntity<ApiResponseDto<ProjectMemberVo>> addMember(@RequestBody ProjectMemberEntity member) {
+        ProjectMemberEntity created = projectMemberService.addMember(member);
+        return ResponseEntity.ok(ApiResponseDto.success("Member added successfully", ProjectMemberVo.fromEntity(created)));
     }
 
     @PutMapping("/{id}")
@@ -59,18 +48,10 @@ public class ProjectMemberController {
         resourceIdIndex = 0,
         description = "更新项目成员信息"
     )
-    public ApiResponseDto<ProjectMemberVo> updateMember(@PathVariable Long id, @RequestBody ProjectMemberEntity member) {
-        try {
-            ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
-            if (updated != null) {
-                return ApiResponseDto.success("Member updated successfully", ProjectMemberVo.fromEntity(updated));
-            } else {
-                return ApiResponseDto.error("Member not found");
-            }
-        } catch (Exception e) {
-            log.error("Failed to update member: " + id, e);
-            return ApiResponseDto.error("Failed to update member");
-        }
+    public ResponseEntity<ApiResponseDto<ProjectMemberVo>> updateMember(@PathVariable Long id, @RequestBody ProjectMemberEntity member) {
+        ProjectMemberEntity updated = projectMemberService.updateMember(id, member);
+        if (updated == null) throw new BizException(404, "Member not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Member updated successfully", ProjectMemberVo.fromEntity(updated)));
     }
 
     @DeleteMapping("/{id}")
@@ -81,17 +62,9 @@ public class ProjectMemberController {
         resourceIdIndex = 0,
         description = "移除项目成员"
     )
-    public ApiResponseDto<Void> removeMember(@PathVariable Long id) {
-        try {
-            boolean deleted = projectMemberService.removeMemberById(id);
-            if (deleted) {
-                return ApiResponseDto.success("Member removed successfully", null);
-            } else {
-                return ApiResponseDto.error("Member not found");
-            }
-        } catch (Exception e) {
-            log.error("Failed to remove member: " + id, e);
-            return ApiResponseDto.error("Failed to remove member");
-        }
+    public ResponseEntity<ApiResponseDto<Void>> removeMember(@PathVariable Long id) {
+        boolean deleted = projectMemberService.removeMemberById(id);
+        if (!deleted) throw new BizException(404, "Member not found");
+        return ResponseEntity.ok(ApiResponseDto.success("Member removed successfully", null));
     }
 }

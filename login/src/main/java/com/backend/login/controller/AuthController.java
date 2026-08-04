@@ -1,7 +1,9 @@
 package com.backend.login.controller;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.backend.login.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
+import com.backend.utils.exception.BizException;
 import com.backend.login.dto.LoginRequestDto;
 import com.backend.login.dto.SsoLoginRequestDto;
 import com.backend.login.dto.JwtGenerateRequestDto;
@@ -12,35 +14,24 @@ import com.backend.login.service.SsoService;
 import com.backend.login.entity.UserEntity;
 import com.backend.utils.JwtUtil;
 import java.util.HashMap;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
-
-    @Autowired
-    private SecurityService securityService;
-
-    @Autowired
-    private com.backend.login.service.OperationLogService operationLogService;
-
-    @Autowired
-    private com.backend.login.service.SettingService settingService;
-
-    @Autowired
-    private SsoService ssoService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final AuthService authService;
+    private final SecurityService securityService;
+    private final com.backend.login.service.OperationLogService operationLogService;
+    private final com.backend.login.service.SettingService settingService;
+    private final SsoService ssoService;
+    private final JwtUtil jwtUtil;
 
     @PostMapping("/authLogIn")
     public ResponseEntity<ApiResponseDto<LoginVo>> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
@@ -61,9 +52,8 @@ public class AuthController {
                 request.getRemoteAddr()
             );
 
-            // IP 访问控制
             if (!settingService.isIpAllowed(clientIP)) {
-                return ResponseEntity.status(403).body(ApiResponseDto.error(403, "IP not allowed: " + clientIP));
+                return ResponseEntity.status(403).body(ApiResponseDto.error("IP not allowed: " + clientIP));
             }
 
             var loginResponse = authService.login(loginRequest, clientIP);
@@ -90,14 +80,10 @@ public class AuthController {
             } catch (Exception ignored) {}
             String msg = e.getMessage();
             int code = (msg != null && (msg.contains("locked") || msg.contains("password") || msg.contains("verification"))) ? 401 : 500;
-            return ResponseEntity.status(code).body(ApiResponseDto.error(code, "Login failed: " + msg));
+            return ResponseEntity.status(code).body(ApiResponseDto.error("Login failed: " + msg));
         }
     }
 
-    /**
-     * SSO 登录
-     * 前端传 Keycloak token，后端验证后返回 devops-admin JWT
-     */
     @PostMapping("/authSSO")
     public ResponseEntity<ApiResponseDto<LoginVo>> authSSO(@RequestBody SsoLoginRequestDto ssoRequest, HttpServletRequest request) {
         try {
@@ -111,10 +97,8 @@ public class AuthController {
                 request.getRemoteAddr()
             );
 
-            // 验证 Keycloak token 并获取/创建用户
             UserEntity user = ssoService.verifyAndGetUser(ssoRequest.token());
 
-            // 生成 devops-admin JWT
             var claims = new HashMap<String, Object>();
             claims.put("userId", user.getId());
             claims.put("role", user.getRole() != null ? user.getRole() : "");
@@ -151,20 +135,16 @@ public class AuthController {
                     null, null, false, e.getMessage(), "LOGIN");
             } catch (Exception ignored) {}
             log.error("SSO login failed: {}", e.getMessage());
-            return ResponseEntity.status(401).body(ApiResponseDto.error(401, "SSO login failed: " + e.getMessage()));
+            return ResponseEntity.status(401).body(ApiResponseDto.error("SSO login failed: " + e.getMessage()));
         }
     }
 
     @PostMapping("/authLogOut")
-    public ApiResponseDto<Void> logout(HttpServletRequest request) {
-        try {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                authService.logout(authHeader.substring(7));
-            }
-            return ApiResponseDto.success("Logout successful", null);
-        } catch (Exception e) {
-            return ApiResponseDto.error("Logout failed: " + e.getMessage());
+    public ResponseEntity<ApiResponseDto<Void>> logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            authService.logout(authHeader.substring(7));
         }
+        return ResponseEntity.ok(ApiResponseDto.success("Logout successful", null));
     }
 }

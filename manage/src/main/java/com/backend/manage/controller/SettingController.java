@@ -1,7 +1,7 @@
 package com.backend.manage.controller;
 
 import com.backend.manage.annotation.OperationLog;
-import com.backend.manage.dto.ApiResponseDto;
+import com.backend.utils.dto.ApiResponseDto;
 import com.backend.manage.service.SettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

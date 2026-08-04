@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.backend.manage.mapper.ModuleMapper">
+
+    <resultMap id="moduleResultMap" type="com.backend.manage.entity.ModuleEntity">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="code" column="code"/>
+        <result property="icon" column="icon"/>
+        <result property="routePrefix" column="route_prefix"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="description" column="description"/>
+        <result property="category" column="category"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="moduleResultMap">
+        SELECT id, name, code, icon, route_prefix, parent_id, sort_order,
+               description, category, enabled, created_at, updated_at
+        FROM `module`
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="findById" resultMap="moduleResultMap">
+        SELECT id, name, code, icon, route_prefix, parent_id, sort_order,
+               description, category, enabled, created_at, updated_at
+        FROM `module`
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByRoleId" resultMap="moduleResultMap">
+        SELECT m.id, m.name, m.code, m.icon, m.route_prefix, m.parent_id,
+               m.sort_order, m.description, m.category, m.enabled, m.created_at, m.updated_at
+        FROM `module` m
+        INNER JOIN role_module rm ON rm.module_id = m.id
+        WHERE rm.role_id = #{roleId} AND m.enabled = 1
+        ORDER BY m.sort_order ASC, m.id ASC
+    </select>
+
+    <select id="findByCategory" resultMap="moduleResultMap">
+        SELECT id, name, code, icon, route_prefix, parent_id, sort_order,
+               description, category, enabled, created_at, updated_at
+        FROM `module`
+        WHERE category = #{category} AND enabled = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="findByParentId" resultMap="moduleResultMap">
+        SELECT id, name, code, icon, route_prefix, parent_id, sort_order,
+               description, category, enabled, created_at, updated_at
+        FROM `module`
+        <if test="parentId != null">
+            WHERE parent_id = #{parentId}
+        </if>
+        <if test="parentId == null">
+            WHERE parent_id IS NULL
+        </if>
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.backend.manage.entity.ModuleEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO `module` (name, code, icon, route_prefix, parent_id, sort_order,
+                              description, category, enabled, created_at, updated_at)
+        VALUES (#{name}, #{code}, #{icon}, #{routePrefix}, #{parentId}, #{sortOrder},
+                #{description}, #{category}, #{enabled}, NOW(), NOW())
+    </insert>
+
+    <update id="update" parameterType="com.backend.manage.entity.ModuleEntity">
+        UPDATE `module`
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="code != null">code = #{code},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="routePrefix != null">route_prefix = #{routePrefix},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM `module` WHERE id = #{id}
+    </delete>
+
+    <update id="updateSortOrder">
+        UPDATE `module` SET sort_order = #{sortOrder}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

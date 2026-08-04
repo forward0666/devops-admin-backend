@@ -1,0 +1,13 @@
+-- Cache Rules
+CREATE TABLE IF NOT EXISTS cf_cache_rule (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    project_id BIGINT NOT NULL,
+    env VARCHAR(32) NOT NULL DEFAULT '',
+    name VARCHAR(255) NOT NULL,
+    url VARCHAR(1024) NOT NULL,
+    type VARCHAR(64) NOT NULL DEFAULT 'web',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_project_name_env (project_id, name, env)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
