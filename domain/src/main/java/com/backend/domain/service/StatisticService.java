@@ -293,7 +293,9 @@ public class StatisticService {
             var aggregation = Aggregation.newAggregation(pipeline);
             List<Map<String, Object>> results;
             try {
-                results = mongoTemplate.aggregate(aggregation, colName, Map.class).getMappedResults();
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> rawResults = (List<Map<String, Object>>) (List<?>) mongoTemplate.aggregate(aggregation, colName, Map.class).getMappedResults();
+                results = rawResults;
             } catch (Exception e) {
                 log.warn("[Statistic] Chart aggregation failed for {}: {}", colName, e.getMessage());
                 // Fallback to direct query + in-memory merge

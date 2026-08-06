@@ -7,8 +7,8 @@
         </encoder>
     </appender>
 
-    <!-- Allow per-module overrides -->
-    <include optional="true" file="${spring.config.location:-classpath:}/logback-spring-extra.xml"/>
+    <!-- Allow per-module overrides (override with -Dlogging.config=file:/path/logback-spring-extra.xml) -->
+    <include optional="true" resource="logback-spring-extra.xml"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
