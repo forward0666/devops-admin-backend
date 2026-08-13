@@ -39,6 +39,7 @@
         <spring-boot.version>3.2.12</spring-boot.version>
         <spring-cloud.version>2023.0.4</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.3.4</spring-cloud-alibaba.version>
+        <jackson.version>2.17.3</jackson.version>
         <kafka.version>3.7.2</kafka.version>
         <clickhouse.version>0.2.6</clickhouse.version>
 <!--        <clickhouse-new.version>0.8.2</clickhouse-new.version>-->
@@ -51,6 +52,7 @@
         <springdoc.version>2.6.0</springdoc.version>
         <r2dbc-mysql.version>1.4.1</r2dbc-mysql.version>
         <jackson-datatype-jsr310.version>2.17.3</jackson-datatype-jsr310.version>
+        <jackson.version>2.17.3</jackson.version>
         <xxl-job-core.version>3.1.0</xxl-job-core.version>
         <logstash-encoder.version>8.0</logstash-encoder.version>
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
@@ -195,6 +197,13 @@
             </dependency>
 
             <!-- Jackson (core + databind + JSR310) -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>

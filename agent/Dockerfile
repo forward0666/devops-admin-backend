@@ -1,10 +1,10 @@
 FROM amazoncorretto:21.0.9-alpine3.22
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" appuser
-ARG JAR_FILE=monitor/target/monitor-1.0.0.jar
+ARG JAR_FILE=agent/target/agent-1.0.0.jar
 COPY ${JAR_FILE} app.jar
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Dspring.config.location=classpath:/application.properties -Duser.timezone=Asia/Shanghai"
 RUN chown -R appuser:appuser /app
 USER appuser
 ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar" ]
-EXPOSE 8086
+EXPOSE 8092
