@@ -1,4 +1,78 @@
-<!-- Spring Cloud 依赖管理 -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    DevOps 管理平台 - 父级POM配置文件
+    作用：定义整个微服务项目的公共配置、依赖管理和模块结构
+    包含5个核心模块：网关、管理服务、安全服务、Cloudflare日志生产者和消费者
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- Maven 模型版本 -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 项目坐标信息 -->
+    <groupId>com.backend</groupId>                              <!-- 组织标识：com.admin -->
+    <artifactId>devop</artifactId>                              <!-- 项目标识：admin-platform -->
+    <version>1.0.0</version>                                    <!-- 版本号：1.0.0 -->
+    <packaging>pom</packaging>                                  <!-- 打包类型：pom（多模块项目） -->
+    <name>Devop Backend</name>                                  <!-- 项目名称 -->
+    <description>Parent project for Devop Backend</description> <!-- 项目描述 -->
+
+    <!-- 项目模块定义 -->
+        <modules>
+                    <module>utils-core</module>
+                    <module>utils-webflux</module>
+                    <module>gateway</module>
+                    <module>security</module>
+                    <module>login</module>
+                    <module>user</module>
+                    <module>manage</module>
+                    <module>monitor</module>
+                    <module>bot</module>
+                    <module>agent</module>
+                    <module>domain</module>
+                </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <spring-boot.version>3.2.12</spring-boot.version>
+        <spring-cloud.version>2023.0.4</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
+        <jackson.version>2.17.3</jackson.version>
+        <kafka.version>3.7.2</kafka.version>
+        <clickhouse.version>0.2.6</clickhouse.version>
+<!--        <clickhouse-new.version>0.8.2</clickhouse-new.version>-->
+        <lombok.version>1.18.46</lombok.version>
+        <mybatis-plus.version>3.5.12</mybatis-plus.version>
+        <guava.version>33.4.0-jre</guava.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <kaptcha.version>2.3.2</kaptcha.version>
+        <springdoc.version>2.6.0</springdoc.version>
+        <r2dbc-mysql.version>1.4.1</r2dbc-mysql.version>
+        <jackson-datatype-jsr310.version>2.17.3</jackson-datatype-jsr310.version>
+        <jackson.version>2.17.3</jackson.version>
+        <jackson-core.version>2.17.3</jackson-core.version>
+        <xxl-job-core.version>3.1.0</xxl-job-core.version>
+        <logstash-encoder.version>8.0</logstash-encoder.version>
+        <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <!-- 依赖管理：统一管理所有子模块的依赖版本 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot 依赖管理 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+
+            </dependency>
+            <!-- Spring Cloud 依赖管理 -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -6,7 +80,6 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
             <!-- Spring Cloud Alibaba 依赖管理 -->
             <dependency>
                 <groupId>com.alibaba.cloud</groupId>
@@ -16,7 +89,7 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Jackson BOM - 必须在所有 BOM 之后，确保版本覆盖 -->
+            <!-- Jackson BOM - 必须在 Alibaba BOM 之后确保版本覆盖 -->
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
@@ -24,3 +97,196 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- 内部模块 -->
+            <dependency>
+                <groupId>com.backend</groupId>
+                <artifactId>utils-core</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.backend</groupId>
+                <artifactId>utils-webflux</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
+            <!-- Kafka -->
+            <dependency>
+                <groupId>org.springframework.kafka</groupId>
+                <artifactId>spring-kafka</artifactId>
+                <version>${kafka.version}</version>
+            </dependency>
+
+            <!-- ClickHouse -->
+<!--            <dependency>-->
+<!--                <groupId>com.clickhouse</groupId>-->
+<!--                <artifactId>clickhouse-jdbc</artifactId>-->
+<!--                <version>${clickhouse-new.version}</version>-->
+<!--                <classifier>shaded-all</classifier>-->
+<!--            </dependency>-->
+
+            <dependency>
+                <groupId>ru.yandex.clickhouse</groupId>
+                <artifactId>clickhouse-jdbc</artifactId>
+                <version>${clickhouse.version}</version>
+            </dependency>
+
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- MyBatis Plus -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Guava -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+
+            <!-- MySQL Connector -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>8.3.0</version>
+            </dependency>
+
+            <!-- Caffeine -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- JWT -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <!-- Kaptcha -->
+            <dependency>
+                <groupId>com.github.penggle</groupId>
+                <artifactId>kaptcha</artifactId>
+                <version>${kaptcha.version}</version>
+            </dependency>
+
+            <!-- SpringDoc OpenAPI -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- R2DBC MySQL -->
+            <dependency>
+                <groupId>io.asyncer</groupId>
+                <artifactId>r2dbc-mysql</artifactId>
+                <version>${r2dbc-mysql.version}</version>
+            </dependency>
+
+            <!-- Jackson (core + databind + JSR310) -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.17.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson-datatype-jsr310.version}</version>
+            </dependency>
+
+            <!-- Test -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring-boot.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- XXL-Job -->
+            <dependency>
+                <groupId>com.xuxueli</groupId>
+                <artifactId>xxl-job-core</artifactId>
+                <version>${xxl-job-core.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+<!--     构建配置 -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Maven 编译器插件配置 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
+                        <parameters>true</parameters>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!-- Spring Boot Maven 插件 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <!-- 版本由Spring Boot依赖管理自动控制 -->
+                     <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
