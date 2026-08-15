@@ -85,6 +85,14 @@ public class JwtController {
     }
 
     /**
+     * 获取公钥（给 Gateway 验证 JWT 用）
+     */
+    @GetMapping("/public-key")
+    public ResponseEntity<Map<String, String>> getPublicKey() {
+        return ResponseEntity.ok(Map.of("publicKey", jwtService.getPublicKeyPem()));
+    }
+
+    /**
      * 生成数字图形验证码
      */
     @PostMapping("/verificationCode")

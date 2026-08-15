@@ -1,53 +1,77 @@
 package com.backend.gateway.filter;
 
 import com.backend.gateway.config.BaseAuthConfig;
-import filter.TraceIdFilter;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import network.HttpResponseUtils;
 import network.TraceIdUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
-import reactor.core.scheduler.Scheduler;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import security.AuthValidationUtils;
-import webflux.WebExchangeUtils;
+import reactor.core.scheduler.Scheduler;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.PublicKey;
+import java.security.KeyFactory;
+import java.security.spec.X509EncodedKeySpec;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.concurrent.Callable;
 
-
-/**
- * 授权过滤器工厂
- * 负责读取配置、创建 GatewayFilter 实例，并执行异步授权校验。
- */
 @Slf4j
 public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterFactory<T> {
 
-    // 🌟 核心修改 1: 将 ExecutorService 替换为 Scheduler
     private final Scheduler scheduler;
     private final CacheManager cacheManager;
 
-    // 🌟 核心修改 2: 构造器接受 Scheduler
+    // JWT 公钥（从 Security 服务获取）
+    private static PublicKey jwtPublicKey;
+
+    // 签名密钥（用于 API 签名验证）
+    @Value("${secure.api.signing.secret:default-signing-secret}")
+    private String apiSigningSecret;
+
     public AuthFilter(Class<T> configClass, Scheduler scheduler, CacheManager cacheManager) {
         super(configClass);
-        // 不再需要 TraceIdUtils.mdcExecutor，因为我们将使用 Reactor Context 传播
         this.scheduler = scheduler;
         this.cacheManager = cacheManager;
     }
 
-    protected abstract String getSecret();
-
-    /** 检查是否为允许的请求方法（空=允许所有方法） */
-    protected boolean isAllowedMethod(String method) {
-        return true;
+    @PostConstruct
+    public void initJwtKey() {
+        // 从 Nacos 或环境变量读取公钥
+        String pubKeyPem = getJwtPublicKeyPem();
+        if (pubKeyPem != null && !pubKeyPem.isBlank()) {
+            try {
+                byte[] keyBytes = Base64.getDecoder().decode(
+                    pubKeyPem.replace("-----BEGIN PUBLIC KEY-----", "")
+                            .replace("-----END PUBLIC KEY-----", "")
+                            .replaceAll("\\s", "")
+                );
+                jwtPublicKey = KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(keyBytes));
+            } catch (Exception e) {
+                log.error("Failed to load JWT public key", e);
+            }
+        }
     }
 
-    /** 白名单路径，子类可覆盖 */
-    protected boolean isWhitelistedPath(String path) {
-        return false;
+    /** 子类可覆盖，从 Nacos 或 direct call 获取公钥 */
+    protected String getJwtPublicKeyPem() {
+        return null;
     }
 
+    protected abstract boolean isWhitelistedPath(String path);
+
+    @Override
     public GatewayFilter apply(T config) {
         if (!config.isEnabled()) {
             return (exchange, chain) -> chain.filter(exchange);
@@ -55,110 +79,108 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
         return createAuthGatewayFilter(config);
     }
 
-    /**
-     * 核心实现：构建并返回实际的 GatewayFilter 实例
-     */
     private GatewayFilter createAuthGatewayFilter(T config) {
-
         return (exchange, chain) -> Mono.deferContextual(contextView -> {
+            String traceId = contextView.getOrEmpty("traceId")
+                    .map(Object::toString).orElse("NO_TRACE_ID");
 
-            // 1. 从 Reactor Context 中获取 Trace ID (由 TraceIdWebFilter 注入)
-            final String traceId = contextView
-                    .getOrEmpty("traceId")
-                    .map(Object::toString)
-                    .orElse("NO_TRACE_ID");
-
-            // 🌟 [可选优化] 在主线程设置 MDC，确保后续日志能打印 Trace ID
             if (!"NO_TRACE_ID".equals(traceId)) {
                 TraceIdUtils.setTraceId(traceId);
             }
-            // ❗ 注意：这里不需要清 MDC，因为这是 I/O 线程，留给 doFinally/框架清理
 
-            final String method = WebExchangeUtils.getMethod(exchange);
-            final String path = WebExchangeUtils.getPath(exchange);
-            final String routeId = WebExchangeUtils.getRouteId(exchange);
-            final String ip = WebExchangeUtils.getClientIp(exchange);
+            String path = exchange.getRequest().getURI().getPath();
 
             if (isWhitelistedPath(path)) {
-                String encryptedData = exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data");
-                log.info("[traceId={}] ✅ Whitelisted path (BotAuth skip) | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
-                        traceId, ip, routeId, method, path, encryptedData);
+                log.info("[traceId={}] ✅ Whitelisted path | Path={}", traceId, path);
                 return chain.filter(exchange);
             }
 
-            // 2. 阻塞验证 Callable：用于 Mono.fromCallable()，包含所有阻塞逻辑和 MDC 切换
             Callable<Boolean> validationCallable = () -> {
-                TraceIdUtils.setTraceId(traceId); // 异步线程开始时设置 MDC
+                TraceIdUtils.setTraceId(traceId);
                 try {
-                    String cacheKey = "auth:" + ip + ":" + method + ":" + path;
-                    Cache cache = cacheManager.getCache("authCache");
-                    Boolean cached = cache != null ? cache.get(cacheKey, Boolean.class) : null;
+                    // Step 1: JWT 验证（优先）
+                    String authHeader = exchange.getRequest().getHeaders()
+                            .getFirst(HttpHeaders.AUTHORIZATION);
 
-                    if (cached != null) {
-                        if (!cached) {
-                            log.warn("[traceId={}] 🔹 Cache hit BLOCKED | IP={} | Route={} | Method={} | Path={}",
-                                    traceId, ip, routeId, method, path);
-                        } else {
-                            log.info("[traceId={}] 🔹 Cache hit ALLOWED | key={}", traceId, cacheKey);
+                    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                        String token = authHeader.substring(7);
+                        if (jwtPublicKey != null) {
+                            try {
+                                Claims claims = Jwts.parser()
+                                        .verifyWith(jwtPublicKey)
+                                        .build()
+                                        .parseSignedClaims(token)
+                                        .getPayload();
+
+                                log.info("[traceId={}] ✅ JWT valid | subject={} | exp={}",
+                                        traceId, claims.getSubject(), claims.getExpiration());
+                                return true;
+                            } catch (Exception e) {
+                                log.warn("[traceId={}] ❌ JWT invalid: {}", traceId, e.getMessage());
+                            }
                         }
-                        return cached;
                     }
 
-                    // 1. 先检查方法是否允许
-                    if (!isAllowedMethod(method)) {
-                        log.warn("[traceId={}] ❌ Method NOT allowed | IP={} | Route={} | Method={} | Path={}",
-                                traceId, ip, routeId, method, path);
-                        if (cache != null) cache.put(cacheKey, false);
+                    // Step 2: API 签名验证（用于服务间调用/Webhook）
+                    String signature = exchange.getRequest().getHeaders().getFirst("X-Signature");
+                    String timestamp = exchange.getRequest().getHeaders().getFirst("X-Timestamp");
+                    String nonce = exchange.getRequest().getHeaders().getFirst("X-Nonce");
+
+                    if (signature != null && timestamp != null && nonce != null) {
+                        // 检查时间戳（5 分钟内有效）
+                        long ts = Long.parseLong(timestamp);
+                        if (Math.abs(Instant.now().getEpochSecond() - ts) > 300) {
+                            log.warn("[traceId={}] ❌ Signature expired | ts={}", traceId, timestamp);
+                            return false;
+                        }
+
+                        String method = exchange.getRequest().getMethod().name();
+                        String payload = method + "\n" + path + "\n" + timestamp + "\n" + nonce;
+                        String expectedSign = hmacSha256(apiSigningSecret, payload);
+
+                        if (expectedSign.equals(signature)) {
+                            log.info("[traceId={}] ✅ Signature valid", traceId);
+                            return true;
+                        }
+
+                        log.warn("[traceId={}] ❌ Signature mismatch", traceId);
                         return false;
                     }
 
-                    // 2. 再检查 header auth
-                    String encryptedData = exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data");
-                    boolean authorized = AuthValidationUtils.isAuthorized(exchange, getSecret());
-
-                    if (!authorized) {
-                        log.warn("[traceId={}] ❌ Auth FAILED | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
-                                traceId, ip, routeId, method, path, encryptedData);
-                        if (cache != null) cache.put(cacheKey, false);
-                        return false;
-                    }
-
-                    log.info("[traceId={}] ✅ Authorized request | IP={} | Route={} | Method={} | Path={}",
-                            traceId, ip, routeId, method, path);
-                    if (cache != null) cache.put(cacheKey, true);
-                    return true;
+                    log.warn("[traceId={}] ❌ No auth provided | Path={}", traceId, path);
+                    return false;
                 } finally {
-                    TraceIdUtils.clearMdc(); // 异步线程结束时清除 MDC
+                    TraceIdUtils.clearMdc();
                 }
             };
 
-            // 3. 🌟 核心修改 3: 使用 Mono.fromCallable 和 subscribeOn
             Mono<Boolean> validationMono = Mono.fromCallable(validationCallable)
-                    .subscribeOn(scheduler); // 切换到阻塞专用的 Scheduler
+                    .subscribeOn(scheduler);
 
             return validationMono
                     .flatMap(authorized -> {
                         if (!authorized) {
-                            // 失败路径：不需要额外的 MDC.set/clear，因为 HttpResponseUtils 及其后的日志应依赖 Logback 配置
-                            log.warn("[traceId={}] ❌ Request blocked | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
-                                    traceId, ip, routeId, method, path, exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data"));
-                            // 返回一个带响应的 Mono
                             return HttpResponseUtils.write(exchange.getResponse(),
-                                    HttpResponseUtils.unauthorized("Unauthorized or service unavailable"));
+                                    HttpResponseUtils.unauthorized("Unauthorized"));
                         }
-                        // 验证成功，继续执行过滤器链
                         return chain.filter(exchange);
                     })
                     .onErrorResume(ex -> {
-                        // 错误处理路径
-                        log.error("[traceId={}] ❌ Downstream unavailable | IP={} | Route={} | Method={} | Path={} | Exception={}",
-                                traceId, ip, routeId, method, path, ex.toString());
-                        // 返回一个带响应的 Mono
+                        log.error("[traceId={}] ❌ Auth error: {}", traceId, ex.getMessage());
                         return HttpResponseUtils.write(exchange.getResponse(),
-                                HttpResponseUtils.internalError("Downstream service unavailable"));
+                                HttpResponseUtils.internalError("Auth service unavailable"));
                     })
-                    // 🌟 核心修改 4: 确保 Trace ID 在整个链执行完毕后被清理
                     .doFinally(signal -> TraceIdUtils.clearMdc());
         });
+    }
+
+    private String hmacSha256(String secret, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+            return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes()));
+        } catch (Exception e) {
+            throw new RuntimeException("HMAC error", e);
+        }
     }
 }
