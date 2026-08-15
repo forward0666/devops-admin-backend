@@ -9,46 +9,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.cache.CacheManager;
 import reactor.core.scheduler.Scheduler;
 
-/**
- * 全局认证过滤器
- */
 @Slf4j
 @RefreshScope
-@Component("GlobalAuth")
+@Component("global")
 public class GlobalAuth extends AuthFilter<BaseAuthConfig> {
-
-    @Value("${secure.header.global.secret:default-secret}")
-    private String secret;
 
     @Value("${secure.global.whitelist-paths:}")
     private String whitelistPaths;
 
-    @Value("${secure.global.authorized-methods:}")
-    private String authorizedMethods;
-
-    /**
-     * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
-     */
     public GlobalAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
-        super(BaseAuthConfig.class, scheduler, cacheManager); // 传递 scheduler
-    }
-
-    @Override
-    protected String getSecret() {
-        return secret;
-    }
-
-    @Override
-    protected boolean isAllowedMethod(String method) {
-        if (authorizedMethods == null || authorizedMethods.isBlank()) {
-            return true;
-        }
-        for (String m : authorizedMethods.split(",")) {
-            if (m.trim().equalsIgnoreCase(method)) {
-                return true;
-            }
-        }
-        return false;
+        super(BaseAuthConfig.class, scheduler, cacheManager);
     }
 
     @Override

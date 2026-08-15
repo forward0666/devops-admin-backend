@@ -4,45 +4,21 @@ import com.backend.gateway.filter.AuthFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.CacheManager;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
+import org.springframework.cache.CacheManager;
 import reactor.core.scheduler.Scheduler;
 
 @Slf4j
 @RefreshScope
-@Component("DomainAuth")
+@Component("domain")
 public class DomainAuth extends AuthFilter<BaseAuthConfig> {
 
-    @Value("${secure.header.domain.secret:default-secret}")
-    private String secret;
-
-    @Value("${secure.domain.whitelist-paths:/health}")
+    @Value("${secure.domain.whitelist-paths:}")
     private String whitelistPaths;
-
-    @Value("${secure.domain.authorized-methods:}")
-    private String authorizedMethods;
 
     public DomainAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
         super(BaseAuthConfig.class, scheduler, cacheManager);
-    }
-
-    @Override
-    protected String getSecret() {
-        return secret;
-    }
-
-    @Override
-    protected boolean isAllowedMethod(String method) {
-        if (authorizedMethods == null || authorizedMethods.isBlank()) {
-            return true;
-        }
-        for (String m : authorizedMethods.split(",")) {
-            if (m.trim().equalsIgnoreCase(method)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

@@ -4,51 +4,21 @@ import com.backend.gateway.filter.AuthFilter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import reactor.core.scheduler.Scheduler;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 import org.springframework.cache.CacheManager;
+import reactor.core.scheduler.Scheduler;
 
-/**
- * 全局认证过滤器
- */
 @Slf4j
 @RefreshScope
-@Component("BotAuth")
+@Component("bot")
 public class BotAuth extends AuthFilter<BaseAuthConfig> {
-
-    @Value("${secure.header.bot.secret:default-secret}")
-    private String secret;
 
     @Value("${secure.bot.whitelist-paths:}")
     private String whitelistPaths;
 
-    @Value("${secure.bot.authorized-methods:}")
-    private String authorizedMethods;
-
-    /**
-     * 🌟 关键修改：使用 @Qualifier 注入 Scheduler
-     */
     public BotAuth(@Qualifier("blockingTaskScheduler") Scheduler scheduler, CacheManager cacheManager) {
-        super(BaseAuthConfig.class, scheduler, cacheManager); // 传递 scheduler
-    }
-
-    @Override
-    protected String getSecret() {
-        return secret;
-    }
-
-    @Override
-    protected boolean isAllowedMethod(String method) {
-        if (authorizedMethods == null || authorizedMethods.isBlank()) {
-            return true;
-        }
-        for (String m : authorizedMethods.split(",")) {
-            if (m.trim().equalsIgnoreCase(method)) {
-                return true;
-            }
-        }
-        return false;
+        super(BaseAuthConfig.class, scheduler, cacheManager);
     }
 
     @Override
