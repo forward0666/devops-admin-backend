@@ -1,0 +1,36 @@
+# .hermesconfig — Hermes Agent 配置
+
+> 此文件定义 Hermes Agent 在当前工作目录下的行为和工作方式。
+> 放在 /root/workspace/devops-admin-backend/ 根目录。
+
+## 项目概述
+
+devops-admin 后端微服务（Java/Spring Boot 3.2），部署在 K3s v1.31.14 集群上。
+共 10 个后端模块 + 1 个前端，镜像通过 Harbor 管理。
+
+## 关键文件
+
+- `INVENTORY.md` — 基础设施信息（节点、端口、密码、GitHub Token）
+- `MEMORY.md` — 项目记忆（跨会话持久）
+- `TASKS.md` — 任务进度
+- `scripts/` — 运维脚本
+
+## 工作原则
+
+1. 先读 INVENTORY.md 和 MEMORY.md，不要重复问基础设施信息
+2. 改代码后必须同步 master + 构建镜像 + 重启验证
+3. 配置统一走 Nacos（本地只保留 Nacos 连接参数）
+4. 所有凭据见 INVENTORY.md
+
+## 集群操作
+
+```bash
+# 一键构建
+bash scripts/build/build-all.sh
+
+# 部署
+k3s kubectl -n devops-admin rollout restart deploy/<name>
+
+# 日志
+k3s kubectl -n devops-admin logs deploy/<name> --tail=50
+```
