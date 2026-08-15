@@ -19,26 +19,25 @@
     <description>Parent project for Devop Backend</description> <!-- 项目描述 -->
 
     <!-- 项目模块定义 -->
-    <modules>
-        <module>utils-core</module>                             <!-- 工具模块 -->
-        <module>utils-webflux</module>                          <!-- 工具模块，针对webflux -->
-        <module>gateway</module>                                <!-- 网关模块：负责请求路由和过滤 -->
-        <module>bot</module>                                    <!-- Bot 管理模块-->
-        <module>security</module>                               <!-- 安全模块：负责用户认证和授权 -->
-        <module>manage</module>                                 <!-- 管理服务模块 -->
-        <module>user</module>                                   <!-- 用户服务模块 -->
-        <module>login</module>                                  <!-- 登录服务模块 -->
-        <module>cloudflare</module>                             <!-- Cloudflare 服务模块 -->
-        <module>domain</module>                                 <!-- Domain 服务模块 -->
-        <module>agent</module>                                  <!-- Agent 服务模块 -->
-        <module>monitor</module>                                <!-- Monitor 服务模块 -->
-    </modules>
+        <modules>
+                    <module>utils-core</module>
+                    <module>utils-webflux</module>
+                    <module>gateway</module>
+                    <module>security</module>
+                    <module>login</module>
+                    <module>user</module>
+                    <module>manage</module>
+                    <module>monitor</module>
+                    <module>bot</module>
+                    <module>agent</module>
+                    <module>domain</module>
+                </modules>
 
     <properties>
         <java.version>21</java.version>
         <spring-boot.version>3.2.12</spring-boot.version>
         <spring-cloud.version>2023.0.4</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.3.4</spring-cloud-alibaba.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
         <jackson.version>2.17.3</jackson.version>
         <kafka.version>3.7.2</kafka.version>
         <clickhouse.version>0.2.6</clickhouse.version>
@@ -53,6 +52,7 @@
         <r2dbc-mysql.version>1.4.1</r2dbc-mysql.version>
         <jackson-datatype-jsr310.version>2.17.3</jackson-datatype-jsr310.version>
         <jackson.version>2.17.3</jackson.version>
+        <jackson-core.version>2.17.3</jackson-core.version>
         <xxl-job-core.version>3.1.0</xxl-job-core.version>
         <logstash-encoder.version>8.0</logstash-encoder.version>
         <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
@@ -208,6 +208,11 @@
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
                 <version>2.17.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson-core.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.datatype</groupId>

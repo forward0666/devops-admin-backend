@@ -64,7 +64,7 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
 
             // 1. 从 Reactor Context 中获取 Trace ID (由 TraceIdWebFilter 注入)
             final String traceId = contextView
-                    .getOrEmpty(TraceIdFilter.CONTEXT_KEY_TRACE_ID)
+                    .getOrEmpty("traceId")
                     .map(Object::toString)
                     .orElse("NO_TRACE_ID");
 
@@ -143,7 +143,7 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                             log.warn("[traceId={}] ❌ Request blocked | IP={} | Route={} | Method={} | Path={} | X-Encrypted-Data={}",
                                     traceId, ip, routeId, method, path, exchange.getRequest().getHeaders().getFirst("X-Encrypted-Data"));
                             // 返回一个带响应的 Mono
-                            return HttpResponseUtils.write(exchange,
+                            return HttpResponseUtils.write(exchange.getResponse(),
                                     HttpResponseUtils.unauthorized("Unauthorized or service unavailable"));
                         }
                         // 验证成功，继续执行过滤器链
@@ -154,7 +154,7 @@ public abstract class AuthFilter<T extends BaseAuthConfig> extends AbstractGatew
                         log.error("[traceId={}] ❌ Downstream unavailable | IP={} | Route={} | Method={} | Path={} | Exception={}",
                                 traceId, ip, routeId, method, path, ex.toString());
                         // 返回一个带响应的 Mono
-                        return HttpResponseUtils.write(exchange,
+                        return HttpResponseUtils.write(exchange.getResponse(),
                                 HttpResponseUtils.internalError("Downstream service unavailable"));
                     })
                     // 🌟 核心修改 4: 确保 Trace ID 在整个链执行完毕后被清理

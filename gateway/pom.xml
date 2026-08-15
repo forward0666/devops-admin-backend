@@ -23,19 +23,34 @@
         </dependency>
         <dependency>
             <groupId>com.backend</groupId>
+            <artifactId>utils-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.backend</groupId>
             <artifactId>utils-webflux</artifactId>
         </dependency>
 
-        <!-- Sentinel: circuit breaker + rate limiter for gateway -->
+        <!-- 排除 Jackson 冲突（nacos-client 引用了旧版） -->
         <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-alibaba-sentinel-gateway</artifactId>
+            <groupId>com.alibaba.nacos</groupId>
+            <artifactId>nacos-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-        <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
-        </dependency>
-    </dependencies>
+
+        </dependencies>
 
     <build>
         <plugins>
