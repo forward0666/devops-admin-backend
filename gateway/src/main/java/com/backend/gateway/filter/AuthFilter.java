@@ -1,6 +1,5 @@
 package com.backend.gateway.filter;
 
-import com.backend.gateway.config.BaseAuthConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.SignatureException;
@@ -62,7 +61,6 @@ public class AuthFilter {
     private static final long REDIS_CACHE_SECONDS = 300;
 
     public AuthFilter(StringRedisTemplate redisTemplate) {
-        super(BaseAuthConfig.class);
         this.redisTemplate = redisTemplate;
     }
 
