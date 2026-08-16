@@ -131,6 +131,8 @@ public class AuthFilter {
                 return unauthorized(exchange, "Missing required header: " + cfHeaderName);
             }
 
+            final String finalCfValue = cfValue;
+
             // 3. JWT 验证（本地公钥验证）
             String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -176,7 +178,7 @@ public class AuthFilter {
                         .header("X-User-Role", role)
                         .header("X-Trace-Id", claims.getId())
                         .header("X-Real-IP", requestIp)
-                        .header(cfHeaderName, cfValue)
+                        .header(cfHeaderName, finalCfValue)
                     )
                     .build();
 
