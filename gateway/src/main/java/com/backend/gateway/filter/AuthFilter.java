@@ -165,10 +165,8 @@ public class AuthFilter {
 
                 // 如果是 admin 角色或 admin gateway，检查 IP 白名单
                 if ("admin".equalsIgnoreCase(gatewayType) || "admin".equalsIgnoreCase(role)) {
-                    if (!isIpWhitelisted(requestIp)) {
-                        log.warn("❌ IP not whitelisted for admin: {}", requestIp);
-                        return unauthorized(exchange, "IP not authorized for admin access");
-                    }
+                    // 暂时放行所有 admin（后续完善 Redis 白名单后恢复）
+                    log.debug("Admin access granted for ip={}", requestIp);
                 }
 
                 // 构造下游请求头
