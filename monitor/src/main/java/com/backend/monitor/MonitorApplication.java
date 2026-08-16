@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(
         scanBasePackages = {
                 "com.backend.utils",
+                "config",
+                "shutdown",
                 "com.backend.monitor"
         })
 @EnableDiscoveryClient

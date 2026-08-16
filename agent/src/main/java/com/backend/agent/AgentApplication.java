@@ -7,6 +7,8 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 @SpringBootApplication(
         scanBasePackages = {
                 "com.backend.utils",
+                "config",
+                "shutdown",
                 "com.backend.agent"
         })
 @EnableDiscoveryClient
