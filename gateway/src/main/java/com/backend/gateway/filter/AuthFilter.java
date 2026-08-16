@@ -24,14 +24,7 @@ import java.util.List;
 @Slf4j
 public class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterFactory<T> {
 
-    @Value("${auth.public-key.url:http://security:8080/security/public-key}")
-    private String publicKeyUrl;
-
-    private volatile PublicKey publicKey;
-    private volatile long lastKeyRefresh = 0;
-    private static final long KEY_REFRESH_INTERVAL_MS = 3600_000; // 1 小时
-
-    private static final List<String> WHITELIST = List.of(
+    private static final List<String> DEFAULT_WHITELIST = List.of(
         "/security/public-key",
         "/security/generate",
         "/security/verificationCode",
@@ -42,6 +35,17 @@ public class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterF
         "/actuator/health/readiness"
     );
 
+    @Value("${auth.public-key.url:http://security:8080/security/public-key}")
+    private String publicKeyUrl;
+
+    @Value("${auth.whitelist.paths:}")
+    private String whitelistConfig;
+
+    private volatile List<String> whitelist;
+    private volatile PublicKey publicKey;
+    private volatile long lastKeyRefresh = 0;
+    private static final long KEY_REFRESH_INTERVAL_MS = 3600_000;
+
     public AuthFilter(Class<T> configClass) {
         super(configClass);
     }
@@ -49,6 +53,17 @@ public class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterF
     @PostConstruct
     public void init() {
         refreshPublicKey();
+        initWhitelist();
+    }
+
+    private void initWhitelist() {
+        if (whitelistConfig != null && !whitelistConfig.isBlank()) {
+            whitelist = List.of(whitelistConfig.split(","));
+            log.info("✅ Whitelist loaded from config: {}", whitelist);
+        } else {
+            whitelist = DEFAULT_WHITELIST;
+            log.info("✅ Whitelist using defaults: {}", whitelist);
+        }
     }
 
     private void refreshPublicKey() {
@@ -153,8 +168,8 @@ public class AuthFilter<T extends BaseAuthConfig> extends AbstractGatewayFilterF
     }
 
     private boolean isWhitelisted(String path) {
-        for (String wl : WHITELIST) {
-            if (path.startsWith(wl)) {
+        for (String wl : whitelist) {
+            if (path.startsWith(wl.trim())) {
                 return true;
             }
         }
