@@ -37,6 +37,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Redis (for IP whitelist cache) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- 排除 Jackson 冲突（nacos-client 引用了旧版） -->
         <dependency>
             <groupId>com.alibaba.nacos</groupId>
