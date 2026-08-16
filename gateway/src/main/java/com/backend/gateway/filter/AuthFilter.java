@@ -113,6 +113,19 @@ public class AuthFilter {
 
             // 2. CF Header 验证（所有请求都必须携带）
             String cfValue = exchange.getRequest().getHeaders().getFirst(cfHeaderName);
+            // 如果 header 获取失败，尝试从属性获取（某些 Gateway 版本会转换 header）
+            if (cfValue == null || cfValue.isBlank()) {
+                cfValue = exchange.getRequest().getHeaders().getFirst("X-Real-IP");
+            }
+            if (cfValue == null || cfValue.isBlank()) {
+                cfValue = exchange.getAttribute(cfHeaderName);
+            }
+            // 如果带有请求来源记录，也可以从 remote address 提取
+            if (cfValue == null || cfValue.isBlank()) {
+                try {
+                    cfValue = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+                } catch (Exception ignored) {}
+            }
             if (cfValue == null || cfValue.isBlank()) {
                 log.warn("❌ Missing required header: {}", cfHeaderName);
                 return unauthorized(exchange, "Missing required header: " + cfHeaderName);
