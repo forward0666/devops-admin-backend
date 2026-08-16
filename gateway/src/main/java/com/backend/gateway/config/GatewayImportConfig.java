@@ -6,5 +6,5 @@ import org.springframework.context.annotation.Import;
 
 @Configuration
 @Import(ThreadPoolConfig.class)
-public class GatewayConfig {
+public class GatewayImportConfig {
 }
