@@ -169,11 +169,18 @@ public class AuthFilter {
                     log.debug("Admin access granted for ip={}", requestIp);
                 }
 
+                // 从 claims 获取用户 ID（优先 userId claim）
+                String userId = claims.get("userId", String.class);
+                if (userId == null || userId.isBlank()) {
+                    userId = claims.getSubject();
+                }
+
                 // 构造下游请求头
                 ServerWebExchange mutatedExchange = exchange.mutate()
                     .request(r -> r
-                        .header("X-User-Id", claims.getSubject())
+                        .header("X-User-Id", userId)
                         .header("X-User-Role", role)
+                        .header("X-Username", claims.getSubject())
                         .header("X-Trace-Id", claims.getId())
                         .header("X-Real-IP", requestIp)
                         .header(cfHeaderName, finalCfValue)

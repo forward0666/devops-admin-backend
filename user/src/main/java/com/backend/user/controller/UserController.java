@@ -27,10 +27,29 @@ public class UserController {
     private final JwtUtil jwtUtil;
 
     private Long getCurrentUserId(HttpServletRequest request) {
+        // 信任 Gateway 上游认证
+        String userIdStr = request.getHeader("X-User-Id");
+        if (userIdStr != null && !userIdStr.isBlank()) {
+            try {
+                return Long.parseLong(userIdStr);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid X-User-Id: {}", userIdStr);
+            }
+        }
+        // Fallback: 从 Attribute 获取（Filter 设置）
+        Object attr = request.getAttribute("userId");
+        if (attr != null) {
+            try {
+                return Long.parseLong(attr.toString());
+            } catch (NumberFormatException e) {
+                log.warn("Invalid userId attribute: {}", attr);
+            }
+        }
+        // 最后手段：解析 Token
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            return jwtUtil.getUserIdFromToken(token);
+            // 如有需要可以从 Security Feign 调 validate
         }
         return null;
     }
