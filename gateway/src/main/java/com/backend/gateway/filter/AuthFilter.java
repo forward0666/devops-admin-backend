@@ -38,7 +38,7 @@ public class AuthFilter {
     @Value("${auth.public-key.url:http://security:8080/security/public-key}")
     private String publicKeyUrl;
 
-    @Value("${auth.whitelist.paths:/security/public-key,/security/generate,/security/verificationCode,/login/authLogIn,/login/authLogOut,/actuator/health}")
+    @Value("${auth.whitelist.paths:/security/public-key,/security/generate,/security/verificationCode,/login/authLogIn,/login/authLogOut,/auth/verificationCode,/actuator/health}")
     private String whitelistPaths;
 
     @Value("${auth.cf.header:X-Forwarded-For}")

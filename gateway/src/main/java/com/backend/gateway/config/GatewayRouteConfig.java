@@ -62,6 +62,12 @@ public class GatewayRouteConfig {
                     .filter(authFilter.createAuthFilter())
                     .stripPrefix(1))
                 .uri("http://" + loginHost + ":" + PORT))
+            .route("auth", r -> r
+                .path("/auth/**")
+                .filters(f -> f
+                    .filter(authFilter.createAuthFilter())
+                    .stripPrefix(1))
+                .uri("http://" + securityHost + ":" + PORT))
             .route("user", r -> r
                 .path("/user/**")
                 .filters(f -> f
