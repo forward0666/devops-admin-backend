@@ -1,5 +1,6 @@
 FROM amazoncorretto:21.0.9-alpine3.22
 WORKDIR /app
+RUN apk add --no-cache fontconfig ttf-dejavu 2>&1 | tail -1
 RUN adduser --disabled-password --gecos "" appuser
 ENV TZ=Asia/Shanghai
 ARG JAR_FILE=security/target/security-1.0.0.jar
