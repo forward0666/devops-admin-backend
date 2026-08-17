@@ -174,11 +174,12 @@ public class AuthFilter {
                 if (userId == null || userId.isBlank()) {
                     userId = claims.getSubject();
                 }
+                final String finalUserId = userId;
 
                 // 构造下游请求头
                 ServerWebExchange mutatedExchange = exchange.mutate()
                     .request(r -> r
-                        .header("X-User-Id", userId)
+                        .header("X-User-Id", finalUserId)
                         .header("X-User-Role", role)
                         .header("X-Username", claims.getSubject())
                         .header("X-Trace-Id", claims.getId())
