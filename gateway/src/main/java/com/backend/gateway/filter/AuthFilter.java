@@ -170,10 +170,8 @@ public class AuthFilter {
                 }
 
                 // 从 claims 获取用户 ID（优先 userId claim）
-                String userId = claims.get("userId", String.class);
-                if (userId == null || userId.isBlank()) {
-                    userId = claims.getSubject();
-                }
+                Object userIdObj = claims.get("userId");
+                String userId = userIdObj == null ? claims.getSubject() : userIdObj.toString();
                 final String finalUserId = userId;
 
                 // 构造下游请求头
