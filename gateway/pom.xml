@@ -30,6 +30,12 @@
             <artifactId>utils-webflux</artifactId>
         </dependency>
 
+        <!-- Nacos Config (for dynamic route config) -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
         <!-- Servlet API (needed by jakarta.servlet.Filter) -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
