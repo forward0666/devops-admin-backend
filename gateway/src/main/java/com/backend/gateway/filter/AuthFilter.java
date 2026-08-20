@@ -38,6 +38,9 @@ public class AuthFilter {
     @Value("${auth.public-key.url:http://security:8080/security/public-key}")
     private String publicKeyUrl;
 
+    @Value("${auth.public-key.fallback:http://192.168.86.14:32102/security/public-key}")
+    private String publicKeyFallbackUrl;
+
     @Value("${auth.whitelist.paths:/security/public-key,/security/generate,/security/verificationCode,/login/authLogIn,/login/authLogOut,/auth/verificationCode,/actuator/health}")
     private String whitelistPaths;
 
@@ -73,29 +76,40 @@ public class AuthFilter {
 
     private void refreshPublicKey() {
         try {
-            java.net.URL url = new java.net.URL(publicKeyUrl);
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            String response = new String(conn.getInputStream().readAllBytes());
-            String keyStr = response;
-            if (response.contains("\"publicKey\"")) {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                keyStr = mapper.readTree(response).get("publicKey").asText();
-            }
-            String pem = keyStr
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s", "");
-            byte[] keyBytes = Base64.getDecoder().decode(pem);
-            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            this.publicKey = kf.generatePublic(spec);
-            this.lastKeyRefresh = System.currentTimeMillis();
-            log.info("✅ JWT public key loaded ({} bytes)", keyBytes.length);
+            loadPublicKeyFromUrl(publicKeyUrl);
+            if (publicKey != null) return;
         } catch (Exception e) {
-            log.warn("⚠️ Failed to load JWT public key: {}", e.getMessage());
+            log.warn("Failed to load public key from primary URL: {}", e.getMessage());
         }
+        // fallback: 通过 NodePort 尝试
+        try {
+            loadPublicKeyFromUrl(publicKeyFallbackUrl);
+        } catch (Exception e) {
+            log.warn("Failed to load public key from fallback URL: {}", e.getMessage());
+        }
+    }
+
+    private void loadPublicKeyFromUrl(String urlStr) throws Exception {
+        java.net.URL url = new java.net.URL(urlStr);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+        String response = new String(conn.getInputStream().readAllBytes());
+        String keyStr = response;
+        if (response.contains("\"publicKey\"")) {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            keyStr = mapper.readTree(response).get("publicKey").asText();
+        }
+        String pem = keyStr
+            .replace("-----BEGIN PUBLIC KEY-----", "")
+            .replace("-----END PUBLIC KEY-----", "")
+            .replaceAll("\\s", "");
+        byte[] keyBytes = Base64.getDecoder().decode(pem);
+        X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        this.publicKey = kf.generatePublic(spec);
+        this.lastKeyRefresh = System.currentTimeMillis();
+        log.info("✅ JWT public key loaded ({} bytes)", keyBytes.length);
     }
 
     // ==================== 核心过滤逻辑 ====================
