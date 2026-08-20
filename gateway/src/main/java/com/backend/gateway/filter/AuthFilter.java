@@ -162,15 +162,21 @@ public class AuthFilter {
                         if (publicKey == null) {
                             // 放行（降级模式），由下游服务验证
                             log.warn("Public key not loaded, entering pass-through mode");
-                            // 用默认 admin 用户信息（降级）
+                            // 保留原始请求头，添加默认用户信息
                             ServerWebExchange passThroughExchange = exchange.mutate()
-                                .request(r -> r.header("X-User-Id", "1")
-                                    .header("X-User-Role", "admin")
-                                    .header("X-Username", "admin")
-                                    .header("X-Real-IP", extractClientIp(exchange))
-                                    .header(cfHeaderName, 
-                                        exchange.getRequest().getHeaders().getFirst(cfHeaderName) != null 
-                                        ? exchange.getRequest().getHeaders().getFirst(cfHeaderName) : "192.168.86.0"))
+                                .request(r -> {
+                                    var headers = new java.util.ArrayList<>(exchange.getRequest().getHeaders().get(org.springframework.http.HttpHeaders.AUTHORIZATION));
+                                    if (headers.isEmpty()) headers.add("Bearer unknown");
+                                    r.header("X-User-Id", "1")
+                                     .header("X-User-Role", "admin")
+                                     .header("X-Username", "admin")
+                                     .header("X-Real-IP", extractClientIp(exchange))
+                                     .header(cfHeaderName, 
+                                         exchange.getRequest().getHeaders().getFirst(cfHeaderName) != null 
+                                         ? exchange.getRequest().getHeaders().getFirst(cfHeaderName) : "192.168.86.0");
+                                    // 保留原始 Authorization
+                                    r.header(org.springframework.http.HttpHeaders.AUTHORIZATION, headers.get(0));
+                                })
                                 .build();
                             return chain.filter(passThroughExchange);
                         }
