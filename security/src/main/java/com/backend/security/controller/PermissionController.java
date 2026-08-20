@@ -28,7 +28,7 @@ public class PermissionController {
     /**
      * 获取当前用户的权限列表（前端用来控制菜单和按钮显隐）
      */
-    @GetMapping("/mine")
+    @GetMapping("/admin/permission/mine")
     public ApiResponseDto<Map<String, Object>> getMyPermissions(HttpServletRequest request) {
         Long userId = getUserId(request);
         if (userId == null) {
