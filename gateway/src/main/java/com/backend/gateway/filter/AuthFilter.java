@@ -38,7 +38,7 @@ public class AuthFilter {
     @Value("${auth.public-key.url:http://security:8080/security/public-key}")
     private String publicKeyUrl;
 
-    @Value("${auth.public-key.fallback:http://192.168.86.14:32102/security/public-key}")
+    @Value("${auth.public-key.fallback:http://127.0.0.1:32102/security/public-key}")
     private String publicKeyFallbackUrl;
 
     @Value("${auth.whitelist.paths:/security/public-key,/security/generate,/security/verificationCode,/login/authLogIn,/login/authLogOut,/auth/verificationCode,/actuator/health}")
