@@ -162,7 +162,14 @@ public class AuthFilter {
                         if (publicKey == null) {
                             // 放行（降级模式），由下游服务验证
                             log.warn("Public key not loaded, entering pass-through mode");
-                            return chain.filter(exchange);
+                            // 设置基本请求头（放行但不提供用户信息）
+                            ServerWebExchange passThroughExchange = exchange.mutate()
+                                .request(r -> r.header("X-Real-IP", extractClientIp(exchange))
+                                    .header(cfHeaderName, 
+                                        exchange.getRequest().getHeaders().getFirst(cfHeaderName) != null 
+                                        ? exchange.getRequest().getHeaders().getFirst(cfHeaderName) : "10.42.0.0"))
+                                .build();
+                            return chain.filter(passThroughExchange);
                         }
                     } catch (Exception e) {
                         log.error("Failed to refresh public key", e);
