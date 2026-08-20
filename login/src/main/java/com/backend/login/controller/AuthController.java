@@ -75,7 +75,7 @@ public class AuthController {
             java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
             String body = "{\"userId\":1,\"username\":\"" + username + "\"}";
             var request = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(securityServiceUrl + "/generate"))
+                .uri(java.net.URI.create(securityServiceUrl + "/security/generate"))
                 .header("Content-Type", "application/json")
                 .header("X-Real-IP", ip)
                 .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))

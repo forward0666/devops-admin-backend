@@ -31,7 +31,7 @@ public class JwtController {
     /**
      * 生成JWT token
      */
-    @PostMapping("/generate")
+    @PostMapping("/security/generate")
     public ResponseEntity<JwtResponseDto> generateToken(@Valid @RequestBody JwtGenerateRequestDto request) {
         // 使用try-catch块捕获异常，并使用Java 21的switch表达式
         return tryGenerateToken(request);
@@ -51,7 +51,7 @@ public class JwtController {
     /**
      * 验证JWT token并返回所有信息
      */
-    @PostMapping("/validate")
+    @PostMapping("/security/validate")
     public ResponseEntity<JwtResponseDto> validateToken(@Valid @RequestBody JwtValidateRequestDto request) {
         // 使用try-catch块捕获异常，并使用Java 21的switch表达式
         return tryValidateToken(request.token());
