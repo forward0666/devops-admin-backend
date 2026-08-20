@@ -1,6 +1,5 @@
-package com.backend.security.controller;
+package com.backend.manage.controller;
 
-import com.backend.security.authorization.PermissionEvaluator;
 import com.backend.utils.dto.ApiResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,21 +8,12 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
 
-/**
- * 权限查询接口
- * 注意：Gateway 路由 admin/** → security 时 stripPrefix(1)
- * 所以实际 endpoint 是 /admin/permission/mine → /permission/mine
- * 但又不能直接用 /permission 因为跟其他 controller 冲突
- * 
- * 快捷方式：Gateway 不 stripPrefix，直接用 /admin 路由到 security
- */
 @RestController
-@RequestMapping
+@RequestMapping("/admin")
 @RequiredArgsConstructor
 public class PermissionController {
 
     private final JdbcTemplate jdbc;
-    private final PermissionEvaluator permissionEvaluator;
 
     /**
      * 获取当前用户的权限列表（前端用来控制菜单和按钮显隐）

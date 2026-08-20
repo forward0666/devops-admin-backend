@@ -5,12 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -18,7 +16,6 @@ import java.util.stream.Collectors;
 public class PermissionEvaluator {
 
     private final StringRedisTemplate redis;
-    private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String KEY_PREFIX = "auth:policy:";
@@ -88,54 +85,7 @@ public class PermissionEvaluator {
             try { return objectMapper.readValue(cached, new TypeReference<List<PolicyStatement>>() {}); }
             catch (Exception e) { log.warn("Failed to parse cached policies", e); }
         }
-        List<PolicyStatement> policies = loadPoliciesFromDb(userId);
-        try {
-            redis.opsForHash().put(key, "policies", objectMapper.writeValueAsString(policies));
-            redis.expire(key, CACHE_TTL, TimeUnit.SECONDS);
-        } catch (Exception e) { log.warn("Failed to cache policies", e); }
-        return policies;
-    }
-
-    private List<PolicyStatement> loadPoliciesFromDb(Long userId) {
-        // 查询用户的所有角色 → 角色的所有权限策略
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT rp.permission_code, rp.resource_scope, rp.effect " +
-            "FROM sys_user_role ur " +
-            "JOIN sys_role_permission rp ON ur.role_id = rp.role_id " +
-            "WHERE ur.user_id = ?", userId);
-
-        Map<String, PolicyStatement> merged = new HashMap<>();
-        for (Map<String, Object> row : rows) {
-            String code = (String) row.get("permission_code");
-            String scope = (String) row.get("resource_scope");
-            if (scope == null || scope.isBlank()) scope = "*";
-            String effect = (String) row.get("effect");
-            if (effect == null) effect = "Allow";
-
-            PolicyStatement.Effect eff = "Deny".equals(effect) 
-                ? PolicyStatement.Effect.Deny 
-                : PolicyStatement.Effect.Allow;
-
-            // 通配符 code="*" 表示所有权限
-            if ("*".equals(code)) {
-                return List.of(PolicyStatement.builder()
-                    .effect(eff)
-                    .actions(List.of("*"))
-                    .resources(List.of(scope))
-                    .build());
-            }
-
-            merged.merge(code, PolicyStatement.builder()
-                .effect(eff)
-                .actions(List.of(code))
-                .resources(List.of(scope))
-                .build(), (a, b) -> {
-                    // Deny 优先
-                    if (b.getEffect() == PolicyStatement.Effect.Deny) return b;
-                    return a;
-                });
-        }
-
-        return new ArrayList<>(merged.values());
+        log.debug("No cached policies for user {}", userId);
+        return Collections.emptyList();
     }
 }
