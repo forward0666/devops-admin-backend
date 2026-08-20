@@ -65,7 +65,7 @@ public class PermissionController {
         result.put("permissions", permissions.stream().distinct().toList());
         result.put("menus", menuPermissions);
 
-        return ApiResponseDto.success(result);
+        return ApiResponseDto.success("获取成功", result);
     }
 
     private Long getUserId(HttpServletRequest request) {
