@@ -41,7 +41,7 @@ public class GatewayRouteConfig {
                 .uri("http://user:" + PORT))
             .route("admin", r -> r.path("/admin/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()))
-                .uri("http://security:8080"))
+                .uri("http://manage:8080"))
             .route("manage", r -> r.path("/manage/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
                 .uri("http://manage:" + PORT))
