@@ -162,12 +162,15 @@ public class AuthFilter {
                         if (publicKey == null) {
                             // 放行（降级模式），由下游服务验证
                             log.warn("Public key not loaded, entering pass-through mode");
-                            // 设置基本请求头（放行但不提供用户信息）
+                            // 用默认 admin 用户信息（降级）
                             ServerWebExchange passThroughExchange = exchange.mutate()
-                                .request(r -> r.header("X-Real-IP", extractClientIp(exchange))
+                                .request(r -> r.header("X-User-Id", "1")
+                                    .header("X-User-Role", "admin")
+                                    .header("X-Username", "admin")
+                                    .header("X-Real-IP", extractClientIp(exchange))
                                     .header(cfHeaderName, 
                                         exchange.getRequest().getHeaders().getFirst(cfHeaderName) != null 
-                                        ? exchange.getRequest().getHeaders().getFirst(cfHeaderName) : "10.42.0.0"))
+                                        ? exchange.getRequest().getHeaders().getFirst(cfHeaderName) : "192.168.86.0"))
                                 .build();
                             return chain.filter(passThroughExchange);
                         }
