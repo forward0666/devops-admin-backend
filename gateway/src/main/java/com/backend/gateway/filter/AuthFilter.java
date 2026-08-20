@@ -157,9 +157,16 @@ public class AuthFilter {
             String token = authHeader.substring(7);
             try {
                 if (publicKey == null) {
-                    refreshPublicKey();
-                    if (publicKey == null) {
-                        return unauthorized(exchange, "Public key not loaded");
+                    try {
+                        refreshPublicKey();
+                        if (publicKey == null) {
+                            // 放行（降级模式），由下游服务验证
+                            log.warn("Public key not loaded, entering pass-through mode");
+                            return chain.filter(exchange);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to refresh public key", e);
+                        return chain.filter(exchange);
                     }
                 }
 
