@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import com.backend.utils.dto.ApiResponseDto;
 import com.backend.login.dto.LoginRequestDto;
 import com.backend.login.vo.LoginVo;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,6 +18,9 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 public class AuthController {
+
+    @Value("${security.service.url:http://security:8080}")
+    private String securityServiceUrl;
 
     @PostMapping("/authLogIn")
     public ResponseEntity<ApiResponseDto<LoginVo>> login(@RequestBody LoginRequestDto loginRequest, HttpServletRequest request) {
@@ -70,7 +75,7 @@ public class AuthController {
             java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
             String body = "{\"userId\":1,\"username\":\"" + username + "\"}";
             var request = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create("http://security:8080/security/generate"))
+                .uri(java.net.URI.create(securityServiceUrl + "/security/generate"))
                 .header("Content-Type", "application/json")
                 .header("X-Real-IP", ip)
                 .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
