@@ -30,9 +30,10 @@ public class AuthController {
             var clientIP = getClientIP(request);
             log.info("Login attempt: username={}, ip={}", loginRequest.username(), clientIP);
 
-            // Dev mode: skip security service, return mock token
+            // Dev mode: call security service to generate real JWT
+            String token = callSecurityService(loginRequest.username(), clientIP);
             LoginVo mockVo = new LoginVo(
-                "mock-token-" + System.currentTimeMillis(),
+                token,
                 1L,
                 loginRequest.username(),
                 "Administrator",
@@ -58,5 +59,37 @@ public class AuthController {
         ip = request.getHeader("X-Real-IP");
         if (ip != null && !ip.isBlank()) return ip;
         return request.getRemoteAddr();
+    }
+
+    /**
+     * 调用 Security 服务生成 JWT token
+     * 用 K8s service DNS 直连
+     */
+    private String callSecurityService(String username, String ip) {
+        try {
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            String body = "{\"userId\":1,\"username\":\"" + username + "\"}";
+            var request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create("http://security:8080/security/generate"))
+                .header("Content-Type", "application/json")
+                .header("X-Real-IP", ip)
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+                .timeout(java.time.Duration.ofSeconds(10))
+                .build();
+            var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                var root = mapper.readTree(response.body());
+                var data = root.get("data");
+                if (data != null && data.get("token") != null) {
+                    return data.get("token").asText();
+                }
+            }
+            log.warn("Security service returned {}: {}", response.statusCode(), response.body());
+        } catch (Exception e) {
+            log.error("Failed to call security service", e);
+        }
+        // fallback
+        return "mock-token-" + System.currentTimeMillis();
     }
 }
