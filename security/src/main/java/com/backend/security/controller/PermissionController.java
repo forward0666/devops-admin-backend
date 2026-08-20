@@ -9,8 +9,16 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
 
+/**
+ * 权限查询接口
+ * 注意：Gateway 路由 admin/** → security 时 stripPrefix(1)
+ * 所以实际 endpoint 是 /admin/permission/mine → /permission/mine
+ * 但又不能直接用 /permission 因为跟其他 controller 冲突
+ * 
+ * 快捷方式：Gateway 不 stripPrefix，直接用 /admin 路由到 security
+ */
 @RestController
-@RequestMapping("/admin/permission")
+@RequestMapping
 @RequiredArgsConstructor
 public class PermissionController {
 
