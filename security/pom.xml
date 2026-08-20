@@ -69,6 +69,18 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- AOP (for @CheckPermission aspect) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- JDBC (for PermissionEvaluator JdbcTemplate) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
