@@ -64,7 +64,7 @@ public class JwtController {
     private ResponseEntity<JwtResponseDto> tryValidateToken(String token) {
         try {
             if (jwtService.validateToken(token)) {
-                Claims claims = jwtService.getClaimsFromToken(token);
+                Claims claims = jwtService.getClaims(token);
                 // 使用Map.of创建不可变映射，这是Java 9+的特性
                 Map<String, Object> data = new HashMap<>();
                 data.put("subject", claims.getSubject());
