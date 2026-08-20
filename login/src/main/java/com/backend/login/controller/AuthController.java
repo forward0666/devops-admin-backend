@@ -85,6 +85,12 @@ public class AuthController {
             if (response.statusCode() == 200) {
                 var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 var root = mapper.readTree(response.body());
+                // /generate 返回格式: {"success":true,"token":"***"}
+                var tokenNode = root.get("token");
+                if (tokenNode != null && !tokenNode.asText().isBlank()) {
+                    return tokenNode.asText();
+                }
+                // 备用格式: {"data":{"token":"***"}}
                 var data = root.get("data");
                 if (data != null && data.get("token") != null) {
                     return data.get("token").asText();
