@@ -35,14 +35,11 @@ public class AuthFilter {
     @Value("${gateway.type:client}")
     private String gatewayType; // client | admin
 
-    @Value("${auth.public-key.url:http://security:8082/security/public-key}")
+    @Value("${auth.public-key.url:http://security:8080/security/public-key}")
     private String publicKeyUrl;
 
     @Value("${auth.public-key.fallback:http://127.0.0.1:32102/security/public-key}")
     private String publicKeyFallbackUrl;
-
-    // 硬编码备选公钥（当所有远程加载都失败时使用）
-    private static final String FALLBACK_PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyDM46DY9d9Tzsx4sSR5b2ajEmsK7pT1OvQs7ddX98ZESKLLPDhkXveAiQ9ZsqShABt87lhVvewOrDarXi8CXjBiSNO8LEDuqkF7uSQ8jhClpkW8yCKmt2tEk7s19QX4FgFFQJrwvjXQYHzXBPr1/w6TCgwe4/YDJ1TVhJZTJgPOjeH3Vvv6bb4rcQRjjZj8jcKWDuKeZARADdmpRhyjrCn69Fv0D8sgdUO4WaK8O/EdCgFoKokhG7gOcCkJX8C7cA2NQnYBb/hdhzvAYXL809f05ffQPy98brGjRIZkkEI/GOCHQXEUn4cgRaSgFdclNFsRh4YpZ7y4qPDz1pI58RQIDAQAB";
 
     @Value("${auth.whitelist.paths:/security/public-key,/security/generate,/security/verificationCode,/login/authLogIn,/login/authLogOut,/auth/verificationCode,/actuator/health}")
     private String whitelistPaths;
@@ -91,25 +88,6 @@ public class AuthFilter {
         } catch (Exception e) {
             log.warn("Failed to load public key from fallback URL: {}", e.getMessage());
         }
-        // final fallback: 使用硬编码公钥
-        try {
-            loadPublicKeyFromPem(FALLBACK_PUBLIC_KEY);
-            log.info("✅ JWT public key loaded from hardcoded fallback");
-        } catch (Exception e) {
-            log.error("Failed to load public key from all sources", e);
-        }
-    }
-
-    private void loadPublicKeyFromPem(String pem) throws Exception {
-        String cleaned = pem
-            .replace("-----BEGIN PUBLIC KEY-----", "")
-            .replace("-----END PUBLIC KEY-----", "")
-            .replaceAll("\\s", "");
-        byte[] keyBytes = Base64.getDecoder().decode(cleaned);
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        this.publicKey = kf.generatePublic(spec);
-        this.lastKeyRefresh = System.currentTimeMillis();
     }
 
     private void loadPublicKeyFromUrl(String urlStr) throws Exception {
