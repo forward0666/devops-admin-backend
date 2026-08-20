@@ -7,16 +7,13 @@ import com.backend.security.dto.VerificationCodeRequestDto;
 import com.backend.security.dto.VerificationCodeResponseDto;
 import com.backend.security.service.JwtService;
 import com.backend.security.service.VerificationCodeService;
-import io.jsonwebtoken.Claims;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
 import java.time.Instant;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/")
@@ -64,13 +61,14 @@ public class JwtController {
     private ResponseEntity<JwtResponseDto> tryValidateToken(String token) {
         try {
             if (jwtService.validateToken(token)) {
-                Claims claims = jwtService.getClaims(token);
-                // 使用Map.of创建不可变映射，这是Java 9+的特性
+                Map<String, Object> claims = jwtService.getClaims(token);
+                String subject = (String) claims.get("sub");
                 Map<String, Object> data = new HashMap<>();
-                data.put("subject", claims.getSubject());
-                data.put("issuedAt", claims.getIssuedAt());
-                data.put("expiration", claims.getExpiration());
-                data.put("expired", claims.getExpiration().before(Date.from(Instant.now())));
+                data.put("subject", subject != null ? subject : "");
+                data.put("issuedAt", claims.get("iat"));
+                data.put("expiration", claims.get("exp"));
+                Object exp = claims.get("exp");
+                data.put("expired", exp != null && ((Number) exp).longValue() * 1000 < System.currentTimeMillis());
                 data.put("claims", claims);
                 
                 return ResponseEntity.ok(JwtResponseDto.success("Token is valid", token, data));
