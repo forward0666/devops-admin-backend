@@ -25,9 +25,11 @@ public class PermissionController {
             return ApiResponseDto.error(401, "Unauthorized");
         }
 
-        // 用户信息
-        Map<String, Object> userInfo = jdbc.queryForMap(
-            "SELECT id, username, role FROM login.user WHERE id = ?", userId);
+        // 用户信息（从 login 模块的 API 获取，但这里先用静态信息）
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("id", userId);
+        userInfo.put("username", "admin");
+        userInfo.put("role", "admin");
 
         // 角色列表
         List<Map<String, Object>> roles = jdbc.queryForList(
