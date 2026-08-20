@@ -35,7 +35,7 @@ public class AuthFilter {
     @Value("${gateway.type:client}")
     private String gatewayType; // client | admin
 
-    @Value("${auth.public-key.url:http://security:8080/security/public-key}")
+    @Value("${auth.public-key.url:http://security:8082/security/public-key}")
     private String publicKeyUrl;
 
     @Value("${auth.public-key.fallback:http://127.0.0.1:32102/security/public-key}")
