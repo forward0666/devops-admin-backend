@@ -88,12 +88,6 @@
             </exclusions>
         </dependency>
 
-        <!-- Nacos Discovery (lb:// 路由用) -->
-        <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-        </dependency>
-
         <!-- Spring Cloud LoadBalancer -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
