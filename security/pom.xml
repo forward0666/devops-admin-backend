@@ -70,6 +70,12 @@
             </exclusions>
         </dependency>
 
+        <!-- Nacos Discovery -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
         <!-- AOP (for @CheckPermission aspect) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

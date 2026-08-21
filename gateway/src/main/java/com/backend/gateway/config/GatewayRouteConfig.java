@@ -8,14 +8,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Gateway 路由配置 — 通过 service DNS (K8s ClusterIP) 实现服务发现
- * 不再使用 Pod IP 或 NodePort
+ * Gateway 路由配置 — 通过 Nacos 服务发现
+ * lb://service-name 表示从 Nacos 负载均衡发现
  */
 @Slf4j
 @Configuration
 public class GatewayRouteConfig {
 
-    private static final int PORT = 8080;
     private final AuthFilter authFilter;
 
     public GatewayRouteConfig(AuthFilter authFilter) {
@@ -24,39 +23,39 @@ public class GatewayRouteConfig {
 
     @Bean
     public RouteLocator customRoutes(RouteLocatorBuilder builder) {
-        log.info("🔄 Gateway routes via service DNS (ClusterIP)");
+        log.info("🔄 Gateway routes via Nacos service discovery (lb://)");
 
         return builder.routes()
             .route("security", r -> r.path("/security/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://security:" + PORT))
+                .uri("lb://security"))
             .route("login", r -> r.path("/login/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://login:" + PORT))
+                .uri("lb://login"))
             .route("auth", r -> r.path("/auth/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://security:" + PORT))
-            .route("user", r -> r.path("/user/**")
-                .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://user:" + PORT))
+                .uri("lb://security"))
             .route("admin", r -> r.path("/admin/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()))
-                .uri("http://manage:8080"))
+                .uri("lb://manage"))
+            .route("user", r -> r.path("/user/**")
+                .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
+                .uri("lb://user"))
             .route("manage", r -> r.path("/manage/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://manage:" + PORT))
+                .uri("lb://manage"))
             .route("monitor", r -> r.path("/monitor/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://monitor:" + PORT))
+                .uri("lb://monitor"))
             .route("bot", r -> r.path("/bot/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://bot:" + PORT))
+                .uri("lb://bot"))
             .route("agent", r -> r.path("/agent/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://agent:" + PORT))
+                .uri("lb://agent"))
             .route("domain", r -> r.path("/domain/**")
                 .filters(f -> f.filter(authFilter.createAuthFilter()).stripPrefix(1))
-                .uri("http://domain:" + PORT))
+                .uri("lb://domain"))
             .build();
     }
 }
